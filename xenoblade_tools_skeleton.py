@@ -21,8 +21,8 @@ from bpy.types import (
 bl_info = {
 	"name": "Xenoblade Skeleton Tools",
 	"description": "Manipulate skeletons from Xenoblade games",
-	"author": "Sir Teatei Moonlight (xenoserieswiki.org/tools)",
-	"version": (0, 7, 1),
+	"author": "Sir Teatei Moonlight (xenoserieswiki.org/tools) (https://github.com/Sir-Teatei-Moonlight)",
+	"version": (0, 8, 0),
 	"blender": (3, 3, 1),
 	"category": "Armature",
 }
@@ -92,6 +92,60 @@ rad180 = math.radians(180)
 rad360 = math.radians(360)
 rad720 = math.radians(720)
 
+class MonadoForgeBone:
+	def __init__(self):
+		self._name = "Bone"
+		self._parent = -1
+		self._position = [0,0,0,1] # x, y, z, w
+		self._rotation = [0,0,0,1] # w, x, y, z
+		self._scale = [1,1,1,1] # x, y, z, w
+		self._endpoint = False
+	
+	def setName(self,x):
+		if not isinstance(x,str):
+			raise TypeError("expected a string, not a(n) "+str(type(x)))
+		self._name = x
+	def getName(self):
+		return self._name
+	
+	def setParent(self,x):
+		if not isinstance(x,int):
+			raise TypeError("expected an int, not a(n) "+str(type(x)))
+		self._parent = x
+	def getParent(self):
+		return self._parent
+	
+	def setPos(self,a):
+		if len(a) == 4:
+			self._position = a[:]
+		else:
+			raise ValueError("sequence must be length 4, not "+str(len(a)))
+	def getPos(self):
+		return self._position
+	
+	def setRot(self,a):
+		if len(a) == 4:
+			self._rotation = a[:]
+		else:
+			raise ValueError("sequence must be length 4, not "+str(len(a)))
+	def getRot(self):
+		return self._rotation
+	
+	def setScl(self,a):
+		if len(a) == 4:
+			self._scale = a[:]
+		else:
+			raise ValueError("sequence must be length 4, not "+str(len(a)))
+	def getScl(self):
+		return self._scale
+	
+	def setEndpoint(self,x):
+		if not isinstance(x,bool):
+			raise TypeError("expected a bool, not a(n) "+str(type(x)))
+		self._endpoint = x
+	def isEndpoint(self):
+		return self._endpoint
+
 def flipRoll(roll):
 	return roll % rad360 - rad180
 
@@ -139,19 +193,19 @@ def isBonePairAutoMirrorable(thisBone,otherBone,positionEpsilon,angleEpsilon):
 	return True,""
 
 class XBSkeletonImportOperator(Operator):
-	bl_idname = "object.xb_skeleton_import_operator"
+	bl_idname = "object.xb_tools_skeleton_operator"
 	bl_label = "Xenoblade Skeleton Import Operator"
 	bl_description = "Imports a skeleton from a Xenoblade file"
 	bl_options = {"REGISTER","UNDO"}
 	
 	def execute(self, context):
 		try:
-			game = context.scene.xb_skeleton_import.game
-			absolutePath = bpy.path.abspath(context.scene.xb_skeleton_import.path)
-			boneSize = context.scene.xb_skeleton_import.boneSize
-			positionEpsilon = context.scene.xb_skeleton_import.positionEpsilon
-			angleEpsilon = context.scene.xb_skeleton_import.angleEpsilon
-			importEndpoints = context.scene.xb_skeleton_import.importEndpoints
+			game = context.scene.xb_tools_skeleton.game
+			absolutePath = bpy.path.abspath(context.scene.xb_tools_skeleton.path)
+			boneSize = context.scene.xb_tools_skeleton.boneSize
+			positionEpsilon = context.scene.xb_tools_skeleton.positionEpsilon
+			angleEpsilon = context.scene.xb_tools_skeleton.angleEpsilon
+			importEndpoints = context.scene.xb_tools_skeleton.importEndpoints
 			print("Importing skeleton from: "+absolutePath)
 			
 			filename, fileExtension = os.path.splitext(absolutePath)
@@ -161,9 +215,6 @@ class XBSkeletonImportOperator(Operator):
 				return {"CANCELLED"}
 			
 			# first, read in the data and store it in a game-agnostic way
-			# [name, parent, [px,py,pz,pw], [rw,rx,ry,rz], [sx,sy,sz,sw], isEndpoint]
-			# note how the rotation's w comes first, that's how Blender needs it
-			
 			if game == "XC1":
 				modelFormat = "BRES"
 				endian = "big"
@@ -191,7 +242,7 @@ class XBSkeletonImportOperator(Operator):
 				elif modelFormat == "SAR1":
 					magic = f.read(4)
 					if magic != b"1RAS":
-						self.report({"ERROR"}, "Not a valid .chr file (unexpected header)")
+						self.report({"ERROR"}, "Not a valid "+expectedExtension+" file (unexpected header)")
 						return {"CANCELLED"}
 					fileSize = readAndParseInt(f,4,endian)
 					version = readAndParseInt(f,4,endian)
@@ -232,7 +283,7 @@ class XBSkeletonImportOperator(Operator):
 						skelHeaderUnknown1 = readAndParseInt(f,4,endian)
 						skelHeaderUnknown2 = readAndParseInt(f,4,endian)
 						skelTocItems = []
-						for j in range(9): # a magic number from XBC2ModelDecomp
+						for j in range(10): # yeah it's a magic number, deal with it
 							itemOffset = readAndParseInt(f,4,endian)
 							itemUnknown1 = readAndParseInt(f,4,endian)
 							itemCount = readAndParseInt(f,4,endian)
@@ -250,6 +301,7 @@ class XBSkeletonImportOperator(Operator):
 						# [6]: endpoint parent IDs
 						# [7]: endpoint names
 						# [8]: endpoint data (position, rotation, scale)
+						# [9]: ???
 						if (skelTocItems[2][2] != skelTocItems[3][2]) or (skelTocItems[3][2] != skelTocItems[4][2]):
 							print("bone parent entries: "+str(skelTocItems[2][2]))
 							print("bone name entries: "+str(skelTocItems[3][2]))
@@ -262,21 +314,16 @@ class XBSkeletonImportOperator(Operator):
 								print("endpoint name entries: "+str(skelTocItems[7][2]))
 								print("endpoint data entries: "+str(skelTocItems[8][2]))
 								self.report({"WARNING"}, ".skl file "+filename+" has inconsistent endpoint counts (see console); endpoint import skipped")
-						boneParentIDs = []
-						boneNames = []
-						boneData = []
-						boneIsEndpoint = []
+						forgeBones = []
 						for b in range(skelTocItems[2][2]):
 							# parent
 							f.seek(offset+skelTocItems[2][0]+b*2)
 							parent = readAndParseInt(f,2,endian)
-							boneParentIDs.append(parent)
 							# name
 							f.seek(offset+skelTocItems[3][0]+b*16)
 							nameOffset = readAndParseInt(f,4,endian)
 							f.seek(offset+nameOffset)
 							name = readStr(f)
-							boneNames.append(name)
 							# data
 							f.seek(offset+skelTocItems[4][0]+b*(4*12))
 							px = readAndParseFloat(f,endian)
@@ -292,20 +339,24 @@ class XBSkeletonImportOperator(Operator):
 							sz = readAndParseFloat(f,endian)
 							sw = readAndParseFloat(f,endian)
 							# reminder that the pos and scale are x,y,z,w but the rotation is w,x,y,z
-							boneData.append([[px,py,pz,pw],[rw,rx,ry,rz],[sx,sy,sz,sw]])
-							boneIsEndpoint.append(False)
+							fb = MonadoForgeBone()
+							fb.setParent(parent)
+							fb.setName(name)
+							fb.setPos([px,py,pz,pw])
+							fb.setRot([rw,rx,ry,rz])
+							fb.setScl([sx,sy,sz,sw])
+							fb.setEndpoint(False)
+							forgeBones.append(fb)
 						if importEndpoints:
 							for ep in range(skelTocItems[6][2]):
 								# parent
 								f.seek(offset+skelTocItems[6][0]+ep*2)
 								parent = readAndParseInt(f,2,endian)
-								boneParentIDs.append(parent)
 								# name
-								f.seek(offset+skelTocItems[7][0]+ep*8) # yeah they're packed tighter than the bone names
+								f.seek(offset+skelTocItems[7][0]+ep*8) # yeah endpoint names are packed tighter than "normal" bone names
 								nameOffset = readAndParseInt(f,4,endian)
 								f.seek(offset+nameOffset)
 								name = readStr(f)
-								boneNames.append(name)
 								# data
 								f.seek(offset+skelTocItems[8][0]+ep*(4*12))
 								px = readAndParseFloat(f,endian)
@@ -320,16 +371,18 @@ class XBSkeletonImportOperator(Operator):
 								sy = readAndParseFloat(f,endian)
 								sz = readAndParseFloat(f,endian)
 								sw = readAndParseFloat(f,endian)
-								# for some reason, endpoints tend to have pw = 0, which positions it based on root (and we don't want that)
+								# for some reason, endpoints tend to have pw = 0, which positions it relative to root instead of parent (and we don't want that)
 								if pw == 0.0: pw = 1.0
 								# reminder that the pos and scale are x,y,z,w but the rotation is w,x,y,z
-								boneData.append([[px,py,pz,pw],[rw,rx,ry,rz],[sx,sy,sz,sw]])
-								boneIsEndpoint.append(True)
-						# transform the split lists into a single one
-						boneList = []
-						for b in range(len(boneParentIDs)):
-							boneList.append([boneParentIDs[b],boneNames[b],boneData[b][0],boneData[b][1],boneData[b][2],boneIsEndpoint[b]])
-						importedSkeletons.append(boneList)
+								fb = MonadoForgeBone()
+								fb.setParent(parent)
+								fb.setName(name)
+								fb.setPos([px,py,pz,pw])
+								fb.setRot([rw,rx,ry,rz])
+								fb.setScl([sx,sy,sz,sw])
+								fb.setEndpoint(True)
+								forgeBones.append(fb)
+						importedSkeletons.append(forgeBones)
 					if not importedSkeletons:
 						self.report({"ERROR"}, "No valid .skl items found in file")
 						return {"CANCELLED"}
@@ -350,20 +403,20 @@ class XBSkeletonImportOperator(Operator):
 				editBones = skeleton.edit_bones
 				for b in s:
 					# assumption: no bone will ever precede its parent (i.e. the parent will always be there already to attach to, no second pass needed)
-					boneParent,boneName,bonePos,boneRot,boneScl,boneIsEndpoint = b[0],b[1],b[2],b[3],b[4],b[5]
-					newBone = editBones.new(boneName)
+					#boneParent,boneName,bonePos,boneRot,boneScl,boneIsEndpoint = b[0],b[1],b[2],b[3],b[4],b[5]
+					newBone = editBones.new(b.getName())
 					newBone.length = boneSize
-					newBone.parent = editBones[boneParent] if boneParent != 0xffff else None
+					newBone.parent = editBones[b.getParent()] if b.getParent() != 0xffff else None
 					parentMatrix = newBone.parent.matrix if newBone.parent else mathutils.Matrix.Identity(4)
-					posMatrix = mathutils.Matrix.Translation(bonePos)
-					rotMatrix = mathutils.Quaternion(boneRot).to_matrix()
+					posMatrix = mathutils.Matrix.Translation(b.getPos())
+					rotMatrix = mathutils.Quaternion(b.getRot()).to_matrix()
 					rotMatrix.resize_4x4()
 					newBone.matrix = parentMatrix @ (posMatrix @ rotMatrix)
 					newBone.length = boneSize # have seen odd non-rounding when not doing this
 					# put "normal" bones in layer 1 and endpoints in layer 2
 					# must be done in this order or the [0] set will be dropped because bones must be in at least one layer
-					newBone.layers[1] = boneIsEndpoint
-					newBone.layers[0] = not boneIsEndpoint
+					newBone.layers[1] = b.isEndpoint()
+					newBone.layers[0] = not b.isEndpoint()
 				# now that the bones are in, spin them around so they point in a more logical-for-Blender direction
 				for b in editBones:
 					b.transform(mathutils.Euler((math.radians(90),0,0)).to_matrix()) # transform from lying down (+Y up +Z forward) to standing up (+Z up -Y forward)
@@ -375,7 +428,11 @@ class XBSkeletonImportOperator(Operator):
 					b.tail = [(0 if abs(p) < positionEpsilon else p) for p in b.tail]
 					clampBoneRoll(b,angleEpsilon)
 				# cleanup
-				bpy.context.view_layer.objects.active.name = editBones[0].name
+				armatureName = editBones[0].name
+				if armatureName.endswith("_top"):
+					armatureName = armatureName[:-4]
+				bpy.context.view_layer.objects.active.name = armatureName
+				bpy.context.view_layer.objects.active.data.name = armatureName
 				bpy.ops.armature.select_all(action="DESELECT")
 				bpy.ops.object.mode_set(mode="OBJECT")
 		except Exception:
@@ -392,8 +449,8 @@ class XBSkeletonBoneFlipAllOperator(Operator):
 	
 	def execute(self, context):
 		try:
-			nonFinalMirror = context.scene.xb_skeleton_import.nonFinalMirror
-			angleEpsilon = context.scene.xb_skeleton_import.angleEpsilon
+			nonFinalMirror = context.scene.xb_tools_skeleton.nonFinalMirror
+			angleEpsilon = context.scene.xb_tools_skeleton.angleEpsilon
 			skeleton = bpy.context.view_layer.objects.active.data
 			bpy.ops.object.mode_set(mode="EDIT")
 			editBones = skeleton.edit_bones
@@ -421,7 +478,7 @@ class XBSkeletonBoneFlipSelectedOperator(Operator):
 	
 	def execute(self, context):
 		try:
-			angleEpsilon = context.scene.xb_skeleton_import.angleEpsilon
+			angleEpsilon = context.scene.xb_tools_skeleton.angleEpsilon
 			# edit mode is assumed (panel is edit mode limited)
 			for bone in bpy.context.selected_bones:
 				roll = bone.roll
@@ -443,9 +500,9 @@ class XBSkeletonBoneMirrorAutoOperator(Operator):
 	
 	def execute(self, context):
 		try:
-			nonFinalMirror = context.scene.xb_skeleton_import.nonFinalMirror
-			positionEpsilon = context.scene.xb_skeleton_import.positionEpsilon
-			angleEpsilon = context.scene.xb_skeleton_import.angleEpsilon
+			nonFinalMirror = context.scene.xb_tools_skeleton.nonFinalMirror
+			positionEpsilon = context.scene.xb_tools_skeleton.positionEpsilon
+			angleEpsilon = context.scene.xb_tools_skeleton.angleEpsilon
 			skeleton = bpy.context.view_layer.objects.active.data
 			bpy.ops.object.mode_set(mode="EDIT")
 			editBones = skeleton.edit_bones
@@ -488,8 +545,8 @@ class XBSkeletonBoneMirrorSelectedOperator(Operator):
 	
 	def execute(self, context):
 		try:
-			positionEpsilon = context.scene.xb_skeleton_import.positionEpsilon
-			angleEpsilon = context.scene.xb_skeleton_import.angleEpsilon
+			positionEpsilon = context.scene.xb_tools_skeleton.positionEpsilon
+			angleEpsilon = context.scene.xb_tools_skeleton.angleEpsilon
 			# edit mode is assumed (panel is edit mode limited)
 			skeleton = bpy.context.view_layer.objects.active.data
 			editBones = skeleton.edit_bones
@@ -563,11 +620,16 @@ class XBSkeletonToolsProperties(PropertyGroup):
 			("XC3","XC3","Xenoblade 3 (untested)"),
 		)
 	
+	def gameListSelectionCallback(self, context):
+		if self.game == "XC1":
+			self.importEndpoints = True # not technically true (endpoints are not a separate bone type), but conceptually true
+	
 	game : EnumProperty(
 		name="Game",
 		items=gameListCallback,
 		description="Game to deal with",
 		default=1, #"XC1DE"
+		update=gameListSelectionCallback,
 	)
 	path : StringProperty(
 		name="Path",
@@ -630,15 +692,18 @@ class OBJECT_PT_XBSkeletonToolsPanel(Panel):
 		scn = context.scene
 		col = layout.column(align=True)
 		col.label(text="General")
-		col.prop(scn.xb_skeleton_import, "nonFinalMirror")
-		col.prop(scn.xb_skeleton_import, "positionEpsilon")
-		col.prop(scn.xb_skeleton_import, "angleEpsilon")
+		col.prop(scn.xb_tools_skeleton, "nonFinalMirror")
+		col.prop(scn.xb_tools_skeleton, "positionEpsilon")
+		col.prop(scn.xb_tools_skeleton, "angleEpsilon")
 		col.separator(factor=2)
 		col.label(text="Import")
-		col.prop(scn.xb_skeleton_import, "game")
-		col.prop(scn.xb_skeleton_import, "path", text="")
-		col.prop(scn.xb_skeleton_import, "boneSize")
-		col.prop(scn.xb_skeleton_import, "importEndpoints")
+		col.prop(scn.xb_tools_skeleton, "game")
+		col.prop(scn.xb_tools_skeleton, "path", text="")
+		col.prop(scn.xb_tools_skeleton, "boneSize")
+		epSubcol = col.column()
+		epSubcol.prop(scn.xb_tools_skeleton, "importEndpoints")
+		if (scn.xb_tools_skeleton.game == "XC1"):
+			epSubcol.enabled = False
 		col.separator()
 		col.operator(XBSkeletonImportOperator.bl_idname, text="Import Skeleton", icon="IMPORT")
 		col.separator(factor=2)
@@ -679,13 +744,13 @@ def register():
 	for cls in classes:
 		register_class(cls)
 
-	bpy.types.Scene.xb_skeleton_import = PointerProperty(type=XBSkeletonToolsProperties)
+	bpy.types.Scene.xb_tools_skeleton = PointerProperty(type=XBSkeletonToolsProperties)
 
 def unregister():
 	from bpy.utils import unregister_class
 	for cls in reversed(classes):
 		unregister_class(cls)
-	del bpy.types.Scene.xb_skeleton_import
+	del bpy.types.Scene.xb_tools_skeleton
 
 if __name__ == "__main__":
 	register()
