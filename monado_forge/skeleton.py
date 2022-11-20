@@ -85,7 +85,12 @@ class XBSkeletonImportOperator(Operator):
 						size = readAndParseInt(f,4,endian)
 						unknown = readAndParseInt(f,4,endian)
 						filename = readStr(f)
-						if ".skl" not in filename: # yes, we're just dropping everything that's not a skeleton, this ain't a general-purpose script
+						# todo: try to do this based on file type instead of name
+						if game == "XC3":
+							skelFilename = "skeleton"
+						else: # XC2, XC1DE
+							skelFilename = ".skl"
+						if skelFilename not in filename: # yes, we're just dropping everything that's not a skeleton, this ain't a general-purpose script
 							continue
 						
 						f.seek(offset)
@@ -443,12 +448,12 @@ class XBSkeletonToolsProperties(PropertyGroup):
 			#("XCX","XCX","Xenoblade X"),
 			("XC2","XC2","Xenoblade 2"),
 			("XC1DE","XC1DE","Xenoblade 1 DE"),
-			("XC3","XC3","Xenoblade 3 (untested)"),
+			("XC3","XC3","Xenoblade 3"),
 		)
 	
 	def gameListSelectionCallback(self, context):
 		if self.game == "XC1":
-			self.importEndpoints = True # not technically true (endpoints are not a separate bone type), but conceptually true
+			self.importEndpoints = True # not technically true, but conceptually true (endpoints are not a separate bone type, they're just in with the rest)
 	
 	game : EnumProperty(
 		name="Game",
