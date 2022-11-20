@@ -6,12 +6,13 @@ bl_info = {
 	"name": "Monado Forge",
 	"description": "Xenoblade tools",
 	"author": "Sir Teatei Moonlight (xenoserieswiki.org/tools) (https://github.com/Sir-Teatei-Moonlight)",
-	"version": (1, 0, 0),
+	"version": (1, 1, 0),
 	"blender": (3, 3, 1),
 	"category": "General",
 }
 
 packageList = (
+				"ui",
 				"skeleton",
 				)
 
