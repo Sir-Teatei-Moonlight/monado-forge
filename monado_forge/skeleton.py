@@ -24,6 +24,10 @@ class XBSkeletonImportOperator(Operator):
 	bl_description = "Imports a skeleton from a Xenoblade file"
 	bl_options = {"REGISTER","UNDO"}
 	
+	@classmethod
+	def poll(cls, context):
+		return context.scene.xb_tools_skeleton.path
+	
 	def execute(self, context):
 		try:
 			game = context.scene.xb_tools.game
@@ -280,6 +284,14 @@ class XBSkeletonBoneFlipAllOperator(Operator):
 	bl_description = "Flips all _R bones, pointing them the other way (reversible)"
 	bl_options = {"REGISTER","UNDO"}
 	
+	@classmethod
+	def poll(cls, context):
+		activeObject = context.view_layer.objects.active
+		if not activeObject: return False
+		if activeObject.type != "ARMATURE": return False
+		if activeObject.mode == "POSE": return False
+		return True
+	
 	def execute(self, context):
 		try:
 			nonFinalMirror = context.scene.xb_tools_skeleton.nonFinalMirror
@@ -309,10 +321,17 @@ class XBSkeletonBoneFlipSelectedOperator(Operator):
 	bl_description = "Flips all selected bones, pointing them the other way (reversible)"
 	bl_options = {"REGISTER","UNDO"}
 	
+	@classmethod
+	def poll(cls, context):
+		activeObject = context.view_layer.objects.active
+		if not activeObject: return False
+		if activeObject.type != "ARMATURE": return False
+		if activeObject.mode != "EDIT": return False
+		return True
+	
 	def execute(self, context):
 		try:
 			angleEpsilon = context.scene.xb_tools_skeleton.angleEpsilon
-			# edit mode is assumed (panel is edit mode limited)
 			for bone in bpy.context.selected_bones:
 				roll = bone.roll
 				bone.matrix = bone.matrix @ mathutils.Matrix([[-1,0,0,0],[0,-1,0,0],[0,0,-1,0],[0,0,0,1]])
@@ -330,6 +349,14 @@ class XBSkeletonBoneMirrorAutoOperator(Operator):
 	bl_label = "Xenoblade Skeleton Bone Mirror Auto Operator"
 	bl_description = "Edits all _R bones to mirror the _L bones of the same name (destructive)"
 	bl_options = {"REGISTER","UNDO"}
+	
+	@classmethod
+	def poll(cls, context):
+		activeObject = context.view_layer.objects.active
+		if not activeObject: return False
+		if activeObject.type != "ARMATURE": return False
+		if activeObject.mode == "POSE": return False
+		return True
 	
 	def execute(self, context):
 		try:
@@ -376,6 +403,14 @@ class XBSkeletonBoneMirrorSelectedOperator(Operator):
 	bl_description = "Edits all selected bones to mirror the bones of the same name with reverse L/R polarity (destructive)"
 	bl_options = {"REGISTER","UNDO"}
 	
+	@classmethod
+	def poll(cls, context):
+		activeObject = context.view_layer.objects.active
+		if not activeObject: return False
+		if activeObject.type != "ARMATURE": return False
+		if activeObject.mode != "EDIT": return False
+		return True
+	
 	def execute(self, context):
 		try:
 			positionEpsilon = context.scene.xb_tools_skeleton.positionEpsilon
@@ -420,6 +455,14 @@ class XBSkeletonNonFinalLRFixAllOperator(Operator):
 	bl_description = "Edits all bone names to put the _L/_R at the end"
 	bl_options = {"REGISTER","UNDO"}
 	
+	@classmethod
+	def poll(cls, context):
+		activeObject = context.view_layer.objects.active
+		if not activeObject: return False
+		if activeObject.type != "ARMATURE": return False
+		if activeObject.mode == "POSE": return False
+		return True
+	
 	def execute(self, context):
 		try:
 			skeleton = bpy.context.view_layer.objects.active.data
@@ -447,6 +490,14 @@ class XBSkeletonNonFinalLRFixSelectedOperator(Operator):
 	bl_label = "Xenoblade Skeleton Non Final LR Fix Selected Operator"
 	bl_description = "Edits selected bone names to put the _L/_R at the end"
 	bl_options = {"REGISTER","UNDO"}
+	
+	@classmethod
+	def poll(cls, context):
+		activeObject = context.view_layer.objects.active
+		if not activeObject: return False
+		if activeObject.type != "ARMATURE": return False
+		if activeObject.mode != "EDIT": return False
+		return True
 	
 	def execute(self, context):
 		try:
@@ -528,11 +579,12 @@ class OBJECT_PT_XBSkeletonToolsPanel(Panel):
 	def draw(self, context):
 		layout = self.layout
 		scn = context.scene
+		activeObject = bpy.context.view_layer.objects.active
 		col = layout.column(align=True)
 		settingsPanel = col.column(align=True)
-		settingsPanel.prop(scn.xb_tools_skeleton, "nonFinalMirror")
 		settingsPanel.prop(scn.xb_tools_skeleton, "positionEpsilon")
 		settingsPanel.prop(scn.xb_tools_skeleton, "angleEpsilon")
+		settingsPanel.prop(scn.xb_tools_skeleton, "nonFinalMirror")
 		col.separator(factor=2)
 		importPanel = col.column(align=True)
 		importPanel.label(text="Import")
@@ -546,7 +598,7 @@ class OBJECT_PT_XBSkeletonToolsPanel(Panel):
 		importPanel.operator(XBSkeletonImportOperator.bl_idname, text="Import Skeleton", icon="IMPORT")
 		col.separator(factor=2)
 		modifyPanel = col.column(align=True)
-		if bpy.context.view_layer.objects.active and bpy.context.view_layer.objects.active.mode == "EDIT":
+		if activeObject and activeObject.mode == "EDIT":
 			modifyPanel.label(text="Modify Selected")
 			modifyPanel.operator(XBSkeletonBoneFlipSelectedOperator.bl_idname, text="Flip _R Bones", icon="ARROW_LEFTRIGHT")
 			modifyPanel.operator(XBSkeletonBoneMirrorSelectedOperator.bl_idname, text="Mirror _R Bones", icon="MOD_MIRROR")
@@ -556,8 +608,6 @@ class OBJECT_PT_XBSkeletonToolsPanel(Panel):
 			modifyPanel.operator(XBSkeletonBoneFlipAllOperator.bl_idname, text="Flip _R Bones", icon="ARROW_LEFTRIGHT")
 			modifyPanel.operator(XBSkeletonBoneMirrorAutoOperator.bl_idname, text="Mirror _R Bones", icon="MOD_MIRROR")
 			modifyPanel.operator(XBSkeletonNonFinalLRFixAllOperator.bl_idname, text="Fix Non-Final L/R Bone Names")
-		if not bpy.context.view_layer.objects.active or bpy.context.view_layer.objects.active.type != "ARMATURE" or bpy.context.view_layer.objects.active.mode == "POSE":
-			modifyPanel.enabled = False
 
 classes = (
 			XBSkeletonImportOperator,
