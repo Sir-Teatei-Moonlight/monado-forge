@@ -1,3 +1,4 @@
+import bpy
 import math
 import mathutils
 import struct
@@ -76,50 +77,50 @@ class MonadoForgeBone:
 		self._scale = [1,1,1,1] # x, y, z, w
 		self._endpoint = False
 	
+	def getName(self):
+		return self._name
 	def setName(self,x):
 		if not isinstance(x,str):
 			raise TypeError("expected a string, not a(n) "+str(type(x)))
 		self._name = x
-	def getName(self):
-		return self._name
 	
+	def getParent(self):
+		return self._parent
 	def setParent(self,x):
 		if not isinstance(x,int):
 			raise TypeError("expected an int, not a(n) "+str(type(x)))
 		self._parent = x
-	def getParent(self):
-		return self._parent
 	
+	def getPos(self):
+		return self._position
 	def setPos(self,a):
 		if len(a) == 4:
 			self._position = a[:]
 		else:
 			raise ValueError("sequence must be length 4, not "+str(len(a)))
-	def getPos(self):
-		return self._position
 	
+	def getRot(self):
+		return self._rotation
 	def setRot(self,a):
 		if len(a) == 4:
 			self._rotation = a[:]
 		else:
 			raise ValueError("sequence must be length 4, not "+str(len(a)))
-	def getRot(self):
-		return self._rotation
 	
+	def getScl(self):
+		return self._scale
 	def setScl(self,a):
 		if len(a) == 4:
 			self._scale = a[:]
 		else:
 			raise ValueError("sequence must be length 4, not "+str(len(a)))
-	def getScl(self):
-		return self._scale
 	
+	def isEndpoint(self):
+		return self._endpoint
 	def setEndpoint(self,x):
 		if not isinstance(x,bool):
 			raise TypeError("expected a bool, not a(n) "+str(type(x)))
 		self._endpoint = x
-	def isEndpoint(self):
-		return self._endpoint
 
 def flipRoll(roll):
 	return roll % rad360 - rad180
@@ -168,5 +169,127 @@ def isBonePairAutoMirrorable(thisBone,otherBone,positionEpsilon,angleEpsilon):
 	if (angleDiff >= angleEpsilon):
 		return False,"roll angle diff. of "+str(math.degrees(angleDiff))+"d (out of tolerance by "+str(math.degrees(angleEpsilon-angleDiff))+"d)"
 	return True,""
+
+def create_armature_from_bones(boneList,name,boneSize,positionEpsilon,angleEpsilon):
+	bpy.ops.object.select_all(action="DESELECT")
+	bpy.ops.object.armature_add(enter_editmode=True, align="WORLD", location=(0,0,0), rotation=(0,0,0), scale=(1,1,1))
+	skeleton = bpy.context.view_layer.objects.active.data
+	skeleton.show_names = True
+	# delete the default bone to start with
+	bpy.ops.armature.select_all(action="SELECT")
+	bpy.ops.armature.delete()
+	# start adding
+	editBones = skeleton.edit_bones
+	for b in boneList:
+		# assumption: no bone will ever precede its parent (i.e. the parent will always be there already to attach to, no second pass needed)
+		newBone = editBones.new(b.getName())
+		newBone.length = boneSize
+		newBone.parent = editBones[b.getParent()] if b.getParent() != 0xffff else None
+		parentMatrix = newBone.parent.matrix if newBone.parent else mathutils.Matrix.Identity(4)
+		posMatrix = mathutils.Matrix.Translation(b.getPos())
+		rotMatrix = mathutils.Quaternion(b.getRot()).to_matrix()
+		rotMatrix.resize_4x4()
+		newBone.matrix = parentMatrix @ (posMatrix @ rotMatrix)
+		newBone.length = boneSize # have seen odd non-rounding when not doing this
+		# put "normal" bones in layer 1 and endpoints in layer 2
+		# must be done in this order or the [0] set will be dropped because bones must be in at least one layer
+		newBone.layers[1] = b.isEndpoint()
+		newBone.layers[0] = not b.isEndpoint()
+	# now that the bones are in, spin them around so they point in a more logical-for-Blender direction
+	for b in editBones:
+		b.transform(mathutils.Euler((math.radians(90),0,0)).to_matrix()) # transform from lying down (+Y up +Z forward) to standing up (+Z up -Y forward)
+		roll = b.y_axis # roll gets lost after the following matrix mult for some reason, so preserve it
+		b.matrix = b.matrix @ mathutils.Matrix([[0,1,0,0],[1,0,0,0],[0,0,1,0],[0,0,0,1]]) # change from +X being the "main axis" to +Y
+		b.align_roll(roll)
+		# everything done, now apply epsilons
+		b.head = [(0 if abs(p) < positionEpsilon else p) for p in b.head]
+		b.tail = [(0 if abs(p) < positionEpsilon else p) for p in b.tail]
+		clampBoneRoll(b,angleEpsilon)
+	bpy.context.view_layer.objects.active.name = name
+	bpy.context.view_layer.objects.active.data.name = name
+	bpy.ops.armature.select_all(action="DESELECT")
+	bpy.ops.object.mode_set(mode="OBJECT")
+
+class MonadoForgeVertex:
+	def __init__(self,p,n=None,c=None,w={}):
+		if len(p) != 3: raise ValueError("sequence must be length 3, not "+str(len(p)))
+		self._position = p[:]
+		self._normal = n
+		self._colour = c
+		self._weights = w
+	
+	def getPos(self):
+		return self._position
+	def setPos(self,a):
+		if len(a) == 4:
+			self._position = a[:]
+		else:
+			raise ValueError("sequence must be length 4, not "+str(len(a)))
+	
+	def getNrm(self):
+		return self._normal
+	def clearNrm(self):
+		self._normal = None
+	def setNrm(self,a):
+		if len(a) == 3:
+			self._normal = a[:]
+		else:
+			raise ValueError("sequence must be length 3, not "+str(len(a)))
+	
+	def getCol(self):
+		return self._colour
+	def clearCol(self):
+		self._colour = None
+	def setCol(self,a):
+		if len(a) == 3 or len(a) == 4: # allow for the chance of alpha colours
+			self._colour = a[:]
+		else:
+			raise ValueError("sequence must be length 3 or 4, not "+str(len(a)))
+	
+	def getWeights(self):
+		return self._weights
+	def getWeight(self,name):
+		return self._weights[name]
+	def clearWeights(self):
+		self._weights = {}
+	def addWeight(self,name,value):
+		self._weights[name] = value
+
+# probably don't really need this one but it's consistent to have
+class MonadoForgeEdge:
+	def __init__(self,v1,v2):
+		self._vert1 = v1
+		self._vert2 = v2
+
+class MonadoForgeFace:
+	def __init__(self,v,mi=0):
+		self._verts = v[:]
+		self._materialIndex = mi
+
+class MonadoForgeMesh:
+	def __init__(self):
+		self._name = "Mesh"
+		self._vertices = []
+		self._edges = []
+		self._faces = []
+
+class MonadoForgePackage:
+	def __init__(self):
+		self._bones = []
+	
+	def getBones(self):
+		return self._bones
+	def clearBones(self):
+		self._bones = []
+	def addBone(self,bone):
+		self._bones.append(bone)
+	def setBones(self,bones):
+		self._bones = bones[:]
+
+def register():
+	pass
+
+def unregister():
+	pass
 
 #[...]

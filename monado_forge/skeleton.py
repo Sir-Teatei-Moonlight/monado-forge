@@ -226,52 +226,13 @@ class XBSkeletonImportOperator(Operator):
 					return {"CANCELLED"}
 			
 			# we now have the skeletons in generic format - create the armatures
-			for s in importedSkeletons:
-				bpy.ops.object.select_all(action="DESELECT")
-				bpy.ops.object.armature_add(enter_editmode=True, align="WORLD", location=(0,0,0), rotation=(0,0,0), scale=(1,1,1))
-				skeleton = bpy.context.view_layer.objects.active.data
-				skeleton.show_names = True
-				# delete the default bone to start with
-				bpy.ops.armature.select_all(action="SELECT")
-				bpy.ops.armature.delete()
-				# start adding
-				editBones = skeleton.edit_bones
-				for b in s:
-					# assumption: no bone will ever precede its parent (i.e. the parent will always be there already to attach to, no second pass needed)
-					#boneParent,boneName,bonePos,boneRot,boneScl,boneIsEndpoint = b[0],b[1],b[2],b[3],b[4],b[5]
-					newBone = editBones.new(b.getName())
-					newBone.length = boneSize
-					newBone.parent = editBones[b.getParent()] if b.getParent() != 0xffff else None
-					parentMatrix = newBone.parent.matrix if newBone.parent else mathutils.Matrix.Identity(4)
-					posMatrix = mathutils.Matrix.Translation(b.getPos())
-					rotMatrix = mathutils.Quaternion(b.getRot()).to_matrix()
-					rotMatrix.resize_4x4()
-					newBone.matrix = parentMatrix @ (posMatrix @ rotMatrix)
-					newBone.length = boneSize # have seen odd non-rounding when not doing this
-					# put "normal" bones in layer 1 and endpoints in layer 2
-					# must be done in this order or the [0] set will be dropped because bones must be in at least one layer
-					newBone.layers[1] = b.isEndpoint()
-					newBone.layers[0] = not b.isEndpoint()
-				# now that the bones are in, spin them around so they point in a more logical-for-Blender direction
-				for b in editBones:
-					b.transform(mathutils.Euler((math.radians(90),0,0)).to_matrix()) # transform from lying down (+Y up +Z forward) to standing up (+Z up -Y forward)
-					roll = b.y_axis # roll gets lost after the following matrix mult for some reason, so preserve it
-					b.matrix = b.matrix @ mathutils.Matrix([[0,1,0,0],[1,0,0,0],[0,0,1,0],[0,0,0,1]]) # change from +X being the "main axis" to +Y
-					b.align_roll(roll)
-					# everything done, now apply epsilons
-					b.head = [(0 if abs(p) < positionEpsilon else p) for p in b.head]
-					b.tail = [(0 if abs(p) < positionEpsilon else p) for p in b.tail]
-					clampBoneRoll(b,angleEpsilon)
-				# cleanup
-				armatureName = editBones[0].name
+			for skeleton in importedSkeletons:
+				armatureName = skeleton[0].getName()
 				if armatureName.endswith("_top"):
 					armatureName = armatureName[:-4]
 				if armatureName.endswith("_Bone"):
 					armatureName = armatureName[:-5]
-				bpy.context.view_layer.objects.active.name = armatureName
-				bpy.context.view_layer.objects.active.data.name = armatureName
-				bpy.ops.armature.select_all(action="DESELECT")
-				bpy.ops.object.mode_set(mode="OBJECT")
+				create_armature_from_bones(skeleton,armatureName,boneSize,positionEpsilon,angleEpsilon)
 		except Exception:
 			traceback.print_exc()
 			self.report({"ERROR"}, "Unexpected error; see console")
@@ -580,6 +541,7 @@ class OBJECT_PT_XBSkeletonToolsPanel(Panel):
 		layout = self.layout
 		scn = context.scene
 		activeObject = bpy.context.view_layer.objects.active
+		expectedExtension = {"XC1":".brres","XCX":".xcx","XC2":".arc","XC1DE":".chr","XC3":".chr",}[scn.xb_tools.game]
 		col = layout.column(align=True)
 		settingsPanel = col.column(align=True)
 		settingsPanel.prop(scn.xb_tools_skeleton, "positionEpsilon")
@@ -588,11 +550,11 @@ class OBJECT_PT_XBSkeletonToolsPanel(Panel):
 		col.separator(factor=2)
 		importPanel = col.column(align=True)
 		importPanel.label(text="Import")
-		importPanel.prop(scn.xb_tools_skeleton, "path", text="")
+		importPanel.prop(scn.xb_tools_skeleton, "path", text=expectedExtension)
 		importPanel.prop(scn.xb_tools_skeleton, "boneSize")
 		epSubcol = importPanel.column()
 		epSubcol.prop(scn.xb_tools_skeleton, "importEndpoints")
-		if (scn.xb_tools.game == "XC1"):
+		if scn.xb_tools.game == "XC1":
 			epSubcol.enabled = False
 		importPanel.separator()
 		importPanel.operator(XBSkeletonImportOperator.bl_idname, text="Import Skeleton", icon="IMPORT")

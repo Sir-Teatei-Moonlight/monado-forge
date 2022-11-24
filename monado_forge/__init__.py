@@ -6,14 +6,16 @@ bl_info = {
 	"name": "Monado Forge",
 	"description": "Xenoblade tools",
 	"author": "Sir Teatei Moonlight (xenoserieswiki.org/tools) (https://github.com/Sir-Teatei-Moonlight)",
-	"version": (1, 1, 1),
+	"version": (1, 2, 0),
 	"blender": (3, 3, 1),
 	"category": "General",
 }
 
 packageList = (
+				"utils",
 				"ui",
 				"skeleton",
+				"model",
 				)
 
 register, unregister = bpy.utils.register_submodule_factory(__package__, packageList)
