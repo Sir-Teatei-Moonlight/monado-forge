@@ -215,7 +215,7 @@ class XBModelToolsProperties(PropertyGroup):
 
 class OBJECT_PT_XBModelToolsPanel(Panel):
 	bl_idname = "OBJECT_PT_XBModelToolsPanel"
-	bl_label = "Mesh"
+	bl_label = "Model"
 	bl_space_type = "VIEW_3D"
 	bl_region_type = "UI"
 	bl_parent_id = "OBJECT_PT_XBToolsPanel"

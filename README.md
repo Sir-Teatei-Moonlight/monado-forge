@@ -12,10 +12,11 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files.
 
 ### model
 * Imports skeletons from model definition files (i.e. .wimdo).
+	* Doesn't yet apply proper parenting.
 
 ## Planned
 ### skeleton
 * Merge skeletons, keeping one copy of duplicate bones.
 ### model
-* (unsure as of yet)
+* Fix parenting of packaged bones.
 
