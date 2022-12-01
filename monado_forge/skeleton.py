@@ -177,9 +177,9 @@ class XBSkeletonImportOperator(Operator):
 							fb = MonadoForgeBone()
 							fb.setParent(parent)
 							fb.setName(name)
-							fb.setPos([px,py,pz,pw])
-							fb.setRot([rw,rx,ry,rz])
-							fb.setScl([sx,sy,sz,sw])
+							fb.setPosition([px,py,pz,pw])
+							fb.setRotation([rw,rx,ry,rz])
+							fb.setScale([sx,sy,sz,sw])
 							fb.setEndpoint(False)
 							forgeBones.append(fb)
 						if importEndpoints:
@@ -212,9 +212,9 @@ class XBSkeletonImportOperator(Operator):
 								fb = MonadoForgeBone()
 								fb.setParent(parent)
 								fb.setName(name)
-								fb.setPos([px,py,pz,pw])
-								fb.setRot([rw,rx,ry,rz])
-								fb.setScl([sx,sy,sz,sw])
+								fb.setPosition([px,py,pz,pw])
+								fb.setRotation([rw,rx,ry,rz])
+								fb.setScale([sx,sy,sz,sw])
 								fb.setEndpoint(True)
 								forgeBones.append(fb)
 						importedSkeletons.append(forgeBones)
@@ -340,7 +340,7 @@ class XBSkeletonBoneMirrorAutoOperator(Operator):
 					except KeyError:
 						otherBone = None
 					if otherBone:
-						canAutoMirror,message = isBonePairAutoMirrorable(bone,otherBone,positionEpsilon,angleEpsilon)
+						canAutoMirror,message = isBonePairIdentical(bone,otherBone,positionEpsilon,angleEpsilon,mirrorable=True)
 						if canAutoMirror:
 							mirrorBone(bone,otherBone)
 							mirroredCount += 1
@@ -391,7 +391,7 @@ class XBSkeletonBoneMirrorSelectedOperator(Operator):
 				except KeyError:
 					otherBone = None
 				if otherBone:
-					canAutoMirror,message = isBonePairAutoMirrorable(bone,otherBone,positionEpsilon,angleEpsilon)
+					canAutoMirror,message = isBonePairIdentical(bone,otherBone,positionEpsilon,angleEpsilon,mirrorable=True)
 					if not canAutoMirror:
 						print(bone.name+" != "+otherBone.name+" ~ "+message)
 						outOfRangeCount += 1
@@ -481,6 +481,85 @@ class XBSkeletonNonFinalLRFixSelectedOperator(Operator):
 			return {"CANCELLED"}
 		return {"FINISHED"}
 
+class XBSkeletonMergeSelectedToActiveOperator(Operator):
+	bl_idname = "object.xb_skeleton_mergeselectedtoactive_operator"
+	bl_label = "Xenoblade Skeleton Merge Selected To Active Operator"
+	bl_description = "Joins armatures, merging bones of the same name"
+	bl_options = {"REGISTER","UNDO"}
+	
+	@classmethod
+	def poll(cls, context):
+		activeObject = context.view_layer.objects.active
+		selectedObjects = context.view_layer.objects.selected
+		if not activeObject: return False
+		if activeObject.type != "ARMATURE": return False
+		if activeObject.mode != "OBJECT": return False
+		if len(selectedObjects) < 2: return False
+		for s in selectedObjects:
+			if s.type != "ARMATURE": return False
+			if s.mode != "OBJECT": return False
+		return True
+	
+	def execute(self, context):
+		try:
+			positionEpsilon = context.scene.xb_tools_skeleton.positionEpsilon
+			angleEpsilon = context.scene.xb_tools_skeleton.angleEpsilon
+			safeMerge = context.scene.xb_tools_skeleton.safeMerge
+			# based on the poll above, we can assume all selected objects are armatures and there's more than one of them
+			targetObject = context.view_layer.objects.active
+			selectedObjects = context.view_layer.objects.selected
+			# there doesn't seem to be a clean way to do this without invoking edit mode :/
+			# at least we can have edit mode on multiple objects at once now
+			bpy.ops.object.mode_set(mode="EDIT")
+			targetBones = targetObject.data.edit_bones
+			targetNameList = [b.name for b in targetBones]
+			objsToDelete = []
+			pruned = []
+			outOfRangeCount = 0
+			for otherObject in selectedObjects:
+				if targetObject == otherObject: continue
+				# move all the children right now to get it out of the way
+				for c in otherObject.children:
+					c.parent = targetObject
+					for m in c.modifiers:
+						if m.object == otherObject:
+							m.object = targetObject
+				otherBones = otherObject.data.edit_bones
+				keep = []
+				toss = []
+				for otherBone in otherBones:
+					if otherBone.name not in targetNameList:
+						keep.append(otherBone)
+						continue
+					targetBone = targetBones[otherBone.name]
+					areTheSame,message = isBonePairIdentical(targetBone,otherBone,positionEpsilon,angleEpsilon)
+					if areTheSame or not safeMerge:
+						toss.append(otherBone)
+					else:
+						print(targetObject.name+"."+targetBone.name+" != "+otherObject.name+"."+otherBone.name+" ~ "+message)
+						outOfRangeCount += 1
+						keep.append(otherBone)
+				if len(keep) == -1:
+					objsToDelete.append(otherObject)
+					pruned.append(otherObject.name)
+				else:
+					for schmuck in toss:
+						otherBones.remove(schmuck)
+			for i in range(len(objsToDelete)):
+				bpy.data.objects.remove(objsToDelete[i],do_unlink=True)
+			if pruned:
+				self.report({"INFO"}, "Removed "+str(len(pruned))+" object(s) for being entirely superfluous: "+", ".join(pruned))
+			# at this point, we have removed all the stuff we don't want to keep, so join the rest
+			bpy.ops.object.mode_set(mode="OBJECT")
+			bpy.ops.object.join()
+			if outOfRangeCount > 0:
+				self.report({"WARNING"}, "Kept "+str(outOfRangeCount)+" bones for being out of epsilon tolerance. See console for list.")
+		except Exception:
+			traceback.print_exc()
+			self.report({"ERROR"}, "Unexpected error; see console")
+			return {"CANCELLED"}
+		return {"FINISHED"}
+
 class XBSkeletonToolsProperties(PropertyGroup):
 	path : StringProperty(
 		name="Path",
@@ -529,6 +608,11 @@ class XBSkeletonToolsProperties(PropertyGroup):
 		description="Imports endpoints as well and adds them to the skeleton (in layer 2)",
 		default=False,
 	)
+	safeMerge : BoolProperty(
+		name="Safe Merge",
+		description="Only merges bones of the same name if they have the same position and rotation (false: merge them no matter what)",
+		default=True,
+	)
 
 class OBJECT_PT_XBSkeletonToolsPanel(Panel):
 	bl_idname = "OBJECT_PT_XBSkeletonToolsPanel"
@@ -570,6 +654,9 @@ class OBJECT_PT_XBSkeletonToolsPanel(Panel):
 			modifyPanel.operator(XBSkeletonBoneFlipAllOperator.bl_idname, text="Flip _R Bones", icon="ARROW_LEFTRIGHT")
 			modifyPanel.operator(XBSkeletonBoneMirrorAutoOperator.bl_idname, text="Mirror _R Bones", icon="MOD_MIRROR")
 			modifyPanel.operator(XBSkeletonNonFinalLRFixAllOperator.bl_idname, text="Fix Non-Final L/R Bone Names")
+			modifyPanel.separator()
+			modifyPanel.operator(XBSkeletonMergeSelectedToActiveOperator.bl_idname, text="Merge Selected to Active", icon="AUTOMERGE_ON")
+			modifyPanel.prop(scn.xb_tools_skeleton, "safeMerge")
 
 classes = (
 			XBSkeletonImportOperator,
@@ -579,6 +666,7 @@ classes = (
 			XBSkeletonBoneMirrorSelectedOperator,
 			XBSkeletonNonFinalLRFixAllOperator,
 			XBSkeletonNonFinalLRFixSelectedOperator,
+			XBSkeletonMergeSelectedToActiveOperator,
 			XBSkeletonToolsProperties,
 			OBJECT_PT_XBSkeletonToolsPanel,
 			)
