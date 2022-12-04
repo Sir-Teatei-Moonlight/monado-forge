@@ -1,14 +1,14 @@
 import bpy
 import io
 #import math
-#import mathutils
+import mathutils
 import os
 import traceback
 import zlib
 from bpy.props import (
 						BoolProperty,
-#						EnumProperty,
-#						FloatProperty,
+						EnumProperty,
+						FloatProperty,
 						PointerProperty,
 						StringProperty,
 						)
@@ -17,7 +17,6 @@ from bpy.types import (
 						Panel,
 						PropertyGroup,
 						)
-from contextlib import redirect_stdout
 
 from . utils import *
 
@@ -222,9 +221,6 @@ def import_wismt(f, wimdoResults, context):
 	
 	meshes = []
 	vertexWeights = {}
-	shapes = []
-	shapeHeaders = []
-	shapeTargets = []
 	nextSubfileIndex = 0
 	hasRootSubfile = hasContentType[0] or hasContentType[1] or hasContentType[2]
 	hasMedResSubfile = hasContentType[3]
@@ -251,6 +247,9 @@ def import_wismt(f, wimdoResults, context):
 					vertexTables = []
 					faceTables = []
 					weightTables = []
+					shapeHeaders = []
+					shapeTargets = []
+					shapes = []
 					if vertexTableOffset > 0: # not sure how we can have a mesh without vertexes, but okay
 						for i in range(vertexTableCount):
 							sf.seek(vertexTableOffset+i*8*4)
@@ -387,7 +386,9 @@ def import_wismt(f, wimdoResults, context):
 							# doesn't necessarily read as normalized
 							vertexBeingModified.setNormal(mathutils.Vector(newNormal).normalized()[:])
 							sf.seek(sf.tell()+targetBlockSize-15) # the magic -15 is the length of the position+normal (4*3 + 3)
-						for j in range(shapeTargetCounts):
+						shapeNameList = ["basis"] + [h[0] for h in wimdoResults.getShapeHeaders()] # "basis" needs to be added because the first target is also the base shape for some reason
+						for j in range(shapeTargetCounts+1):
+							if j == 0: continue # as above, the first is the basis so we don't need it
 							# it's okay to overwrite these variables, we don't need the above ones anymore
 							targetDataChunkOffset,targetVertexCount,targetBlockSize,targetUnknown,targetType = shapeTargets[shapeTargetIndex+j+1]
 							sf.seek(dataOffset+targetDataChunkOffset)
@@ -404,8 +405,16 @@ def import_wismt(f, wimdoResults, context):
 								# doesn't necessarily read as normalized
 								newVertex.setNormal(mathutils.Vector(newNormal).normalized()[:])
 								newShape.addVertex(index,newVertex)
-							newShape.setMeshIndex(shapeDataChunkID)
+							newShape.setVertexTableIndex(shapeDataChunkID)
+							newShape.setName(shapeNameList[j]) # probably wrong but need to find a counterexample
 							shapes.append(newShape)
+					shapesByVertexTableIndex = {}
+					for s in shapes:
+						thisShapesIndex = s.getVertexTableIndex()
+						if thisShapesIndex in shapesByVertexTableIndex.keys():
+							shapesByVertexTableIndex[thisShapesIndex].append(s)
+						else:
+							shapesByVertexTableIndex[thisShapesIndex] = [s]
 					
 					unusedVertexTables = [k for k in vertexData.keys()]
 					unusedFaceTables = [k for k in faceData.keys()]
@@ -439,6 +448,8 @@ def import_wismt(f, wimdoResults, context):
 						newMesh.setVertices(vertexData[vtIndex])
 						newMesh.setFaces(faceData[ftIndex])
 						newMesh.setWeightSets(vertexWeights)
+						if vtIndex in shapesByVertexTableIndex.keys():
+							newMesh.setShapes(shapesByVertexTableIndex[vtIndex])
 						meshes.append(newMesh)
 					if unusedVertexTables:
 						print("Unused vertex tables: "+str(unusedVertexTables))
@@ -475,8 +486,6 @@ def import_wismt(f, wimdoResults, context):
 	results = MonadoForgeImportedPackage()
 	results.addSkeleton(wimdoResults.getSkeleton())
 	results.setMeshes(meshes)
-	#results.setShapes(shapes)
-	#mergedResults = wimdoResults.merge(results)
 	return results
 
 def import_wimdo_only(self, context):
@@ -530,8 +539,6 @@ def realise_results(forgeResults, self, context):
 	# attach to the first armature created (this logic might change later)
 	targetArmature = armatures[0]
 	meshes = forgeResults.getMeshes()
-	#shapes = forgeResults.getShapes()
-	#shapeNames = forgeResults.getShapeNames()
 	for m,mesh in enumerate(meshes):
 		bpy.ops.object.add(type="MESH", enter_editmode=False, align="WORLD", location=(0,0,0), rotation=(0,0,0), scale=(1,1,1))
 		newMeshObject = bpy.context.view_layer.objects.active
@@ -576,36 +583,21 @@ def realise_results(forgeResults, self, context):
 					newMeshObject.vertex_groups[groupIndex].add(vertexIDsToAdd,groupValue,"ADD")
 		elif mesh.hasWeights(): # no indexes, but do have directly-applied weights
 			pass # not needed at the present time
-		# for s,shape in enumerate(shapes):
-			# if shape.getMeshIndex() != m:
-				# continue
-			# if not meshData.shape_keys:
-				# newMeshObject.shape_key_add(name="basis",from_mix=False)
-			# meshData.shape_keys.use_relative = True
-			# newShape = newMeshObject.shape_key_add(name=shapeNames[s],from_mix=False)
-			# #for i in range(vertCount):
-			# #print(newShape.data.keys())
-				# #newShape.data[i].co = meshData[i].co
+		if mesh.hasShapes():
+			shapes = mesh.getShapes()
+			if not meshData.shape_keys:
+				newMeshObject.shape_key_add(name="basis",from_mix=False)
+			meshData.shape_keys.use_relative = True
+			for s in shapes:
+				newShape = newMeshObject.shape_key_add(name=s.getName(),from_mix=False)
+				for vertexIndex,vertex in s.getVertices().items():
+					newShape.data[vertexIndex].co += mathutils.Vector(vertex.getPosition())
 		
 		# import complete, cleanup time
 		#meshData.validate(verbose=True)
 		meshData.validate()
-		meshData.transform(mathutils.Euler((math.radians(90),0,0)).to_matrix().to_4x4()) # transform from lying down (+Y up +Z forward) to standing up (+Z up -Y forward)
-		# remove all the vertices without faces attached (there can be a lot and it's apparently hard to do in any other way)
-		if context.scene.xb_tools_model.cleanupLooseVertices:
-			bpy.ops.object.mode_set(mode="EDIT")
-			with redirect_stdout(io.StringIO()): # hide "X verts deleted" output
-				bpy.ops.mesh.delete_loose(use_verts=True,use_edges=False,use_faces=False)
-			bpy.ops.object.mode_set(mode="OBJECT")
-		# clean up vertex groups that have nothing in them
-		if context.scene.xb_tools_model.cleanupEmptyGroups:
-			unusedVertexGroups = [g.name for g in newMeshObject.vertex_groups]
-			for v in meshData.vertices:
-				for g in v.groups:
-					try: unusedVertexGroups.remove(newMeshObject.vertex_groups[g.group].name)
-					except ValueError: pass
-			for g in unusedVertexGroups:
-				newMeshObject.vertex_groups.remove(newMeshObject.vertex_groups[g])
+		meshData.transform(mathutils.Euler((math.radians(90),0,0)).to_matrix().to_4x4(),shape_keys=True) # transform from lying down (+Y up +Z forward) to standing up (+Z up -Y forward)
+		cleanup_mesh(context,newMeshObject,context.scene.xb_tools_model.cleanupLooseVertices,context.scene.xb_tools_model.cleanupEmptyGroups,context.scene.xb_tools_model.cleanupEmptyShapes)
 		# attach mesh to armature
 		armatureMod = newMeshObject.modifiers.new("Armature","ARMATURE")
 		armatureMod.object = targetArmature
@@ -635,6 +627,39 @@ class XBModelImportOperator(Operator):
 				return import_wimdo_only(self, context)
 			self.report({"ERROR"}, "Unexpected error; code shouldn't be able to reach here")
 			return {"CANCELLED"}
+		except Exception:
+			traceback.print_exc()
+			self.report({"ERROR"}, "Unexpected error; see console")
+			return {"CANCELLED"}
+
+class XBModelCleanupOperator(Operator):
+	bl_idname = "object.xb_tools_model_cleanup_operator"
+	bl_label = "Xenoblade Model Cleanup Operator"
+	bl_description = "Does selected clean up operations to all selected meshes"
+	bl_options = {"REGISTER","UNDO"}
+	
+	@classmethod
+	def poll(cls, context): # must have at least one mesh selected
+		activeObject = context.view_layer.objects.active
+		selectedObjects = context.view_layer.objects.selected
+		if activeObject and activeObject.type == "MESH": return True
+		for s in selectedObjects:
+			if s.type == "MESH": return True
+		return False
+	
+	def execute(self, context):
+		try:
+			objList = []
+			activeObject = context.view_layer.objects.active
+			selectedObjects = context.view_layer.objects.selected
+			if activeObject and activeObject.type == "MESH":
+				objList.append(activeObject)
+			for s in selectedObjects:
+				if s.type == "MESH":
+					objList.append(s)
+			for obj in objList:
+				cleanup_mesh(context,obj,context.scene.xb_tools_model.cleanupLooseVertices,context.scene.xb_tools_model.cleanupEmptyGroups,context.scene.xb_tools_model.cleanupEmptyShapes)
+			return {"FINISHED"}
 		except Exception:
 			traceback.print_exc()
 			self.report({"ERROR"}, "Unexpected error; see console")
@@ -672,6 +697,11 @@ class XBModelToolsProperties(PropertyGroup):
 		description="Include lower-detail meshes in the import",
 		default=False,
 	)
+	doCleanupOnImport : BoolProperty(
+		name="Clean Up After Import",
+		description="Perform selected cleanup tasks once import is complete",
+		default=True,
+	)
 	cleanupLooseVertices : BoolProperty(
 		name="Loose Vertices",
 		description="Erase vertices not connected to anything",
@@ -681,6 +711,11 @@ class XBModelToolsProperties(PropertyGroup):
 		name="Empty Groups",
 		description="Erase vertex groups with nothing using them",
 		default=True,
+	)
+	cleanupEmptyShapes : BoolProperty(
+		name="Empty Shapes",
+		description="Erase shape keys that have no effect",
+		default=False,
 	)
 
 class OBJECT_PT_XBModelToolsPanel(Panel):
@@ -705,11 +740,14 @@ class OBJECT_PT_XBModelToolsPanel(Panel):
 			dataRow.prop(scn.xb_tools_model, "dataPath", text=".wismt")
 		importPanel.prop(scn.xb_tools_model, "useSkeletonSettings")
 		importPanel.prop(scn.xb_tools_model, "alsoImportLODs")
+		importPanel.prop(scn.xb_tools_model, "doCleanupOnImport")
 		importPanel.operator(XBModelImportOperator.bl_idname, text="Import Model", icon="IMPORT")
+		importPanel.separator()
+		importPanel.operator(XBModelCleanupOperator.bl_idname, text="Clean Up Selected Meshes", icon="BRUSH_DATA")
 
 class OBJECT_PT_XBModelToolsCleanupPanel(Panel):
 	bl_idname = "OBJECT_PT_XBModelToolsCleanupPanel"
-	bl_label = "Import Cleanup"
+	bl_label = "Model Cleanup"
 	bl_space_type = "VIEW_3D"
 	bl_region_type = "UI"
 	bl_parent_id = "OBJECT_PT_XBModelToolsPanel"
@@ -720,9 +758,11 @@ class OBJECT_PT_XBModelToolsCleanupPanel(Panel):
 		col = layout.column(align=True)
 		col.prop(scn.xb_tools_model, "cleanupLooseVertices")
 		col.prop(scn.xb_tools_model, "cleanupEmptyGroups")
+		col.prop(scn.xb_tools_model, "cleanupEmptyShapes")
 
 classes = (
 			XBModelImportOperator,
+			XBModelCleanupOperator,
 			XBModelToolsProperties,
 			OBJECT_PT_XBModelToolsPanel,
 			OBJECT_PT_XBModelToolsCleanupPanel,

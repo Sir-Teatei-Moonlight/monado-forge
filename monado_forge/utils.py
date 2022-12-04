@@ -1,7 +1,9 @@
 import bpy
+import io
 import math
 import mathutils
 import struct
+from contextlib import redirect_stdout
 
 # math constants
 
@@ -168,6 +170,41 @@ def create_armature_from_bones(boneList,name,boneSize,positionEpsilon,angleEpsil
 	bpy.ops.armature.select_all(action="DESELECT")
 	bpy.ops.object.mode_set(mode="OBJECT")
 	return skelObj # return the new object
+
+def cleanup_mesh(context,meshObj,looseVerts,emptyGroups,emptyShapes):
+	tempActive = context.view_layer.objects.active
+	context.view_layer.objects.active = meshObj
+	meshData = meshObj.data
+	# remove all the vertices without faces attached (there can be a lot and it's apparently hard to do in any other way)
+	if looseVerts:
+		bpy.ops.object.mode_set(mode="EDIT")
+		with redirect_stdout(io.StringIO()): # hide "X verts deleted" output
+			bpy.ops.mesh.delete_loose(use_verts=True,use_edges=False,use_faces=False)
+		bpy.ops.object.mode_set(mode="OBJECT")
+	# clean up vertex groups that have nothing in them
+	if emptyGroups:
+		unusedVertexGroups = [g.name for g in meshObj.vertex_groups]
+		for v in meshData.vertices:
+			for g in v.groups:
+				try: unusedVertexGroups.remove(meshObj.vertex_groups[g.group].name)
+				except ValueError: pass
+		for g in unusedVertexGroups:
+			meshObj.vertex_groups.remove(meshObj.vertex_groups[g])
+	# determine which shapes don't do anything and remove them
+	# seems to be somewhat conservative (some shapes with no visible effect are kept), but that's the safer error to make
+	if emptyShapes:
+		keysToRemove = []
+		for s in meshData.shape_keys.key_blocks:
+			if s.name == "basis": continue
+			isEmpty = True
+			for v in range(len(meshData.vertices)):
+				if meshData.vertices[v].co != s.data[v].co:
+					isEmpty = False
+			if isEmpty:
+				keysToRemove.append(s)
+		for r in keysToRemove:
+			meshObj.shape_key_remove(r)
+	context.view_layer.objects.active = tempActive
 
 # Forge classes, because just packing/unpacking arrays gets old and error-prone
 
@@ -341,12 +378,40 @@ class MonadoForgeFace:
 			raise TypeError("expected a list, not a(n) "+str(type(a)))
 		self._vertexIndexes = a[:]
 
+class MonadoForgeMeshShape:
+	def __init__(self):
+		self._vtIndex = 0
+		self._vertices = {} # indexes are not necessarily in order or sequential, so must be a dict (by index) rather than a plain list
+		self._name = ""
+	
+	def getVertexTableIndex(self):
+		return self._vtIndex
+	def setVertexTableIndex(self,i):
+		self._vtIndex = i
+	
+	def getVertices(self):
+		return self._vertices
+	def clearVertices(self):
+		self._vertices = {}
+	def addVertex(self,i,v):
+		self._vertices[i] = v
+	def setVertices(self,a):
+		self._vertices = a
+	
+	def getName(self):
+		return self._name
+	def setName(self,x):
+		if not isinstance(x,str):
+			raise TypeError("expected a string, not a(n) "+str(type(x)))
+		self._name = x
+
 class MonadoForgeMesh:
 	def __init__(self):
 		self._name = "Mesh"
 		self._vertices = []
 		self._faces = []
 		self._weightSets = {} # because it can be convenient to hold these here and have vertexes just refer with index
+		self._shapes = [] # list of MonadoForgeMeshShapes
 	
 	def getVertices(self):
 		return self._vertices
@@ -385,6 +450,18 @@ class MonadoForgeMesh:
 			raise TypeError("expected a dict, not a(n) "+str(type(d)))
 		self._weightSets = d
 	
+	def getShapes(self):
+		return self._shapes
+	def clearShapes(self):
+		self._shapes = []
+	def addShape(self,shape):
+		if not isinstance(shape,MonadoForgeMeshShape):
+			raise TypeError("expected a MonadoForgeMeshShape, not a(n) "+str(type(shape)))
+		self._shapes.append(shape)
+	def setShapes(self,shapeList):
+		self._shapes = []
+		for s in shapeList: self.addShape(s)
+	
 	# assumption: if a single vertex has any of these, all the other vertices must also
 	def hasUVs(self):
 		for v in self._vertices:
@@ -406,6 +483,8 @@ class MonadoForgeMesh:
 		for v in self._vertices:
 			if v.hasWeights(): return True
 		return False
+	def hasShapes(self):
+		return len(self._shapes) > 0
 	
 	def indexVertices(self):
 		for i,v in enumerate(self._vertices):
@@ -432,25 +511,6 @@ class MonadoForgeMesh:
 		return [v for v in self._vertices if groupID in v.getWeights().keys()]
 	def getFaceVertexIndexesList(self):
 		return [f.getVertexIndexes() for f in self._faces]
-
-class MonadoForgeMeshShape:
-	def __init__(self):
-		self._meshIndex = 0
-		self._vertices = {} # indexes are not necessarily in order or sequential
-	
-	def getMeshIndex(self):
-		return self._meshIndex
-	def setMeshIndex(self,i):
-		self._meshIndex = i
-	
-	def getVertices(self):
-		return self._vertices
-	def clearVertices(self):
-		self._vertices = {}
-	def addVertex(self,i,v):
-		self._vertices[i] = v
-	def setVertices(self,a):
-		self._vertices = a
 
 class MonadoForgeMeshHeader:
 	# intended to be immutable, so all the setting is in the constructor
@@ -507,15 +567,6 @@ class MonadoForgeImportedPackage:
 	def __init__(self):
 		self._skeletons = []
 		self._meshes = []
-	
-	def getMeshHeaders(self):
-		return self._meshHeaders
-	def clearMeshHeaders(self):
-		self._meshHeaders = []
-	def addMeshHeader(self,desc):
-		self._meshHeaders.append(desc)
-	def setMeshHeaders(self,descs):
-		self._meshHeaders = descs[:]
 	
 	def getSkeletons(self):
 		return self._skeletons

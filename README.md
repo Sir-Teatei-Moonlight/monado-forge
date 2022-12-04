@@ -20,13 +20,18 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files.
 
 ### Model
 * Imports .wimdo/.wismt model files. The .wimdo can be imported alone, which grabs only whatever bones are inside, while the .wismt import requires a .wimdo to go with it.
-* Supports normals, UVs, vertex colours, and rigging. Models are automatically parented to the skeleton found in the .wimdo; use the skeleton merge feature to move it over to one imported form the matching .arc/.chr file.
+* Supports normals, UVs, vertex colours, rigging (vertex groups), and shapes (morphs). Models are automatically parented to the skeleton found in the .wimdo; use the skeleton merge feature to move it over to one imported from the matching .arc/.chr file.
 * Optionally also import lower-LOD models. Doesn't currently distinguish them in any way.
+* Optional mesh cleanup, erasing unused vertices, vertex groups, and shapes.
 
 ## Planned features
 Roughly in order of priority.
-* Model shapes/morphs
-* Better auto-naming of meshes
+* Better auto-naming
 * Texture extraction
+* UV folding
 * Material assignment
+
+## Known issues
+* Blender does not support per-shape normals, so that information is lost.
+* Models entirely embedded in the .wimdo are not checked for yet.
 
