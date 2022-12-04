@@ -152,10 +152,6 @@ def import_wimdo(f, context):
 	skeleton = MonadoForgeSkeleton()
 	skeleton.setBones(forgeBones)
 	results = MonadoForgeWimdoPackage(skeleton,meshHeaders,shapeHeaders)
-	#results.setMeshHeaders(meshHeaders)
-	#results.addNewSkeleton(forgeBones)
-	#results.setShapeHeaders(shapeHeaders)
-	#results.setShapeNames(shapeNames)
 	return results
 
 def extract_wismt_subfile(f, headerOffset):
@@ -498,7 +494,7 @@ def import_wimdo_only(self, context):
 	
 	with open(absoluteDefsPath, "rb") as f:
 		forgeResults = import_wimdo(f, context)
-	return realise_results(forgeResults, self, context)
+	return realise_results(forgeResults, os.path.splitext(os.path.basename(absoluteDefsPath))[0], self, context)
 
 def import_wimdo_and_wismt(self, context):
 	absoluteDefsPath = bpy.path.abspath(context.scene.xb_tools_model.defsPath)
@@ -516,9 +512,9 @@ def import_wimdo_and_wismt(self, context):
 		wimdoResults = import_wimdo(f, context)
 	with open(absoluteDataPath, "rb") as f:
 		wismtResults = import_wismt(f, wimdoResults, context)
-	return realise_results(wismtResults, self, context)
+	return realise_results(wismtResults, os.path.splitext(os.path.basename(absoluteDataPath))[0], self, context)
 
-def realise_results(forgeResults, self, context):
+def realise_results(forgeResults, mainName, self, context):
 	if not forgeResults:
 		self.report({"ERROR"}, "Compiled results were empty. There might be more information in the console.")
 		return {"CANCELLED"}
@@ -526,7 +522,7 @@ def realise_results(forgeResults, self, context):
 	armatures = []
 	for skeleton in skeletons:
 		boneList = skeleton.getBones()
-		armatureName = boneList[0].getName()
+		armatureName = mainName
 		if context.scene.xb_tools_model.useSkeletonSettings:
 			boneSize = context.scene.xb_tools_skeleton.boneSize
 			positionEpsilon = context.scene.xb_tools_skeleton.positionEpsilon
@@ -540,9 +536,9 @@ def realise_results(forgeResults, self, context):
 	targetArmature = armatures[0]
 	meshes = forgeResults.getMeshes()
 	for m,mesh in enumerate(meshes):
-		bpy.ops.object.add(type="MESH", enter_editmode=False, align="WORLD", location=(0,0,0), rotation=(0,0,0), scale=(1,1,1))
+		bpy.ops.object.add(type="MESH", enter_editmode=False, align="WORLD", location=context.scene.cursor.location, rotation=(0,0,0), scale=(1,1,1))
 		newMeshObject = bpy.context.view_layer.objects.active
-		newMeshObject.name = "Mesh"
+		newMeshObject.name = f"{mainName}_mesh{m:03d}"
 		meshData = newMeshObject.data
 		meshData.name = "Mesh"
 		vertCount = len(mesh.getVertices())
