@@ -6,7 +6,7 @@ bl_info = {
 	"name": "Monado Forge",
 	"description": "Xenoblade tools",
 	"author": "Sir Teatei Moonlight (xenoserieswiki.org/tools) (https://github.com/Sir-Teatei-Moonlight)",
-	"version": (2, 1, 1),
+	"version": (2, 1, 2),
 	"blender": (3, 3, 1),
 	"category": "General",
 }

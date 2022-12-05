@@ -24,8 +24,7 @@ def import_wimdo(f, context):
 	# little endian assumed
 	magic = f.read(4)
 	if magic != b"DMXM":
-		self.report({"ERROR"}, "Not a valid .wimdo file (unexpected header)")
-		return {"CANCELLED"}
+		raise ValueError("Not a valid .wimdo file (unexpected header)")
 	version = readAndParseInt(f,4)
 	modelsOffset = readAndParseInt(f,4)
 	materialsOffset = readAndParseInt(f,4)
@@ -180,8 +179,7 @@ def import_wismt(f, wimdoResults, context):
 	# TOC -> subfile headers
 	magic = f.read(4)
 	if magic != b"DRSM":
-		self.report({"ERROR"}, "Not a valid .wismt file (unexpected header)")
-		return {"CANCELLED"}
+		raise ValueError("Not a valid .wismt file (unexpected header)")
 	version = readAndParseInt(f,4)
 	headerSize = readAndParseInt(f,4)
 	mainOffset = readAndParseInt(f,4)
