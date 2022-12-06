@@ -41,4 +41,5 @@ Roughly in order of priority.
 ## Known issues
 * Blender does not support per-shape normals, so that information is lost.
 * Models entirely embedded in the .wimdo are not checked for yet.
+* Models without skeletons will probably not import correctly. (Should be an easy fix, but still counts as a "known issue".)
 

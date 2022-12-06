@@ -31,12 +31,14 @@ class XBSkeletonImportOperator(Operator):
 	def execute(self, context):
 		try:
 			game = context.scene.xb_tools.game
+			printProgress = context.scene.xb_tools.printProgress
 			absolutePath = bpy.path.abspath(context.scene.xb_tools_skeleton.path)
 			boneSize = context.scene.xb_tools_skeleton.boneSize
 			positionEpsilon = context.scene.xb_tools_skeleton.positionEpsilon
 			angleEpsilon = context.scene.xb_tools_skeleton.angleEpsilon
 			importEndpoints = context.scene.xb_tools_skeleton.importEndpoints
-			print("Importing skeleton from: "+absolutePath)
+			if printProgress:
+				print("Importing skeleton from: "+absolutePath)
 			
 			filename, fileExtension = os.path.splitext(absolutePath)
 			expectedExtension = {"XC1":".brres","XCX":".xcx","XC2":".arc","XC1DE":".chr","XC3":".chr",}[game]
@@ -217,6 +219,8 @@ class XBSkeletonImportOperator(Operator):
 								fb.setScale([sx,sy,sz,sw])
 								fb.setEndpoint(True)
 								forgeBones.append(fb)
+						if printProgress:
+							print("Read "+str(len(forgeBones))+" bones.")
 						importedSkeletons.append(forgeBones)
 					if not importedSkeletons:
 						self.report({"ERROR"}, "No valid .skl items found in file")

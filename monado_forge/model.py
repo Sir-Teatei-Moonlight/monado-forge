@@ -21,6 +21,7 @@ from bpy.types import (
 from . utils import *
 
 def import_wimdo(f, context):
+	printProgress = context.scene.xb_tools.printProgress
 	# little endian assumed
 	magic = f.read(4)
 	if magic != b"DMXM":
@@ -77,6 +78,8 @@ def import_wimdo(f, context):
 					meshLODValue = readAndParseInt(f,2)
 					f.seek(f.tell()+16) # skip unknown
 					meshHeaders.append(MonadoForgeMeshHeader(meshID,meshFlags,meshVertTableIndex,meshFaceTableIndex,meshMaterialIndex,meshLODValue))
+			if printProgress:
+				print("Found "+str(len(meshHeaders))+" mesh headers.")
 		
 		if bonesOffset > 0:
 			f.seek(modelsOffset+bonesOffset)
@@ -110,6 +113,8 @@ def import_wimdo(f, context):
 				fb.setPosition(bonePosition[:]) # the [:] is because we're turning a Vector into a list
 				fb.setRotation(rotMatrix.to_quaternion())
 				forgeBones.append(fb)
+			if printProgress:
+				print("Found "+str(len(forgeBones))+" bones.")
 		
 		if shapeItemsOffset > 0:
 			f.seek(modelsOffset+shapeItemsOffset)
@@ -126,6 +131,8 @@ def import_wimdo(f, context):
 				f.seek(modelsOffset+shapeItemsOffset+shapeNameOffset2)
 				shapeName2 = readStr(f)
 				shapeHeaders.append([shapeName1])
+			if printProgress:
+				print("Found "+str(len(shapeHeaders))+" shape headers.")
 		# apparently you can have shapes with controllers without names? odd
 		if shapeNamesOffset > 0:
 			f.seek(modelsOffset+shapeNamesOffset)
@@ -151,6 +158,8 @@ def import_wimdo(f, context):
 	skeleton = MonadoForgeSkeleton()
 	skeleton.setBones(forgeBones)
 	results = MonadoForgeWimdoPackage(skeleton,meshHeaders,shapeHeaders)
+	if printProgress:
+		print("Finished parsing .wimdo file.")
 	return results
 
 def extract_wismt_subfile(f, headerOffset):
@@ -173,6 +182,7 @@ def extract_wismt_subfile(f, headerOffset):
 	return subfileName,content
 
 def import_wismt(f, wimdoResults, context):
+	printProgress = context.scene.xb_tools.printProgress
 	# little endian assumed
 	# renamed some stuff from older programs to make more sense:
 	# data items -> content pointers
@@ -225,8 +235,10 @@ def import_wismt(f, wimdoResults, context):
 			internalOffset,contentSize,highResSubfileIndex,contentType = cp
 			if contentType == 0: # model
 				data = subfileData[internalOffset:internalOffset+contentSize]
+				if printProgress:
+					print("Opening model subfile.")
 				sf = io.BytesIO(data)
-				try:
+				try: # no except, just finally (to close sf)
 					vertexTableOffset = readAndParseInt(sf,4)
 					vertexTableCount = readAndParseInt(sf,4)
 					faceTableOffset = readAndParseInt(sf,4)
@@ -260,6 +272,8 @@ def import_wismt(f, wimdoResults, context):
 								vdSize = readAndParseInt(sf,2)
 								vertexDescriptors.append([vdType,vdSize])
 							vertexTables.append([vtDataOffset,vtDataCount,vtBlockSize,vtDescOffset,vtDescCount,vertexDescriptors])
+						if printProgress:
+							print("Found "+str(len(vertexTables))+" vertex tables.")
 					if faceTableOffset > 0:
 						for i in range(faceTableCount):
 							sf.seek(faceTableOffset+i*5*4)
@@ -271,6 +285,8 @@ def import_wismt(f, wimdoResults, context):
 							for j in range(ftVertCount):
 								ftVertexes.append(readAndParseInt(sf,2))
 							faceTables.append([ftDataOffset,ftVertCount,ftVertexes])
+						if printProgress:
+							print("Found "+str(len(faceTables))+" face tables.")
 					if weightDataOffset > 0:
 						sf.seek(weightDataOffset)
 						weightTableCount = readAndParseInt(sf,4)
@@ -287,6 +303,8 @@ def import_wismt(f, wimdoResults, context):
 							wtLOD = readAndParseInt(sf,1)
 							sf.seek(sf.tell()+10)
 							weightTables.append([wtDataOffset,wtDataCount,wtLOD])
+						if printProgress:
+							print("Found "+str(len(weightTables))+" weight tables.")
 					if shapeDataOffset > 0:
 						sf.seek(shapeDataOffset)
 						shapeHeaderCount = readAndParseInt(sf,4)
@@ -309,6 +327,8 @@ def import_wismt(f, wimdoResults, context):
 							targetUnknown = readAndParseInt(sf,2)
 							targetType = readAndParseInt(sf,2)
 							shapeTargets.append([targetDataChunkOffset,targetVertexCount,targetBlockSize,targetUnknown,targetType])
+						if printProgress:
+							print("Found "+str(len(shapeTargets))+" shapekeys.")
 					
 					# tables ready, now read the actual data
 					unknownVDTypes = {}
@@ -354,6 +374,8 @@ def import_wismt(f, wimdoResults, context):
 							newMesh.addVertex(newVertex)
 							vertexData[i].append(newVertex)
 							vertexWeightData[i].append(weightVertex)
+					if printProgress and vertexData != {}:
+						print("Finished reading vertex data.")
 					if unknownVDTypes:
 						print("unknownVDTypes: "+str(unknownVDTypes))
 					for i in range(len(faceTables)):
@@ -363,6 +385,8 @@ def import_wismt(f, wimdoResults, context):
 							newFace = MonadoForgeFace()
 							newFace.setVertexIndexes([ftVertexes[j],ftVertexes[j+1],ftVertexes[j+2]])
 							faceData[i].append(newFace)
+					if printProgress and faceData != {}:
+						print("Finished reading face data.")
 					for i in range(len(shapeHeaders)):
 						shapeDataChunkID,shapeTargetIndex,shapeTargetCounts,shapeTargetIDOffset = shapeHeaders[i]
 						targetDataChunkOffset,targetVertexCount,targetBlockSize,targetUnknown,targetType = shapeTargets[shapeTargetIndex]
@@ -402,6 +426,8 @@ def import_wismt(f, wimdoResults, context):
 							newShape.setVertexTableIndex(shapeDataChunkID)
 							newShape.setName(shapeNameList[j]) # probably wrong but need to find a counterexample
 							shapes.append(newShape)
+					if printProgress and shapes != []:
+						print("Finished reading shape data.")
 					shapesByVertexTableIndex = {}
 					for s in shapes:
 						thisShapesIndex = s.getVertexTableIndex()
@@ -449,6 +475,8 @@ def import_wismt(f, wimdoResults, context):
 						print("Unused vertex tables: "+str(unusedVertexTables))
 					if unusedFaceTables:
 						print("Unused face tables: "+str(unusedFaceTables))
+					if printProgress:
+						print("Finished processing mesh data.")
 				finally:
 					sf.close()
 			if contentType == 1: # shader
@@ -480,11 +508,14 @@ def import_wismt(f, wimdoResults, context):
 	results = MonadoForgeImportedPackage()
 	results.addSkeleton(wimdoResults.getSkeleton())
 	results.setMeshes(meshes)
+	if printProgress:
+		print("Finished parsing .wismt file.")
 	return results
 
 def import_wimdo_only(self, context):
 	absoluteDefsPath = bpy.path.abspath(context.scene.xb_tools_model.defsPath)
-	print("Importing model from: "+absoluteDefsPath)
+	if context.scene.xb_tools.printProgress:
+		print("Importing model from: "+absoluteDefsPath)
 	
 	if os.path.splitext(absoluteDefsPath)[1] != ".wimdo":
 		self.report({"ERROR"}, "File was not a .wimdo file")
@@ -497,7 +528,8 @@ def import_wimdo_only(self, context):
 def import_wimdo_and_wismt(self, context):
 	absoluteDefsPath = bpy.path.abspath(context.scene.xb_tools_model.defsPath)
 	absoluteDataPath = bpy.path.abspath(context.scene.xb_tools_model.dataPath)
-	print("Importing model from: "+absoluteDefsPath+" & "+absoluteDataPath)
+	if context.scene.xb_tools.printProgress:
+		print("Importing model from: "+absoluteDefsPath+" & "+absoluteDataPath)
 	
 	if os.path.splitext(absoluteDefsPath)[1] != ".wimdo":
 		self.report({"ERROR"}, "First file was not a .wimdo file")
@@ -513,9 +545,12 @@ def import_wimdo_and_wismt(self, context):
 	return realise_results(wismtResults, os.path.splitext(os.path.basename(absoluteDataPath))[0], self, context)
 
 def realise_results(forgeResults, mainName, self, context):
+	printProgress = context.scene.xb_tools.printProgress
 	if not forgeResults:
 		self.report({"ERROR"}, "Compiled results were empty. There might be more information in the console.")
 		return {"CANCELLED"}
+	if printProgress:
+		print("Converting processed data into Blender objects.")
 	skeletons = forgeResults.getSkeletons()
 	armatures = []
 	for skeleton in skeletons:
@@ -532,6 +567,8 @@ def realise_results(forgeResults, mainName, self, context):
 		armatures.append(create_armature_from_bones(boneList,armatureName,boneSize,positionEpsilon,angleEpsilon))
 	# attach to the first armature created (this logic might change later)
 	targetArmature = armatures[0]
+	if printProgress:
+		print("Finished creating "+str(len(armatures))+" armatures.")
 	meshes = forgeResults.getMeshes()
 	for m,mesh in enumerate(meshes):
 		bpy.ops.object.add(type="MESH", enter_editmode=False, align="WORLD", location=context.scene.cursor.location, rotation=(0,0,0), scale=(1,1,1))
@@ -586,6 +623,8 @@ def realise_results(forgeResults, mainName, self, context):
 				newShape = newMeshObject.shape_key_add(name=s.getName(),from_mix=False)
 				for vertexIndex,vertex in s.getVertices().items():
 					newShape.data[vertexIndex].co += mathutils.Vector(vertex.getPosition())
+		if printProgress:
+			print("Created mesh "+str(m)+".")
 		
 		# import complete, cleanup time
 		#meshData.validate(verbose=True)
@@ -596,6 +635,8 @@ def realise_results(forgeResults, mainName, self, context):
 		armatureMod = newMeshObject.modifiers.new("Armature","ARMATURE")
 		armatureMod.object = targetArmature
 		newMeshObject.parent = targetArmature
+	if printProgress:
+		print("Finished creating "+str(len(meshes))+" meshes.")
 	return {"FINISHED"}
 
 class XBModelImportOperator(Operator):

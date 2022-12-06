@@ -32,6 +32,11 @@ class XBToolsProperties(PropertyGroup):
 		default=1, #"XC1DE"
 		update=gameListSelectionCallback,
 	)
+	printProgress : BoolProperty(
+		name="Print Progress",
+		description="Print info to console so it doesn't look like long-running operations are hung",
+		default=True,
+	)
 
 class OBJECT_PT_XBToolsPanel(Panel):
 	bl_idname = "OBJECT_PT_XBToolsPanel"
@@ -46,6 +51,7 @@ class OBJECT_PT_XBToolsPanel(Panel):
 		scn = context.scene
 		col = layout.column(align=True)
 		col.prop(scn.xb_tools, "game")
+		col.prop(scn.xb_tools, "printProgress")
 
 classes = (
 			XBToolsProperties,
