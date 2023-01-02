@@ -378,12 +378,12 @@ def import_wismt(f, wimdoResults, context):
 									newVertex.setPosition([readAndParseFloat(sf),readAndParseFloat(sf),readAndParseFloat(sf)])
 								elif vdType == 3: # weights index
 									newVertex.setWeightSetIndex(readAndParseInt(sf,4))
-								elif vdType == 5: # UV 1 (yes this is copy/pasted for other layers but this is kind of easier actually)
-									newVertex.setUV(0,[readAndParseFloat(sf),readAndParseFloat(sf)])
+								elif vdType == 5: # UV 1 (inverted Y reminder) (yes this is copy/pasted for other layers but this is kind of easier actually)
+									newVertex.setUV(0,[readAndParseFloat(sf),1.0-readAndParseFloat(sf)])
 								elif vdType == 6: # UV 2
-									newVertex.setUV(1,[readAndParseFloat(sf),readAndParseFloat(sf)])
+									newVertex.setUV(1,[readAndParseFloat(sf),1.0-readAndParseFloat(sf)])
 								elif vdType == 7: # UV 3
-									newVertex.setUV(2,[readAndParseFloat(sf),readAndParseFloat(sf)])
+									newVertex.setUV(2,[readAndParseFloat(sf),1.0-readAndParseFloat(sf)])
 								elif vdType == 17: # colour
 									a,r,g,b = readAndParseInt(sf,1),readAndParseInt(sf,1),readAndParseInt(sf,1),readAndParseInt(sf,1)
 									newVertex.setColour([r,g,b,a])
