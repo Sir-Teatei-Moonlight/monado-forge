@@ -2,6 +2,7 @@ import bpy
 import io
 import math
 import mathutils
+import numpy
 import struct
 from contextlib import redirect_stdout
 
@@ -11,6 +12,24 @@ rad90 = math.radians(90)
 rad180 = math.radians(180)
 rad360 = math.radians(360)
 rad720 = math.radians(720)
+
+# useful stuff
+
+def clamp(value,low,high):
+	return max(low,min(value,high))
+# ceiling division (as opposed to "//" floor division)
+# https://stackoverflow.com/questions/14822184/
+def ceildiv(a,b):
+	return -(a // -b)
+# https://stackabuse.com/python-how-to-flatten-list-of-lists/
+def flattened_list(given_list):
+	return [item for sublist in given_list for item in sublist]
+def flattened_list_recursive(given_list):
+	if len(given_list) == 0:
+		return given_list
+	if isinstance(given_list[0], list):
+		return flattened_list_recursive(given_list[0]) + flattened_list_recursive(given_list[1:])
+	return given_list[:1] + flattened_list_recursive(given_list[1:])
 
 # file reading
 
@@ -40,7 +59,7 @@ def readAndParseInt(inFile,bytes,signed=False,endian="little"):
 	elif bytes == 4:
 		parseString = i32CodeL if signed else u32CodeL
 	else:
-		raise ValueException("invalid int bytesize: "+str(bytes))
+		raise ValueError("invalid int bytesize: "+str(bytes))
 	return struct.unpack(parseString,inFile.read(struct.calcsize(parseString)))[0]
 def readAndParseIntBig(inFile,bytes,signed=False):
 	if bytes == 1:
@@ -50,7 +69,7 @@ def readAndParseIntBig(inFile,bytes,signed=False):
 	elif bytes == 4:
 		parseString = i32CodeB if signed else u32CodeB
 	else:
-		raise ValueException("invalid int bytesize: "+str(bytes))
+		raise ValueError("invalid int bytesize: "+str(bytes))
 	return struct.unpack(parseString,inFile.read(struct.calcsize(parseString)))[0]
 
 def readAndParseFloat(inFile,endian="little"):
@@ -205,6 +224,173 @@ def cleanup_mesh(context,meshObj,looseVerts,emptyGroups,emptyShapes):
 		for r in keysToRemove:
 			meshObj.shape_key_remove(r)
 	context.view_layer.objects.active = tempActive
+
+# https://learn.microsoft.com/en-us/windows/win32/api/dxgiformat/ne-dxgiformat-dxgi_format
+# uses the "raw" values taken from the code rather than the ones in the MS enum (we aren't calling any MS code so we don't need it)
+# only contains things we know of (rather than future-proofing with extra entries) since how're we supposed to guess what the raw numbers equate to
+# [formatName, bitsPerPixel]
+imageFormats = {
+				37:["R8G8B8A8_UNORM",32],
+				66:["BC1_UNORM",4], # aka DXT1
+				68:["BC3_UNORM",8], # aka DXT5
+				73:["BC4_UNORM",4],
+				75:["BC5_UNORM",8],
+				77:["BC7_UNORM",8],
+				}
+
+# much of this is just grabbed from XBC2MD, but only after understanding it (rather than blindly copy-pasting anything)
+# REMINDER: don't manipulate image.pixels directly/individually or things will be dummy slow https://blender.stackexchange.com/questions/3673/
+# references:
+# 	https://www.vg-resource.com/thread-31389.html
+# 	https://www.vg-resource.com/thread-33929.html
+# 	https://en.wikipedia.org/wiki/Z-order_curve
+# 	https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-block-compression
+# 	https://github.com/ScanMountGoat/tegra_swizzle
+def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blueBC5):
+	try:
+		format,bitsPerPixel = imageFormats[imgType]
+	except KeyError:
+		raise ValueError("unsupported image type: id# "+str(imgType))
+	if format in ["BC3_UNORM","BC4_UNORM","BC7_UNORM"]:
+		print("Format "+format+" is not yet supported (texture "+textureName+" will be blank)")
+	newImage = bpy.data.images.new(textureName,imgWidth,imgHeight,alpha=False)
+	blockSize = 4 # in pixels
+	unswizzleBufferSize = bitsPerPixel*2 # needs a better name at some point
+	if format == "R8G8B8A8_UNORM": # blocks are single pixels rather than 4x4
+		blockSize = 1
+		unswizzleBufferSize = bitsPerPixel // 8
+	# since the minimum block size is 4, images must be divisible by 4 - extend them as necessary
+	virtImgWidth = imgWidth if imgWidth % blockSize == 0 else imgWidth + (blockSize - (imgWidth % blockSize))
+	virtImgHeight = imgHeight if imgHeight % blockSize == 0 else imgHeight + (blockSize - (imgHeight % blockSize))
+	# gotta create the image in full emptiness to start with, so we can random-access-fill the blocks as they come
+	# Blender always needs alpha, so colours must be length 4
+	pixels = numpy.zeros([virtImgHeight*virtImgWidth,4],dtype=float)
+	
+	blockCountX = virtImgWidth // blockSize
+	blockCountY = virtImgHeight // blockSize
+	blockCount = blockCountX*blockCountY
+	tileWidth = clamp(16 // unswizzleBufferSize, 1, 16)
+	tileCountX = ceildiv(blockCountX,tileWidth)
+	tileCountY = blockCountY # since tile height is always 1
+	tileCount = tileCountX*tileCountY
+	# essentially, how many unswizzled "rows" must we read to get a full "column" (in tiles)
+	# this controls how wide the column chunk must be
+	# not currently used (dunno if it later needs to be)
+	columnStackSize = clamp(blockCountY // 8, 1, 16)
+	
+	d = io.BytesIO(rawData)
+	#print(format)
+	
+	swizzleTileMap = numpy.full([tileCountY,tileCountX],-1,dtype=int)
+	# swizzle pattern: (will likely need to change later, as larger images are tested)
+	# x = 110010010
+	# y = 001101101
+	# [x3, x2, y4, y3, x1, y2, y1, x0, y0]
+	# the distinction between z and currentTile is so we can draw the z-curve out of bounds while keeping all valid values in-bounds
+	currentTile = 0
+	z = -1 # will be incremented to 0 shortly
+	while currentTile < tileCountY*tileCountX:
+		if z > 1000000:
+			raise RuntimeError("Bad z-loop detected in image "+textureName+": z = "+str(z)+"; currentTile = "+str(currentTile))
+		z += 1
+		y = ((z%128)//32)*8 + ((z%16)//4)*2 + z%2
+		if y >= len(swizzleTileMap): continue
+		x = (z//128)*4 + ((z%32)//16)*2 + (z%4)//2
+		if x >= len(swizzleTileMap[y]): continue
+		swizzleTileMap[y,x] = currentTile
+		currentTile += 1
+	swizzlist = swizzleTileMap.flatten().tolist()
+	#print(swizzlist)
+	#swizzlist = range(blockCountX*blockCountY) # no-op option for debugging
+	monochrome = True
+	for t in range(tileCount):
+		d.seek(swizzlist[t]*(unswizzleBufferSize*tileWidth))
+		for t2 in range(tileWidth):
+			targetTile = t
+			targetBlock = t*tileWidth + t2
+			if targetBlock >= blockCount: continue # can happen for tiny textures, not a problem
+			targetBlockX = targetBlock % blockCountX
+			targetBlockY = targetBlock // blockCountX
+			# convert block to pixel (Y is inverted, X is not)
+			blockRootPixelX = targetBlockX*blockSize
+			blockRootPixelY = virtImgHeight - targetBlockY*blockSize - blockSize
+			if format == "R8G8B8A8_UNORM":
+				r = readAndParseInt(d,1)
+				g = readAndParseInt(d,1)
+				b = readAndParseInt(d,1)
+				a = readAndParseInt(d,1)
+				pixels[blockRootPixelX+blockRootPixelY*virtImgWidth] = [r/255.0,g/255.0,b/255.0,a/255.0]
+			elif format == "BC1_UNORM":
+				# the "use reversal to implement 1-bit alpha" logic has been left out (believed not needed)
+				endpoint0 = readAndParseInt(d,2)
+				endpoint1 = readAndParseInt(d,2)
+				row0 = readAndParseInt(d,1)
+				row1 = readAndParseInt(d,1)
+				row2 = readAndParseInt(d,1)
+				row3 = readAndParseInt(d,1)
+				r0,g0,b0 = ((endpoint0 & 0b1111100000000000) >> 11),((endpoint0 & 0b0000011111100000) >> 5),(endpoint0 & 0b0000000000011111)
+				r1,g1,b1 = ((endpoint1 & 0b1111100000000000) >> 11),((endpoint1 & 0b0000011111100000) >> 5),(endpoint1 & 0b0000000000011111)
+				# potential future feature: autodetect images that are supposed to be greyscale and only use the higher-resolution green channel
+				#if monochrome and not(r0 == b0 and r1 == b1 and abs(r0*2 - g0) <= 1 and abs(r1*2 - g1) <= 1):
+				#	monochrome = False
+				colours = [[],[],[],[]]
+				colours[0] = [r0/0b11111,g0/0b111111,b0/0b11111,1.0]
+				colours[1] = [r1/0b11111,g1/0b111111,b1/0b11111,1.0]
+				colours[2] = [2/3*colours[0][0]+1/3*colours[1][0],2/3*colours[0][1]+1/3*colours[1][1],2/3*colours[0][2]+1/3*colours[1][2],1.0]
+				colours[3] = [1/3*colours[0][0]+2/3*colours[1][0],1/3*colours[0][1]+2/3*colours[1][1],1/3*colours[0][2]+2/3*colours[1][2],1.0]
+				pixelIndexes = [
+								(row3 & 0b00000011), (row3 & 0b00001100) >> 2, (row3 & 0b00110000) >> 4, (row3 & 0b11000000) >> 6,
+								(row2 & 0b00000011), (row2 & 0b00001100) >> 2, (row2 & 0b00110000) >> 4, (row2 & 0b11000000) >> 6,
+								(row1 & 0b00000011), (row1 & 0b00001100) >> 2, (row1 & 0b00110000) >> 4, (row1 & 0b11000000) >> 6,
+								(row0 & 0b00000011), (row0 & 0b00001100) >> 2, (row0 & 0b00110000) >> 4, (row0 & 0b11000000) >> 6,
+								]
+				for p,pi in enumerate(pixelIndexes):
+					pixels[(blockRootPixelX + p % 4) + ((blockRootPixelY + p // 4) * virtImgWidth)] = colours[pi]
+			elif format == "BC5_UNORM":
+				# the "use reversal to implement 1-bit alpha" logic has been left out (believed not needed)
+				r0 = readAndParseInt(d,1)
+				r1 = readAndParseInt(d,1)
+				reds = [r0,r1]
+				for r in range(6):
+					reds.append(((6-r)*r0+(r+1)*r1)/7.0)
+				redIndexes0 = int.from_bytes(d.read(3),"little") # can't use readAndParseInt for these since 3 is a weird size
+				redIndexes1 = int.from_bytes(d.read(3),"little")
+				redIndexes = []
+				for r in range(8):
+					redIndexes.append((redIndexes0 & (0b111 << r*3)) >> r*3)
+				for r in range(8):
+					redIndexes.append((redIndexes1 & (0b111 << r*3)) >> r*3)
+				g0 = readAndParseInt(d,1)
+				g1 = readAndParseInt(d,1)
+				greens = [g0,g1]
+				for g in range(6):
+					greens.append(((6-g)*g0+(g+1)*g1)/7.0)
+				greenIndexes0 = int.from_bytes(d.read(3),"little")
+				greenIndexes1 = int.from_bytes(d.read(3),"little")
+				greenIndexes = []
+				for g in range(8):
+					greenIndexes.append((greenIndexes0 & (0b111 << g*3)) >> g*3)
+				for g in range(8):
+					greenIndexes.append((greenIndexes1 & (0b111 << g*3)) >> g*3)
+				pixelIndexes = [[redIndexes[i],greenIndexes[i]] for i in [12,13,14,15,8,9,10,11,4,5,6,7,0,1,2,3]]
+				for p,pi in enumerate(pixelIndexes):
+					if blueBC5: # calculate blue channel for normal mapping (length of [r,g,b] is 1.0)
+						r = (reds[pi[0]]-128)/128.0
+						g = (greens[pi[1]]-128)/128.0
+						try:
+							b = math.sqrt(1-r**2-g**2)
+						except ValueError: # r**2-g**2 > 1, thus sqrt tries to operate on a negative
+							b = 0
+					else:
+						b = 0
+					colour = [reds[pi[0]]/255.0,greens[pi[1]]/255.0,b,1]
+					pixels[(blockRootPixelX + p % 4) + ((blockRootPixelY + p // 4) * virtImgWidth)] = colour
+	d.close()
+	
+	# final pixel data must be flattened (and, if necessary, cropped)
+	newImage.pixels = pixels.reshape([virtImgHeight,virtImgWidth,4])[0:imgHeight,0:imgWidth].flatten()
+	newImage.update()
+	return None
 
 # Forge classes, because just packing/unpacking arrays gets old and error-prone
 

@@ -152,7 +152,7 @@ def import_wimdo(f, context):
 		f.seek(shadersOffset)
 	if cachedTexturesTableOffset > 0:
 		f.seek(cachedTexturesTableOffset)
-	if uncachedTexturesTableOffset > 0:
+	if uncachedTexturesTableOffset > 0: # don't need this for the texture files themselves - it's for metadata (alpha, repeat, etc)
 		f.seek(uncachedTexturesTableOffset)
 	
 	skeleton = MonadoForgeSkeleton()
@@ -222,6 +222,34 @@ def import_wismt(f, wimdoResults, context):
 			contentType = readAndParseInt(f,2)
 			hasContentType[contentType] = True
 			contentPointers.append([internalOffset,contentSize,highResSubfileIndex,contentType])
+	textureIDList = []
+	if textureIDsOffset > 0:
+		f.seek(mainOffset+textureIDsOffset)
+		for i in range(textureIDsCount):
+			textureIDList.append(readAndParseInt(f,2))
+	textureHeaders = []
+	if textureCountOffset > 0:
+		f.seek(mainOffset+textureCountOffset)
+		textureCount = readAndParseInt(f,4)
+		textureChunkSize = readAndParseInt(f,4)
+		textureUnknown = readAndParseInt(f,4)
+		textureStringsOffset = readAndParseInt(f,4)
+		for i in range(textureCount):
+			textureUnknown1 = readAndParseInt(f,4)
+			textureFilesize = readAndParseInt(f,4)
+			textureOffset = readAndParseInt(f,4)
+			textureNameOffset = readAndParseInt(f,4)
+			tempOffset = f.tell()
+			f.seek(mainOffset+textureCountOffset+textureNameOffset)
+			textureName = readStr(f)
+			f.seek(tempOffset)
+			textureHeaders.append([textureFilesize,textureOffset,textureNameOffset,textureName])
+		# not really sure why this is here, but it's in XBC2MD, so there must be a reason for it
+		# special case: if these offsets are the same, the IDs are in a different spot than usual (i.e. here right after the headers)
+		if textureIDsOffset == textureCountOffset:
+			textureIDList = []
+			for i in range(textureCount):
+				textureIDList.append(readAndParseInt(f,2))
 	
 	meshes = []
 	vertexWeights = {}
@@ -481,10 +509,37 @@ def import_wismt(f, wimdoResults, context):
 					sf.close()
 			if contentType == 1: # shader
 				data = subfileData[internalOffset:internalOffset+contentSize]
+				if printProgress:
+					print("Found shader chunk of size "+str(contentSize)+" (not supported, skipping)")
 				pass
 			if contentType == 2: # cached texture
 				data = subfileData[internalOffset:internalOffset+contentSize]
-				pass
+				sf = io.BytesIO(data)
+				try: # no except, just finally (to close sf)
+					for i in range(len(textureHeaders)):
+						textureFilesize,textureOffset,textureNameOffset,textureName = textureHeaders[i]
+						# for some reason, this stuff is in reverse order: first data, then properties (in reverse order), and magic at end
+						sf.seek(textureOffset+textureFilesize-0x4)
+						submagic = sf.read(4)
+						if submagic != b"LBIM":
+							print("Bad cached texture (invalid subfilemagic); skipping "+str(textureName))
+						else:
+							sf.seek(textureOffset+textureFilesize-0x28)
+							subfileUnknown5 = readAndParseInt(sf,4)
+							subfileUnknown4 = readAndParseInt(sf,4)
+							imgWidth = readAndParseInt(sf,4)
+							imgHeight = readAndParseInt(sf,4)
+							subfileUnknown3 = readAndParseInt(sf,4)
+							subfileUnknown2 = readAndParseInt(sf,4)
+							imgType = readAndParseInt(sf,4)
+							subfileUnknown1 = readAndParseInt(sf,4)
+							imgVersion = readAndParseInt(sf,4)
+							if printProgress:
+								print(f"Found texture: name {textureName}, size {imgWidth}x{imgHeight}, format {imgType}")
+							sf.seek(textureOffset)
+							parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,sf.read(textureFilesize),context.scene.xb_tools_model.blueBC5)
+				finally:
+					sf.close()
 		del subfileData # just to ensure it's cleaned up as soon as possible
 		nextSubfileIndex += 1
 	if hasMedResSubfile:
@@ -494,14 +549,11 @@ def import_wismt(f, wimdoResults, context):
 			internalOffset,contentSize,highResSubfileIndex,contentType = cp
 			if contentType == 3: # med-res texture
 				data = subfileData[internalOffset:internalOffset+contentSize]
+				if printProgress:
+					print("Found uncached texture of size "+str(contentSize)+" (not yet supported, skipping)")
 				pass
 		del subfileData
 		nextSubfileIndex += 1
-	
-	if textureIDsOffset > 0:
-		f.seek(mainOffset+textureIDsOffset)
-	if textureCountOffset > 0:
-		f.seek(mainOffset+textureCountOffset)
 	
 	for m in meshes:
 		m.indexVertices()
@@ -752,6 +804,11 @@ class XBModelToolsProperties(PropertyGroup):
 		description="Erase shape keys that have no effect",
 		default=False,
 	)
+	blueBC5 : BoolProperty(
+		name="Normalize BC5s",
+		description="Assume that BC5-format images are normal maps, and calculate the blue channel accordingly",
+		default=True,
+	)
 
 class OBJECT_PT_XBModelToolsPanel(Panel):
 	bl_idname = "OBJECT_PT_XBModelToolsPanel"
@@ -795,12 +852,26 @@ class OBJECT_PT_XBModelToolsCleanupPanel(Panel):
 		col.prop(scn.xb_tools_model, "cleanupEmptyGroups")
 		col.prop(scn.xb_tools_model, "cleanupEmptyShapes")
 
+class OBJECT_PT_XBModelToolsTexturePanel(Panel):
+	bl_idname = "OBJECT_PT_XBModelToolsTexturePanel"
+	bl_label = "Textures"
+	bl_space_type = "VIEW_3D"
+	bl_region_type = "UI"
+	bl_parent_id = "OBJECT_PT_XBModelToolsPanel"
+	
+	def draw(self, context):
+		layout = self.layout
+		scn = context.scene
+		col = layout.column(align=True)
+		col.prop(scn.xb_tools_model, "blueBC5")
+
 classes = (
 			XBModelImportOperator,
 			XBModelCleanupOperator,
 			XBModelToolsProperties,
 			OBJECT_PT_XBModelToolsPanel,
 			OBJECT_PT_XBModelToolsCleanupPanel,
+			OBJECT_PT_XBModelToolsTexturePanel,
 			)
 
 def register():

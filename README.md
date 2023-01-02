@@ -3,7 +3,8 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files.
 
 ## Game support
 * :x: - Not supported, but planned (eventually).
-* :o: - Ought to work, but not well-tested (if at all).
+* :hash: - Partially supported; number is a basic "how done does this feel" estimate.
+* :o: - Not well-tested (if at all). _Ought_ to work just as well as the best-supported version, but no guarantees.
 * :heavy_check_mark: - Supported.
 
 | | <img alt="XC1" src="https://www.xenoserieswiki.org/w/images/8/8d/Article_icon_-_Xenoblade_Chronicles.svg" width="24px"/> | <img alt="XCX" src="https://www.xenoserieswiki.org/w/images/3/3f/Article_icon_-_Xenoblade_Chronicles_X.svg" width="24px"/> | <img alt="XC2" src="https://www.xenoserieswiki.org/w/images/a/a8/Article_icon_-_Xenoblade_Chronicles_2.svg" width="24px"/> | <img alt="XC1DE" src="https://www.xenoserieswiki.org/w/images/6/6f/Article_icon_-_Xenoblade_Chronicles_Definitive_Edition.svg" width="24px"/> | <img alt="XC3" src="https://www.xenoserieswiki.org/w/images/b/bc/Article_icon_-_Xenoblade_Chronicles_3.svg" width="24px"/>
@@ -12,9 +13,10 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files.
 | Model import | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Vertex colours | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ UVs | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
-| └ Vertex normals | :no_entry_sign: | :grey_question: | :heavy_check_mark: | :heavy_check_mark: | :o: |
+| └ Vertex normals | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Vertex groups | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Shapes/Morphs | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
+| └ Textures | :x: | :x: | 25% | 25% | :o: |
 
 ## Current features
 ### Skeleton
@@ -31,10 +33,12 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files.
 * Supports normals, UVs, vertex colours, rigging (vertex groups), and shapes (morphs). Models are automatically parented to the skeleton found in the .wimdo; use the skeleton merge feature to move it over to one imported from the matching .arc/.chr file.
 * Optionally also import lower-LOD models. Doesn't currently distinguish them in any way.
 * Optional mesh cleanup, erasing unused vertices, vertex groups, and shapes.
+* Imports cached textures that are R8G8B8A8_UNORM, BC1_UNORM, or BC5_UNORM.
+* Optionally assumes that BC5_UNORM textures are normal maps, and auto-calculates the blue channel for them.
 
 ## Planned features
 Roughly in order of priority.
-* Texture extraction
+* Remaining texture formats, sizes, and types
 * UV folding
 * Material assignment
 
