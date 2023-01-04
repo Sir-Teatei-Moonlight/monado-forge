@@ -535,7 +535,7 @@ def import_wismt(f, wimdoResults, context):
 							subfileUnknown1 = readAndParseInt(sf,4)
 							imgVersion = readAndParseInt(sf,4)
 							if printProgress:
-								print(f"Found texture: name {textureName}, size {imgWidth}x{imgHeight}, format {imgType}")
+								print(f"Found cached texture: name {textureName}, size {imgWidth}x{imgHeight}, format {imgType}")
 							sf.seek(textureOffset)
 							parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,sf.read(textureFilesize),context.scene.xb_tools_model.blueBC5)
 				finally:
@@ -545,14 +545,43 @@ def import_wismt(f, wimdoResults, context):
 	if hasMedResSubfile:
 		subfileHeaderOffset = mainOffset+subfileHeadersOffset+nextSubfileIndex*3*4
 		subfileName,subfileData = extract_wismt_subfile(f,subfileHeaderOffset)
-		for cp in contentPointers:
+		for cpi,cp in enumerate(contentPointers):
 			internalOffset,contentSize,highResSubfileIndex,contentType = cp
 			if contentType == 3: # med-res texture
 				data = subfileData[internalOffset:internalOffset+contentSize]
-				if printProgress:
-					print("Found uncached texture of size "+str(contentSize)+" (not yet supported, skipping)")
-				pass
+				sf = io.BytesIO(data)
+				try: # no except, just finally (to close sf)
+					textureName = textureHeaders[textureIDList[cpi-3]][3]
+					# for some reason, this stuff is in reverse order: first data, then properties (in reverse order), and magic at end
+					sf.seek(contentSize-0x4)
+					submagic = sf.read(4)
+					if submagic != b"LBIM":
+						print("Bad cached texture (invalid subfilemagic); skipping "+str(textureName))
+					else:
+						sf.seek(contentSize-0x28)
+						subfileUnknown5 = readAndParseInt(sf,4)
+						subfileUnknown4 = readAndParseInt(sf,4)
+						imgWidth = readAndParseInt(sf,4)
+						imgHeight = readAndParseInt(sf,4)
+						subfileUnknown3 = readAndParseInt(sf,4)
+						subfileUnknown2 = readAndParseInt(sf,4)
+						imgType = readAndParseInt(sf,4)
+						subfileUnknown1 = readAndParseInt(sf,4)
+						imgVersion = readAndParseInt(sf,4)
+						if printProgress:
+							print(f"Found med-res texture: name {textureName}, size {imgWidth}x{imgHeight}, format {imgType}")
+						sf.seek(0)
+						parse_texture(textureName+"_medRes",imgVersion,imgType,imgWidth,imgHeight,sf.read(),context.scene.xb_tools_model.blueBC5)
+				finally:
+					sf.close()
 		del subfileData
+		nextSubfileIndex += 1
+	# at this point, any remaining subfiles ought to be full-size textures
+	while nextSubfileIndex < subfileCount:
+		textureName = textureHeaders[textureIDList[nextSubfileIndex-2]][3]
+		#subfileHeaderOffset = mainOffset+subfileHeadersOffset+nextSubfileIndex*3*4
+		#subfileName,subfileData = extract_wismt_subfile(f,subfileHeaderOffset)
+		print(f"Found full-size texture: name {textureName} (not doing anything with it yet)")
 		nextSubfileIndex += 1
 	
 	for m in meshes:
