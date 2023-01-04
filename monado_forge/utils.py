@@ -326,7 +326,6 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 				a = readAndParseInt(d,1)
 				pixels[blockRootPixelX+blockRootPixelY*virtImgWidth] = [r/255.0,g/255.0,b/255.0,a/255.0]
 			elif format == "BC1_UNORM":
-				# the "use reversal to implement 1-bit alpha" logic has been left out (believed not needed)
 				endpoint0 = readAndParseInt(d,2)
 				endpoint1 = readAndParseInt(d,2)
 				row0 = readAndParseInt(d,1)
@@ -341,8 +340,12 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 				colours = [[],[],[],[]]
 				colours[0] = [r0/0b11111,g0/0b111111,b0/0b11111,1.0]
 				colours[1] = [r1/0b11111,g1/0b111111,b1/0b11111,1.0]
-				colours[2] = [2/3*colours[0][0]+1/3*colours[1][0],2/3*colours[0][1]+1/3*colours[1][1],2/3*colours[0][2]+1/3*colours[1][2],1.0]
-				colours[3] = [1/3*colours[0][0]+2/3*colours[1][0],1/3*colours[0][1]+2/3*colours[1][1],1/3*colours[0][2]+2/3*colours[1][2],1.0]
+				if endpoint0 > endpoint1:
+					colours[2] = [2/3*colours[0][0]+1/3*colours[1][0],2/3*colours[0][1]+1/3*colours[1][1],2/3*colours[0][2]+1/3*colours[1][2],1.0]
+					colours[3] = [1/3*colours[0][0]+2/3*colours[1][0],1/3*colours[0][1]+2/3*colours[1][1],1/3*colours[0][2]+2/3*colours[1][2],1.0]
+				else:
+					colours[2] = [1/2*colours[0][0]+1/2*colours[1][0],1/2*colours[0][1]+1/2*colours[1][1],1/2*colours[0][2]+1/2*colours[1][2],1.0]
+					colours[3] = [0.0,0.0,0.0,0.0]
 				pixelIndexes = [
 								(row3 & 0b00000011), (row3 & 0b00001100) >> 2, (row3 & 0b00110000) >> 4, (row3 & 0b11000000) >> 6,
 								(row2 & 0b00000011), (row2 & 0b00001100) >> 2, (row2 & 0b00110000) >> 4, (row2 & 0b11000000) >> 6,
@@ -352,12 +355,17 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 				for p,pi in enumerate(pixelIndexes):
 					pixels[(blockRootPixelX + p % 4) + ((blockRootPixelY + p // 4) * virtImgWidth)] = colours[pi]
 			elif format == "BC5_UNORM":
-				# the "use reversal to implement 1-bit alpha" logic has been left out (believed not needed)
 				r0 = readAndParseInt(d,1)
 				r1 = readAndParseInt(d,1)
 				reds = [r0,r1]
-				for r in range(6):
-					reds.append(((6-r)*r0+(r+1)*r1)/7.0)
+				if r0 > r1:
+					for r in range(6):
+						reds.append(((6-r)*r0+(r+1)*r1)/7.0)
+				else:
+					for r in range(4):
+						reds.append(((4-r)*r0+(r+1)*r1)/5.0)
+					reds.append(0.0)
+					reds.append(255.0)
 				redIndexes0 = int.from_bytes(d.read(3),"little") # can't use readAndParseInt for these since 3 is a weird size
 				redIndexes1 = int.from_bytes(d.read(3),"little")
 				redIndexes = []
@@ -368,8 +376,14 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 				g0 = readAndParseInt(d,1)
 				g1 = readAndParseInt(d,1)
 				greens = [g0,g1]
-				for g in range(6):
-					greens.append(((6-g)*g0+(g+1)*g1)/7.0)
+				if g0 > g1:
+					for g in range(6):
+						greens.append(((6-g)*g0+(g+1)*g1)/7.0)
+				else:
+					for g in range(4):
+						greens.append(((4-g)*g0+(g+1)*g1)/5.0)
+					greens.append(0.0)
+					greens.append(255.0)
 				greenIndexes0 = int.from_bytes(d.read(3),"little")
 				greenIndexes1 = int.from_bytes(d.read(3),"little")
 				greenIndexes = []
