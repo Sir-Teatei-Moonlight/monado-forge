@@ -403,9 +403,9 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 						r = (reds[pi[0]]-128)/128.0
 						g = (greens[pi[1]]-128)/128.0
 						try:
-							b = math.sqrt(1-r**2-g**2)
+							b = (math.sqrt(1-r**2-g**2))/2+0.5
 						except ValueError: # r**2-g**2 > 1, thus sqrt tries to operate on a negative
-							b = 0
+							b = 0.5
 					else:
 						b = 0
 					colour = [reds[pi[0]]/255.0,greens[pi[1]]/255.0,b,1]

@@ -581,7 +581,8 @@ def import_wismt(f, wimdoResults, context):
 		textureName = textureHeaders[textureIDList[nextSubfileIndex-2]][3]
 		#subfileHeaderOffset = mainOffset+subfileHeadersOffset+nextSubfileIndex*3*4
 		#subfileName,subfileData = extract_wismt_subfile(f,subfileHeaderOffset)
-		print(f"Found full-size texture: name {textureName} (not doing anything with it yet)")
+		if printProgress:
+			print(f"Found full-size texture: name {textureName} (not doing anything with it yet)")
 		nextSubfileIndex += 1
 	
 	for m in meshes:
