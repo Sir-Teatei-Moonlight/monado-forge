@@ -31,6 +31,8 @@ def flattened_list_recursive(given_list):
 		return flattened_list_recursive(given_list[0]) + flattened_list_recursive(given_list[1:])
 	return given_list[:1] + flattened_list_recursive(given_list[1:])
 
+swizzleMapCache = {}
+
 # file reading
 
 u8CodeB = ">B"
@@ -281,27 +283,31 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 	d = io.BytesIO(rawData)
 	#print(format)
 	
-	swizzleTileMap = numpy.full([tileCountY,tileCountX],-1,dtype=int)
-	# swizzle pattern: (may need to change as larger images enter the testing phase)
-	# x = 10101011111000010010
-	# y = 01010100000111101101
-	# [x9, y9, x8, y8, x7, y7, x6, x5, x4, x3, x2, y6, y5, y4, y3, x1, y2, y1, x0, y0]
-	# the distinction between z and currentTile is so we can draw the z-curve out of bounds while keeping all valid values in-bounds
-	currentTile = 0
-	z = -1 # will be incremented to 0 shortly
-	while currentTile < tileCountY*tileCountX:
-		if z > 10000000:
-			print("Bad z-loop detected in image "+textureName+": z = "+str(z)+"; currentTile = "+str(currentTile))
-			break
-		z += 1
-		y = ((z&0x40000)>>9) | ((z&0x10000)>>8) | ((z&0x4000)>>7) | ((z&0x1E0)>>2) | ((z&0xC)>>1) | (z&0x1)
-		if y >= len(swizzleTileMap): continue
-		x = ((z&0x80000)>>10) | ((z&0x20000)>>9) | ((z&0x8000)>>8) | ((z&0x3E00)>>7) | ((z&0x10)>>3) | ((z&0x2)>>1)
-		if x >= len(swizzleTileMap[y]): continue
-		swizzleTileMap[y,x] = currentTile
-		currentTile += 1
-	swizzlist = swizzleTileMap.flatten().tolist()
-	#print(swizzlist)
+	try:
+		swizzlist = swizzleMapCache[f"{tileCountY},{tileCountX}"]
+	except KeyError:
+		swizzleTileMap = numpy.full([tileCountY,tileCountX],-1,dtype=int)
+		# swizzle pattern: (may need to change as larger images enter the testing phase)
+		# x = 10101011111000010010
+		# y = 01010100000111101101
+		# [x9, y9, x8, y8, x7, y7, x6, x5, x4, x3, x2, y6, y5, y4, y3, x1, y2, y1, x0, y0]
+		# the distinction between z and currentTile is so we can draw the z-curve out of bounds while keeping all valid values in-bounds
+		currentTile = 0
+		z = -1 # will be incremented to 0 shortly
+		while currentTile < tileCountY*tileCountX:
+			if z > 10000000:
+				print("Bad z-loop detected in image "+textureName+": z = "+str(z)+"; currentTile = "+str(currentTile))
+				break
+			z += 1
+			y = ((z&0x40000)>>9) | ((z&0x10000)>>8) | ((z&0x4000)>>7) | ((z&0x1E0)>>2) | ((z&0xC)>>1) | (z&0x1)
+			if y >= len(swizzleTileMap): continue
+			x = ((z&0x80000)>>10) | ((z&0x20000)>>9) | ((z&0x8000)>>8) | ((z&0x3E00)>>7) | ((z&0x10)>>3) | ((z&0x2)>>1)
+			if x >= len(swizzleTileMap[y]): continue
+			swizzleTileMap[y,x] = currentTile
+			currentTile += 1
+		swizzlist = swizzleTileMap.flatten().tolist()
+		swizzleMapCache[f"{tileCountY},{tileCountX}"] = swizzlist
+		#print(swizzlist)
 	#swizzlist = range(blockCountX*blockCountY) # no-op option for debugging
 	monochrome = True
 	unassignedCount = False

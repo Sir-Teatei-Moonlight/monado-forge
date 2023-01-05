@@ -34,7 +34,7 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files.
 * Optionally also import lower-LOD models. Doesn't currently distinguish them in any way.
 * Optional mesh cleanup, erasing unused vertices, vertex groups, and shapes.
 * Imports cached textures that are R8G8B8A8_UNORM, BC1_UNORM, or BC5_UNORM.
-* Also imports medium-resolution uncached textures. Currently only finds the biggest one and attaches "medRes" to the name, trying to figure out a better way to do it.
+* Also imports medium-resolution uncached textures. Currently only finds the biggest one and attaches "medRes" to the name, trying to figure out a better way to do it. Then again, these are the least important texture sizes, so might not try too hard.
 * Optionally assumes that BC5_UNORM textures are normal maps, and auto-calculates the blue channel for them.
 
 ## Planned features
