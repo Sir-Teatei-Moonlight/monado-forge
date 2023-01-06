@@ -542,7 +542,7 @@ def import_wismt(f, wimdoResults, context):
 					sf.close()
 		del subfileData # just to ensure it's cleaned up as soon as possible
 		nextSubfileIndex += 1
-	if hasMedResSubfile:
+	if hasMedResSubfile and context.scene.xb_tools_model.alsoImportMipmaps:
 		subfileHeaderOffset = mainOffset+subfileHeadersOffset+nextSubfileIndex*3*4
 		subfileName,subfileData = extract_wismt_subfile(f,subfileHeaderOffset)
 		for cpi,cp in enumerate(contentPointers):
@@ -839,6 +839,11 @@ class XBModelToolsProperties(PropertyGroup):
 		description="Assume that BC5-format images are normal maps, and calculate the blue channel accordingly",
 		default=True,
 	)
+	alsoImportMipmaps : BoolProperty(
+		name="Also Import Mipmaps",
+		description="Include non-full-size uncached textures (\"medium resolution\") in the import",
+		default=True,
+	)
 
 class OBJECT_PT_XBModelToolsPanel(Panel):
 	bl_idname = "OBJECT_PT_XBModelToolsPanel"
@@ -894,6 +899,7 @@ class OBJECT_PT_XBModelToolsTexturePanel(Panel):
 		scn = context.scene
 		col = layout.column(align=True)
 		col.prop(scn.xb_tools_model, "blueBC5")
+		col.prop(scn.xb_tools_model, "alsoImportMipmaps")
 
 classes = (
 			XBModelImportOperator,
