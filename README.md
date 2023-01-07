@@ -16,7 +16,7 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files.
 | └ Vertex normals | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Vertex groups | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Shapes/Morphs | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
-| └ Textures | :x: | :x: | 40% | 30% | :o: |
+| └ Textures | :x: | :x: | 60% | 50% | :o: |
 
 ## Current features
 ### Skeleton
@@ -33,8 +33,7 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files.
 * Supports normals, UVs, vertex colours, rigging (vertex groups), and shapes (morphs). Models are automatically parented to the skeleton found in the .wimdo; use the skeleton merge feature to move it over to one imported from the matching .arc/.chr file.
 * Optionally also import lower-LOD models. Doesn't currently distinguish them in any way.
 * Optional mesh cleanup, erasing unused vertices, vertex groups, and shapes.
-* Imports cached textures that are R8G8B8A8_UNORM, BC1_UNORM, or BC5_UNORM.
-* Also (optionally) imports medium-resolution uncached textures (a.k.a. mipmaps). Currently only finds the biggest one and attaches "medRes" to the name, trying to figure out a better way to do it. Then again, these are the least important texture sizes, so might not try too hard.
+* Imports textures that are R8G8B8A8_UNORM, BC1_UNORM, or BC5_UNORM. By default, keeps only the biggest of each, but provides the option to keep all resolutions.
 * Optionally assumes that BC5_UNORM textures are normal maps, and auto-calculates the blue channel for them.
 
 ## Planned features

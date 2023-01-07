@@ -209,7 +209,7 @@ def import_wismt(f, wimdoResults, context):
 	# models, shaders, and cached textures (low-res) point to subfile[0]
 	# uncached textures (mid-res) point to subfile[1] and have a subfile index for their high-res version
 	# both use their internalOffset within their subfile
-	# the remaining subfiles (no matching content pointers) are high-res textures
+	# the remaining subfiles (no matching content pointers) are just raw data to be used by the uncached textures (they don't even have headers)
 	
 	contentPointers = []
 	hasContentType = [False,False,False,False] # model, shader, cached texture, uncached texture
@@ -255,7 +255,7 @@ def import_wismt(f, wimdoResults, context):
 	vertexWeights = {}
 	nextSubfileIndex = 0
 	hasRootSubfile = hasContentType[0] or hasContentType[1] or hasContentType[2]
-	hasMedResSubfile = hasContentType[3]
+	hasUncachedTexSubfile = hasContentType[3]
 	if hasRootSubfile:
 		subfileHeaderOffset = mainOffset+subfileHeadersOffset+nextSubfileIndex*3*4
 		subfileName,subfileData = extract_wismt_subfile(f,subfileHeaderOffset)
@@ -284,7 +284,7 @@ def import_wismt(f, wimdoResults, context):
 					shapeHeaders = []
 					shapeTargets = []
 					shapes = []
-					if vertexTableOffset > 0: # not sure how we can have a mesh without vertexes, but okay
+					if vertexTableOffset > 0: # not sure how we can have a mesh without vertexes, but just in case
 						for i in range(vertexTableCount):
 							sf.seek(vertexTableOffset+i*8*4)
 							vtDataOffset = readAndParseInt(sf,4)
@@ -488,7 +488,7 @@ def import_wismt(f, wimdoResults, context):
 							unusedVertexTables.remove(vtIndex)
 						if ftIndex in unusedFaceTables:
 							unusedFaceTables.remove(ftIndex)
-						# this order of operations means that tables are still "used" even if they're of dropped LODs
+						# this order of operations means that tables are still marked as "used" even if they're of dropped LODs
 						if not context.scene.xb_tools_model.alsoImportLODs:
 							if md.getMeshLODValue() > bestLOD:
 								continue
@@ -534,15 +534,17 @@ def import_wismt(f, wimdoResults, context):
 							imgType = readAndParseInt(sf,4)
 							subfileUnknown1 = readAndParseInt(sf,4)
 							imgVersion = readAndParseInt(sf,4)
+							sf.seek(textureOffset)
 							if printProgress:
 								print(f"Found cached texture: name {textureName}, size {imgWidth}x{imgHeight}, format {imgType}")
-							sf.seek(textureOffset)
+							if context.scene.xb_tools_model.keepAllResolutions:
+								textureName = os.path.join("res0",textureName)
 							parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,sf.read(textureFilesize),context.scene.xb_tools_model.blueBC5)
 				finally:
 					sf.close()
 		del subfileData # just to ensure it's cleaned up as soon as possible
 		nextSubfileIndex += 1
-	if hasMedResSubfile and context.scene.xb_tools_model.alsoImportMipmaps:
+	if hasUncachedTexSubfile:
 		subfileHeaderOffset = mainOffset+subfileHeadersOffset+nextSubfileIndex*3*4
 		subfileName,subfileData = extract_wismt_subfile(f,subfileHeaderOffset)
 		for cpi,cp in enumerate(contentPointers):
@@ -556,7 +558,7 @@ def import_wismt(f, wimdoResults, context):
 					sf.seek(contentSize-0x4)
 					submagic = sf.read(4)
 					if submagic != b"LBIM":
-						print("Bad cached texture (invalid subfilemagic); skipping "+str(textureName))
+						print("Bad uncached texture (invalid subfilemagic); skipping "+str(textureName))
 					else:
 						sf.seek(contentSize-0x28)
 						subfileUnknown5 = readAndParseInt(sf,4)
@@ -568,22 +570,29 @@ def import_wismt(f, wimdoResults, context):
 						imgType = readAndParseInt(sf,4)
 						subfileUnknown1 = readAndParseInt(sf,4)
 						imgVersion = readAndParseInt(sf,4)
-						if printProgress:
-							print(f"Found med-res texture: name {textureName}, size {imgWidth}x{imgHeight}, format {imgType}")
-						sf.seek(0)
-						parse_texture(textureName+"_medRes",imgVersion,imgType,imgWidth,imgHeight,sf.read(),context.scene.xb_tools_model.blueBC5)
+						if context.scene.xb_tools_model.keepAllResolutions or highResSubfileIndex <= 0: # if there's no highResSubfileIndex, this is the best resolution
+							sf.seek(0)
+							if printProgress:
+								print(f"Found uncached texture: name {textureName}, size {imgWidth}x{imgHeight}, format {imgType}")
+							nameToUse = textureName
+							if context.scene.xb_tools_model.keepAllResolutions:
+								nameToUse = os.path.join("res1",nameToUse)
+							parse_texture(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(),context.scene.xb_tools_model.blueBC5)
+						# it is at this point where we need the data from the highest-resolution image
+						if highResSubfileIndex > 0:
+							hdfileHeaderOffset = mainOffset+subfileHeadersOffset+highResSubfileIndex*3*4
+							hdfileName,hdfileData = extract_wismt_subfile(f,hdfileHeaderOffset)
+							if printProgress:
+								print(f"Found uncached texture: name {textureName}, size {imgWidth*2}x{imgHeight*2}, format {imgType}")
+							nameToUse = textureName
+							if context.scene.xb_tools_model.keepAllResolutions:
+								nameToUse = os.path.join("res2",nameToUse)
+							parse_texture(nameToUse,imgVersion,imgType,imgWidth*2,imgHeight*2,hdfileData,context.scene.xb_tools_model.blueBC5)
 				finally:
 					sf.close()
 		del subfileData
 		nextSubfileIndex += 1
-	# at this point, any remaining subfiles ought to be full-size textures
-	while nextSubfileIndex < subfileCount:
-		textureName = textureHeaders[textureIDList[nextSubfileIndex-2]][3]
-		#subfileHeaderOffset = mainOffset+subfileHeadersOffset+nextSubfileIndex*3*4
-		#subfileName,subfileData = extract_wismt_subfile(f,subfileHeaderOffset)
-		if printProgress:
-			print(f"Found full-size texture: name {textureName} (not doing anything with it yet)")
-		nextSubfileIndex += 1
+	# at this point, any remaining subfiles ought to be unheadered data, so ignore them
 	
 	for m in meshes:
 		m.indexVertices()
@@ -839,10 +848,10 @@ class XBModelToolsProperties(PropertyGroup):
 		description="Assume that BC5-format images are normal maps, and calculate the blue channel accordingly",
 		default=True,
 	)
-	alsoImportMipmaps : BoolProperty(
-		name="Also Import Mipmaps",
-		description="Include non-full-size uncached textures (\"medium resolution\") in the import",
-		default=True,
+	keepAllResolutions : BoolProperty(
+		name="Keep All Resolutions",
+		description="Include all textures, even if there's a larger resolution of the same",
+		default=False,
 	)
 
 class OBJECT_PT_XBModelToolsPanel(Panel):
@@ -899,7 +908,7 @@ class OBJECT_PT_XBModelToolsTexturePanel(Panel):
 		scn = context.scene
 		col = layout.column(align=True)
 		col.prop(scn.xb_tools_model, "blueBC5")
-		col.prop(scn.xb_tools_model, "alsoImportMipmaps")
+		col.prop(scn.xb_tools_model, "keepAllResolutions")
 
 classes = (
 			XBModelImportOperator,

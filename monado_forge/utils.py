@@ -248,14 +248,23 @@ imageFormats = {
 # 	https://en.wikipedia.org/wiki/Z-order_curve
 # 	https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-block-compression
 # 	https://github.com/ScanMountGoat/tegra_swizzle
-def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blueBC5):
+def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blueBC5,overwrite=True):
 	try:
 		format,bitsPerPixel = imageFormats[imgType]
 	except KeyError:
 		raise ValueError("unsupported image type: id# "+str(imgType))
 	if format in ["BC3_UNORM","BC4_UNORM","BC7_UNORM"]:
 		print("Format "+format+" is not yet supported (texture "+textureName+" will be blank)")
-	newImage = bpy.data.images.new(textureName,imgWidth,imgHeight,alpha=False)
+	
+	# first, check to see if image of the intended name exists already, and how to proceed
+	try:
+		existingImage = bpy.data.images[textureName]
+		if overwrite:
+			bpy.data.images.remove(existingImage)
+	except KeyError as e: # no existing image of the same name
+		pass # fine, move on
+	newImage = bpy.data.images.new(textureName,imgWidth,imgHeight)
+	
 	blockSize = 4 # in pixels
 	unswizzleBufferSize = bitsPerPixel*2 # needs a better name at some point
 	if format == "R8G8B8A8_UNORM": # blocks are single pixels rather than 4x4
@@ -287,10 +296,10 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 		swizzlist = swizzleMapCache[f"{tileCountY},{tileCountX}"]
 	except KeyError:
 		swizzleTileMap = numpy.full([tileCountY,tileCountX],-1,dtype=int)
-		# swizzle pattern: (may need to change as larger images enter the testing phase)
-		# x = 10101011111000010010
-		# y = 01010100000111101101
-		# [x9, y9, x8, y8, x7, y7, x6, x5, x4, x3, x2, y6, y5, y4, y3, x1, y2, y1, x0, y0]
+		# swizzle pattern: (may need to change as larger images are discovered, but should be correct for smaller ones)
+		# x = 10001111111000010010
+		# y = 01110000000111101101
+		# [x9, y9, y8, y7, x8, x7, x6, x5, x4, x3, x2, y6, y5, y4, y3, x1, y2, y1, x0, y0]
 		# the distinction between z and currentTile is so we can draw the z-curve out of bounds while keeping all valid values in-bounds
 		currentTile = 0
 		z = -1 # will be incremented to 0 shortly
@@ -299,9 +308,9 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 				print("Bad z-loop detected in image "+textureName+": z = "+str(z)+"; currentTile = "+str(currentTile))
 				break
 			z += 1
-			y = ((z&0x40000)>>9) | ((z&0x10000)>>8) | ((z&0x4000)>>7) | ((z&0x1E0)>>2) | ((z&0xC)>>1) | (z&0x1)
+			y = ((z&0x70000)>>9) | ((z&0x1E0)>>2) | ((z&0xC)>>1) | (z&0x1)
 			if y >= len(swizzleTileMap): continue
-			x = ((z&0x80000)>>10) | ((z&0x20000)>>9) | ((z&0x8000)>>8) | ((z&0x3E00)>>7) | ((z&0x10)>>3) | ((z&0x2)>>1)
+			x = ((z&0x80000)>>10) | ((z&0xFE00)>>7) | ((z&0x10)>>3) | ((z&0x2)>>1)
 			if x >= len(swizzleTileMap[y]): continue
 			swizzleTileMap[y,x] = currentTile
 			currentTile += 1
@@ -414,9 +423,11 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 		print("Texture "+textureName+" didn't complete deswizzling correctly: "+str(unassignedCount)+" / "+str(tileCountY*tileCountX)+" tiles unassigned")
 	d.close()
 	
+	newImage.file_format = "PNG"
 	# final pixel data must be flattened (and, if necessary, cropped)
 	newImage.pixels = pixels.reshape([virtImgHeight,virtImgWidth,4])[0:imgHeight,0:imgWidth].flatten()
 	newImage.update()
+	#newImage.save()
 	return None
 
 # Forge classes, because just packing/unpacking arrays gets old and error-prone
