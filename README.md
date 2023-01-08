@@ -48,4 +48,5 @@ Roughly in order of priority.
 * Blender does not support per-shape normals, so that information is lost.
 * Models entirely embedded in the .wimdo are not checked for yet.
 * Models without skeletons will probably not import correctly. (Should be an easy fix, but still counts as a "known issue".)
+* Outline meshes are not recognised or treated as anything special. If you get two entirely identical meshes, consider that one may be the outline, in which case you can delete one of them (probably the higher-numbered one).
 
