@@ -255,13 +255,14 @@ imageFormats = {
 # 	https://en.wikipedia.org/wiki/Z-order_curve
 # 	https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-block-compression
 # 	https://learn.microsoft.com/en-us/windows/win32/direct3d11/bc7-format
+# 	https://github.com/python-pillow/Pillow/blob/main/src/libImaging/BcnDecode.c
 # 	https://github.com/ScanMountGoat/tegra_swizzle
 def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blueBC5,overwrite=True,saveTo=None):
 	try:
 		format,bitsPerPixel = imageFormats[imgType]
 	except KeyError:
 		raise ValueError("unsupported image type: id# "+str(imgType))
-	if format in ["BC3_UNORM","BC4_UNORM","BC7_UNORM"]:
+	if format in ["BC7_UNORM"]:
 		print_warning("Format "+format+" is not yet supported (texture "+textureName+" will be blank)")
 	
 	# first, check to see if image of the intended name exists already, and how to proceed
@@ -352,7 +353,30 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 				b = readAndParseInt(d,1)
 				a = readAndParseInt(d,1)
 				pixels[blockRootPixelX+blockRootPixelY*virtImgWidth] = [r/255.0,g/255.0,b/255.0,a/255.0]
-			elif format == "BC1_UNORM":
+			elif format == "BC1_UNORM" or format == "BC3_UNORM": # easy enough to treat these the same
+				if format == "BC3_UNORM":
+					a0 = readAndParseInt(d,1)
+					a1 = readAndParseInt(d,1)
+					alphas = [a0,a1]
+					if a0 > a1:
+						for a in range(6):
+							alphas.append(((6-a)*a0+(a+1)*a1)/7.0)
+					else:
+						for a in range(4):
+							alphas.append(((4-a)*a0+(a+1)*a1)/5.0)
+						alphas.append(0.0)
+						alphas.append(255.0)
+					alphaIndexes0 = int.from_bytes(d.read(3),"little") # can't use readAndParseInt for these since 3 is a weird size
+					alphaIndexes1 = int.from_bytes(d.read(3),"little")
+					alphaIndexesTemp = []
+					for a in range(8):
+						alphaIndexesTemp.append((alphaIndexes0 & (0b111 << a*3)) >> a*3)
+					for a in range(8):
+						alphaIndexesTemp.append((alphaIndexes1 & (0b111 << a*3)) >> a*3)
+					alphaIndexes = [alphaIndexesTemp[i] for i in [12,13,14,15,8,9,10,11,4,5,6,7,0,1,2,3]]
+				else:
+					alphas = [255.0 for i in range(8)]
+					alphaIndexes = [0 for i in range(16)]
 				endpoint0 = readAndParseInt(d,2)
 				endpoint1 = readAndParseInt(d,2)
 				row0 = readAndParseInt(d,1)
@@ -367,7 +391,7 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 				colours = [[],[],[],[]]
 				colours[0] = [r0/0b11111,g0/0b111111,b0/0b11111,1.0]
 				colours[1] = [r1/0b11111,g1/0b111111,b1/0b11111,1.0]
-				if endpoint0 > endpoint1:
+				if endpoint0 > endpoint1 or format == "BC3_UNORM":
 					colours[2] = [2/3*colours[0][0]+1/3*colours[1][0],2/3*colours[0][1]+1/3*colours[1][1],2/3*colours[0][2]+1/3*colours[1][2],1.0]
 					colours[3] = [1/3*colours[0][0]+2/3*colours[1][0],1/3*colours[0][1]+2/3*colours[1][1],1/3*colours[0][2]+2/3*colours[1][2],1.0]
 				else:
@@ -380,8 +404,8 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 								(row0 & 0b00000011), (row0 & 0b00001100) >> 2, (row0 & 0b00110000) >> 4, (row0 & 0b11000000) >> 6,
 								]
 				for p,pi in enumerate(pixelIndexes):
-					pixels[(blockRootPixelX + p % 4) + ((blockRootPixelY + p // 4) * virtImgWidth)] = colours[pi]
-			elif format == "BC5_UNORM":
+					pixels[(blockRootPixelX + p % 4) + ((blockRootPixelY + p // 4) * virtImgWidth)] = colours[pi][0:3]+[alphas[alphaIndexes[p]]/255.0]
+			elif format == "BC4_UNORM" or format == "BC5_UNORM": # BC5 is just two BC4s stapled together
 				r0 = readAndParseInt(d,1)
 				r1 = readAndParseInt(d,1)
 				reds = [r0,r1]
@@ -400,37 +424,44 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 					redIndexes.append((redIndexes0 & (0b111 << r*3)) >> r*3)
 				for r in range(8):
 					redIndexes.append((redIndexes1 & (0b111 << r*3)) >> r*3)
-				g0 = readAndParseInt(d,1)
-				g1 = readAndParseInt(d,1)
-				greens = [g0,g1]
-				if g0 > g1:
-					for g in range(6):
-						greens.append(((6-g)*g0+(g+1)*g1)/7.0)
-				else:
-					for g in range(4):
-						greens.append(((4-g)*g0+(g+1)*g1)/5.0)
-					greens.append(0.0)
-					greens.append(255.0)
-				greenIndexes0 = int.from_bytes(d.read(3),"little")
-				greenIndexes1 = int.from_bytes(d.read(3),"little")
-				greenIndexes = []
-				for g in range(8):
-					greenIndexes.append((greenIndexes0 & (0b111 << g*3)) >> g*3)
-				for g in range(8):
-					greenIndexes.append((greenIndexes1 & (0b111 << g*3)) >> g*3)
-				pixelIndexes = [[redIndexes[i],greenIndexes[i]] for i in [12,13,14,15,8,9,10,11,4,5,6,7,0,1,2,3]]
-				for p,pi in enumerate(pixelIndexes):
-					if blueBC5: # calculate blue channel for normal mapping (length of [r,g,b] is 1.0)
-						r = (reds[pi[0]]-128)/128.0
-						g = (greens[pi[1]]-128)/128.0
-						try:
-							b = (math.sqrt(1-r**2-g**2))/2+0.5
-						except ValueError: # r**2-g**2 > 1, thus sqrt tries to operate on a negative
-							b = 0.5
+				if format == "BC4_UNORM":
+					pixelIndexes = [redIndexes[i] for i in [12,13,14,15,8,9,10,11,4,5,6,7,0,1,2,3]]
+					for p,pi in enumerate(pixelIndexes):
+						value = reds[pi[0]]/255.0
+						colour = [value,value,value,1]
+						pixels[(blockRootPixelX + p % 4) + ((blockRootPixelY + p // 4) * virtImgWidth)] = colour
+				else: # is BC5_UNORM
+					g0 = readAndParseInt(d,1)
+					g1 = readAndParseInt(d,1)
+					greens = [g0,g1]
+					if g0 > g1:
+						for g in range(6):
+							greens.append(((6-g)*g0+(g+1)*g1)/7.0)
 					else:
-						b = 0
-					colour = [reds[pi[0]]/255.0,greens[pi[1]]/255.0,b,1]
-					pixels[(blockRootPixelX + p % 4) + ((blockRootPixelY + p // 4) * virtImgWidth)] = colour
+						for g in range(4):
+							greens.append(((4-g)*g0+(g+1)*g1)/5.0)
+						greens.append(0.0)
+						greens.append(255.0)
+					greenIndexes0 = int.from_bytes(d.read(3),"little")
+					greenIndexes1 = int.from_bytes(d.read(3),"little")
+					greenIndexes = []
+					for g in range(8):
+						greenIndexes.append((greenIndexes0 & (0b111 << g*3)) >> g*3)
+					for g in range(8):
+						greenIndexes.append((greenIndexes1 & (0b111 << g*3)) >> g*3)
+					pixelIndexes = [[redIndexes[i],greenIndexes[i]] for i in [12,13,14,15,8,9,10,11,4,5,6,7,0,1,2,3]]
+					for p,pi in enumerate(pixelIndexes):
+						if blueBC5: # calculate blue channel for normal mapping (length of [r,g,b] is 1.0)
+							r = (reds[pi[0]]-128)/128.0
+							g = (greens[pi[1]]-128)/128.0
+							try:
+								b = (math.sqrt(1-r**2-g**2))/2+0.5
+							except ValueError: # r**2-g**2 > 1, thus sqrt tries to operate on a negative
+								b = 0.5
+						else:
+							b = 0
+						colour = [reds[pi[0]]/255.0,greens[pi[1]]/255.0,b,1]
+						pixels[(blockRootPixelX + p % 4) + ((blockRootPixelY + p // 4) * virtImgWidth)] = colour
 	if unassignedCount > 0:
 		print_error("Texture "+textureName+" didn't complete deswizzling correctly: "+str(unassignedCount)+" / "+str(tileCountY*tileCountX)+" tiles unassigned")
 	d.close()
