@@ -35,7 +35,7 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 * Optional mesh cleanup, erasing unused vertices, vertex groups, and shapes.
 * Imports textures and saves them to a specified folder. By default, keeps only the biggest of each, but provides the option to keep all resolutions (using subfolders).
 	* Currently supports R8G8B8A8_UNORM, BC1_UNORM, and BC5_UNORM.
-	* Working on BC7_UNORM. BC3_UNORM and BC4_UNORM will come when I find files to test them with.
+	* Expect to support BC3_UNORM, BC4_UNORM, and BC7_UNORM.
 * Optionally assumes that BC5_UNORM textures are normal maps, and auto-calculates the blue channel for them.
 
 ## Planned features
