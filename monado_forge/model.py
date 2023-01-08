@@ -183,6 +183,9 @@ def extract_wismt_subfile(f, headerOffset):
 
 def import_wismt(f, wimdoResults, context):
 	printProgress = context.scene.xb_tools.printProgress
+	texPath = None
+	if context.scene.xb_tools_model.autoSaveTextures:
+		texPath = bpy.path.abspath(context.scene.xb_tools_model.texturePath)
 	# little endian assumed
 	# renamed some stuff from older programs to make more sense:
 	# data items -> content pointers
@@ -539,7 +542,7 @@ def import_wismt(f, wimdoResults, context):
 								print(f"Found cached texture: name {textureName}, size {imgWidth}x{imgHeight}, format {imgType}")
 							if context.scene.xb_tools_model.keepAllResolutions:
 								textureName = os.path.join("res0",textureName)
-							parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,sf.read(textureFilesize),context.scene.xb_tools_model.blueBC5)
+							parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,sf.read(textureFilesize),context.scene.xb_tools_model.blueBC5,saveTo=texPath)
 				finally:
 					sf.close()
 		del subfileData # just to ensure it's cleaned up as soon as possible
@@ -577,7 +580,7 @@ def import_wismt(f, wimdoResults, context):
 							nameToUse = textureName
 							if context.scene.xb_tools_model.keepAllResolutions:
 								nameToUse = os.path.join("res1",nameToUse)
-							parse_texture(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(),context.scene.xb_tools_model.blueBC5)
+							parse_texture(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(),context.scene.xb_tools_model.blueBC5,saveTo=texPath)
 						# it is at this point where we need the data from the highest-resolution image
 						if highResSubfileIndex > 0:
 							hdfileHeaderOffset = mainOffset+subfileHeadersOffset+highResSubfileIndex*3*4
@@ -587,7 +590,7 @@ def import_wismt(f, wimdoResults, context):
 							nameToUse = textureName
 							if context.scene.xb_tools_model.keepAllResolutions:
 								nameToUse = os.path.join("res2",nameToUse)
-							parse_texture(nameToUse,imgVersion,imgType,imgWidth*2,imgHeight*2,hdfileData,context.scene.xb_tools_model.blueBC5)
+							parse_texture(nameToUse,imgVersion,imgType,imgWidth*2,imgHeight*2,hdfileData,context.scene.xb_tools_model.blueBC5,saveTo=texPath)
 				finally:
 					sf.close()
 		del subfileData
@@ -742,6 +745,11 @@ class XBModelImportOperator(Operator):
 		return context.scene.xb_tools_model.singlePath or context.scene.xb_tools_model.defsPath # or context.scene.xb_tools_model.dataPath
 	
 	def execute(self, context):
+		# this isn't part of the poll because it's not a trivial check
+		if context.scene.xb_tools_model.autoSaveTextures:
+			if not os.path.isdir(bpy.path.abspath(context.scene.xb_tools_model.texturePath)):
+				self.report({"ERROR"}, "Auto-save selected but texture output path is not an existing folder")
+				return {"CANCELLED"}
 		try:
 			game = context.scene.xb_tools.game
 			if game == "XC1" or game == "XCX":
@@ -828,6 +836,18 @@ class XBModelToolsProperties(PropertyGroup):
 		description="Perform selected cleanup tasks once import is complete",
 		default=True,
 	)
+	autoSaveTextures : BoolProperty(
+		name="Auto-Save Textures",
+		description="Save extracted textures to disk",
+		default=True,
+	)
+	texturePath : StringProperty(
+		name="Texture Output Path",
+		description="Folder where textures will be auto-saved to (WARNING: will overwrite existing!)",
+		default="",
+		maxlen=1024,
+		subtype="FILE_PATH",
+	)
 	cleanupLooseVertices : BoolProperty(
 		name="Loose Vertices",
 		description="Erase vertices not connected to anything",
@@ -877,6 +897,10 @@ class OBJECT_PT_XBModelToolsPanel(Panel):
 		importPanel.prop(scn.xb_tools_model, "useSkeletonSettings")
 		importPanel.prop(scn.xb_tools_model, "alsoImportLODs")
 		importPanel.prop(scn.xb_tools_model, "doCleanupOnImport")
+		importPanel.prop(scn.xb_tools_model, "autoSaveTextures")
+		importPanel.label(text="Texture Output Path")
+		importPanel.prop(scn.xb_tools_model, "texturePath", text="")
+		importPanel.separator()
 		importPanel.operator(XBModelImportOperator.bl_idname, text="Import Model", icon="IMPORT")
 		importPanel.separator()
 		importPanel.operator(XBModelCleanupOperator.bl_idname, text="Clean Up Selected Meshes", icon="BRUSH_DATA")

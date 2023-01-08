@@ -3,6 +3,7 @@ import io
 import math
 import mathutils
 import numpy
+import os
 import struct
 from contextlib import redirect_stdout
 
@@ -255,7 +256,7 @@ imageFormats = {
 # 	https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-block-compression
 # 	https://learn.microsoft.com/en-us/windows/win32/direct3d11/bc7-format
 # 	https://github.com/ScanMountGoat/tegra_swizzle
-def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blueBC5,overwrite=True):
+def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blueBC5,overwrite=True,saveTo=None):
 	try:
 		format,bitsPerPixel = imageFormats[imgType]
 	except KeyError:
@@ -271,6 +272,10 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 	except KeyError as e: # no existing image of the same name
 		pass # fine, move on
 	newImage = bpy.data.images.new(textureName,imgWidth,imgHeight)
+	# don't really want to do any of this until the end, but apparently setting the filepath after setting the pixels clears the image for no good reason
+	newImage.file_format = "PNG"
+	if saveTo:
+		newImage.filepath = os.path.join(saveTo,textureName+".png")
 	
 	blockSize = 4 # in pixels
 	unswizzleBufferSize = bitsPerPixel*2 # needs a better name at some point
@@ -430,11 +435,11 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 		print_error("Texture "+textureName+" didn't complete deswizzling correctly: "+str(unassignedCount)+" / "+str(tileCountY*tileCountX)+" tiles unassigned")
 	d.close()
 	
-	newImage.file_format = "PNG"
 	# final pixel data must be flattened (and, if necessary, cropped)
 	newImage.pixels = pixels.reshape([virtImgHeight,virtImgWidth,4])[0:imgHeight,0:imgWidth].flatten()
 	newImage.update()
-	#newImage.save()
+	if saveTo:
+		newImage.save()
 	return None
 
 # Forge classes, because just packing/unpacking arrays gets old and error-prone
