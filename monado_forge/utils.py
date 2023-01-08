@@ -30,6 +30,12 @@ def flattened_list_recursive(given_list):
 	if isinstance(given_list[0], list):
 		return flattened_list_recursive(given_list[0]) + flattened_list_recursive(given_list[1:])
 	return given_list[:1] + flattened_list_recursive(given_list[1:])
+def print_colour(s,c):
+	print(c+s+"\033[0m")
+def print_error(s):
+	print_colour(s,"\033[91m")
+def print_warning(s):
+	print_colour(s,"\033[93m")
 
 swizzleMapCache = {}
 
@@ -247,6 +253,7 @@ imageFormats = {
 # 	https://www.vg-resource.com/thread-33929.html
 # 	https://en.wikipedia.org/wiki/Z-order_curve
 # 	https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-block-compression
+# 	https://learn.microsoft.com/en-us/windows/win32/direct3d11/bc7-format
 # 	https://github.com/ScanMountGoat/tegra_swizzle
 def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blueBC5,overwrite=True):
 	try:
@@ -254,7 +261,7 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 	except KeyError:
 		raise ValueError("unsupported image type: id# "+str(imgType))
 	if format in ["BC3_UNORM","BC4_UNORM","BC7_UNORM"]:
-		print("Format "+format+" is not yet supported (texture "+textureName+" will be blank)")
+		print_warning("Format "+format+" is not yet supported (texture "+textureName+" will be blank)")
 	
 	# first, check to see if image of the intended name exists already, and how to proceed
 	try:
@@ -305,7 +312,7 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 		z = -1 # will be incremented to 0 shortly
 		while currentTile < tileCountY*tileCountX:
 			if z > 10000000:
-				print("Bad z-loop detected in image "+textureName+": z = "+str(z)+"; currentTile = "+str(currentTile))
+				print_error("Bad z-loop detected in image "+textureName+": z = "+str(z)+"; currentTile = "+str(currentTile))
 				break
 			z += 1
 			y = ((z&0x70000)>>9) | ((z&0x1E0)>>2) | ((z&0xC)>>1) | (z&0x1)
@@ -420,7 +427,7 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 					colour = [reds[pi[0]]/255.0,greens[pi[1]]/255.0,b,1]
 					pixels[(blockRootPixelX + p % 4) + ((blockRootPixelY + p // 4) * virtImgWidth)] = colour
 	if unassignedCount > 0:
-		print("Texture "+textureName+" didn't complete deswizzling correctly: "+str(unassignedCount)+" / "+str(tileCountY*tileCountX)+" tiles unassigned")
+		print_error("Texture "+textureName+" didn't complete deswizzling correctly: "+str(unassignedCount)+" / "+str(tileCountY*tileCountX)+" tiles unassigned")
 	d.close()
 	
 	newImage.file_format = "PNG"

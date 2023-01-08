@@ -405,7 +405,7 @@ def import_wismt(f, wimdoResults, context):
 					if printProgress and vertexData != {}:
 						print("Finished reading vertex data.")
 					if unknownVDTypes:
-						print("unknownVDTypes: "+str(unknownVDTypes))
+						print_warning("unknownVDTypes: "+str(unknownVDTypes))
 					for i in range(len(faceTables)):
 						faceData[i] = []
 						ftDataOffset,ftVertCount,ftVertexes = faceTables[i]
@@ -522,7 +522,7 @@ def import_wismt(f, wimdoResults, context):
 						sf.seek(textureOffset+textureFilesize-0x4)
 						submagic = sf.read(4)
 						if submagic != b"LBIM":
-							print("Bad cached texture (invalid subfilemagic); skipping "+str(textureName))
+							print_error("Bad cached texture (invalid subfilemagic); skipping "+str(textureName))
 						else:
 							sf.seek(textureOffset+textureFilesize-0x28)
 							subfileUnknown5 = readAndParseInt(sf,4)
@@ -558,7 +558,7 @@ def import_wismt(f, wimdoResults, context):
 					sf.seek(contentSize-0x4)
 					submagic = sf.read(4)
 					if submagic != b"LBIM":
-						print("Bad uncached texture (invalid subfilemagic); skipping "+str(textureName))
+						print_error("Bad uncached texture (invalid subfilemagic); skipping "+str(textureName))
 					else:
 						sf.seek(contentSize-0x28)
 						subfileUnknown5 = readAndParseInt(sf,4)

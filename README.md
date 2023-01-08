@@ -1,5 +1,5 @@
 # Monado Forge
-An addon for Blender (written with 3.3.1) for working with Xenoblade files.
+An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds a tab in the 3D view's right-hand toolbox with a bunch of useful features.
 
 ## Game support
 * :x: - Not supported, but planned (eventually).
@@ -16,7 +16,7 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files.
 | └ Vertex normals | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Vertex groups | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Shapes/Morphs | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
-| └ Textures | :x: | :x: | 60% | 50% | :o: |
+| └ Textures | :x: | :x: | 60% | 50% | 10% |
 
 ## Current features
 ### Skeleton
