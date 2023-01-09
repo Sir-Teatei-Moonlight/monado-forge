@@ -427,7 +427,7 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 				if format == "BC4_UNORM":
 					pixelIndexes = [redIndexes[i] for i in [12,13,14,15,8,9,10,11,4,5,6,7,0,1,2,3]]
 					for p,pi in enumerate(pixelIndexes):
-						value = reds[pi[0]]/255.0
+						value = reds[pi]/255.0
 						colour = [value,value,value,1]
 						pixels[(blockRootPixelX + p % 4) + ((blockRootPixelY + p // 4) * virtImgWidth)] = colour
 				else: # is BC5_UNORM
