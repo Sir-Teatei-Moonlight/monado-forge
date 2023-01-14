@@ -695,15 +695,18 @@ def realise_results(forgeResults, mainName, self, context):
 			for i in range(len(targetArmature.data.bones)):
 				newMeshObject.vertex_groups.new(name=targetArmature.data.bones[i].name)
 				vertexesInEachGroup[i] = mesh.getVertexesInWeightGroup(i)
+			vertexesInEachSet = {}
+			for i in weightIndexes:
+				vertexesInEachSet[i] = mesh.getVertexesWithWeightIndex(i)
 			weightSets = mesh.getWeightSets()
-			for i,weightIndex in enumerate(weightIndexes):
+			for weightIndex in weightIndexes:
 				weightSetData = weightSets[weightIndex]
 				for j in range(len(weightSetData[0])):
 					groupIndex = weightSetData[0][j]
 					groupValue = weightSetData[1][j]
 					if groupValue == 0: continue
 					vertexGroup = newMeshObject.vertex_groups[groupIndex]
-					vertexesToAdd = vertexesInEachGroup[groupIndex]
+					vertexesToAdd = vertexesInEachSet[weightIndex]
 					vertexIDsToAdd = [v.getID() for v in vertexesToAdd]
 					newMeshObject.vertex_groups[groupIndex].add(vertexIDsToAdd,groupValue,"ADD")
 		elif mesh.hasWeights(): # no indexes, but do have directly-applied weights

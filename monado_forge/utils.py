@@ -776,6 +776,8 @@ class MonadoForgeMesh:
 		return [v.getWeights() for v in self._vertices]
 	def getVertexesInWeightGroup(self,groupID):
 		return [v for v in self._vertices if groupID in v.getWeights().keys()]
+	def getVertexesWithWeightIndex(self,index):
+		return [v for v in self._vertices if v.getWeightSetIndex() == index]
 	def getFaceVertexIndexesList(self):
 		return [f.getVertexIndexes() for f in self._faces]
 
