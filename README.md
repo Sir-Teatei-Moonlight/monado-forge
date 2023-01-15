@@ -16,7 +16,7 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 | └ Vertex normals | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Vertex groups | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Shapes/Morphs | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
-| └ Textures | :x: | :x: | :heavy_check_mark: | 80% | 10% |
+| └ Textures | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | 10% |
 | └ Materials | :x: | :x: | :x: | :x: | :x: |
 
 ## Current features
@@ -34,13 +34,13 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 * Supports normals, UVs, vertex colours, rigging (vertex groups), and shapes (morphs). Models are automatically parented to the skeleton found in the .wimdo; use the skeleton merge feature to move it over to one imported from the matching .arc/.chr file.
 * Optionally also import lower-LOD models. Doesn't currently distinguish them in any way.
 * Optional mesh cleanup, erasing unused vertices, vertex groups, and shapes.
-* Imports textures and saves them to a specified folder. By default, keeps only the biggest of each, but provides the option to keep all resolutions (using subfolders).
-	* Currently supports R8G8B8A8 and BCs 1, 3, 4, and 5. BC7 is difficult but will (must) eventually be done. (It's believed BC2 and BC6 are not used, so not gonna bother with them.)
+* Imports textures and saves them to a specified folder. By default, keeps only the biggest of each, but provides the option to keep all resolutions (using subfolders). Supports all known-to-be-used formats (R8G8B8A8, BC1, BC3, BC4, BC5, BC7).
 * Optionally assumes that BC5 textures are normal maps, and auto-calculates the blue channel for them.
 
 ## Planned features
 Roughly in order of priority.
-* Remaining texture formats, sizes, and types
+* (XC3) Getting textures from external folders
+* Better console feedback for super-long-running operations but without too many lines being printed
 * UV folding
 * Material assignment
 
@@ -49,4 +49,5 @@ Roughly in order of priority.
 * Models entirely embedded in the .wimdo are not checked for yet.
 * Models without skeletons will probably not import correctly. (Should be an easy fix, but still counts as a "known issue".)
 * Outline meshes are not recognised or treated as anything special. If you get two entirely identical meshes, consider that one may be the outline, in which case you can delete one of them (probably the higher-numbered one).
+* Certain meshes have messed-up vertex weights (e.g. XC1DE pc082402). Believed to be a rare issue, no idea what the cause could be yet.
 
