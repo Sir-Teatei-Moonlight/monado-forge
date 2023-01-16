@@ -33,11 +33,22 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 
 ### Model
 * Imports .wimdo/.wismt model files. The .wimdo can be imported alone, which grabs only whatever bones are inside, while the .wismt import requires a .wimdo to go with it.
-* Supports normals, UVs, vertex colours, rigging (vertex groups), and shapes (morphs). Models are automatically parented to the skeleton found in the .wimdo; use the skeleton merge feature to move it over to one imported from the matching .arc/.chr file.
+* Supports normals, UVs, vertex colours, rigging (vertex groups), and shapes (morphs). Models are automatically parented to the skeleton found in the .wimdo.
 * Optionally also import lower-LOD models. Doesn't currently distinguish them in any way.
 * Optional mesh cleanup, erasing unused vertices, vertex groups, and shapes.
 * Imports textures and saves them to a specified folder. By default, keeps only the biggest of each, but provides the option to keep all resolutions (using subfolders). Supports all known-to-be-used formats (R8G8B8A8, BC1, BC3, BC4, BC5, BC7).
 * Optionally assumes that BC5 textures are normal maps, and auto-calculates the blue channel for them.
+
+## Known issues
+### Things with workarounds
+* The workflow for getting the proper skeleton setup is not the best. You have to import the .arc/.chr, then import the .wimdo+.wismt, and then use the skeleton merge feature to merge the .wimdo+.wismt skeleton into the .arc/.chr one. There's improvement to be made, but it works well enough and there are more important features to focus on.
+* Some models have multiple weight tables, but the information about which one to use per each mesh cannot yet be found. Use the "Weight Table Override" feature to select which one to use for all meshes, and re-import for each one so you can pick-and-choose which ones are correct.
+### Things with no workarounds
+* Blender does not support per-shape normals, so that information is lost. In theory it won't matter much.
+* Models entirely embedded in the .wimdo are not checked for yet. Very rare, so ought not to be a big deal.
+* Models without skeletons will probably not import correctly. Should be an easy fix, but still counts as a "known issue".
+* Outline meshes are not recognised or treated as anything special. If you get two entirely identical meshes, consider that one may be the outline, in which case you can delete one of them (probably the higher-numbered one). Unclear how to handle this as of yet (guessing it's material-related).
+* Outline data is not yet processed. Not quite sure how to be honest, perhaps will leverage a vertex colour layer for it.
 
 ## Planned features
 Roughly in order of priority.
@@ -45,11 +56,4 @@ Roughly in order of priority.
 * Better console feedback for super-long-running operations but without too many lines being printed
 * UV folding
 * Material assignment
-
-## Known issues
-* Blender does not support per-shape normals, so that information is lost.
-* Models entirely embedded in the .wimdo are not checked for yet.
-* Models without skeletons will probably not import correctly. (Should be an easy fix, but still counts as a "known issue".)
-* Outline meshes are not recognised or treated as anything special. If you get two entirely identical meshes, consider that one may be the outline, in which case you can delete one of them (probably the higher-numbered one).
-* Some models have multiple weight tables, but the information about which one to use cannot yet be found. Use the "Weight Table Override" feature to select which one to use for all meshes, and re-import for each one so you can pick-and-choose which ones are correct.
 
