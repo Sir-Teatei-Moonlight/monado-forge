@@ -946,7 +946,7 @@ class MonadoForgeMesh:
 		self._name = "Mesh"
 		self._vertices = []
 		self._faces = []
-		self._weightSets = {} # because it can be convenient to hold these here and have vertexes just refer with index
+		self._weightSets = [] # because it can be convenient to hold these here and have vertexes just refer with index
 		self._shapes = [] # list of MonadoForgeMeshShapes
 	
 	def getVertices(self):
@@ -977,13 +977,13 @@ class MonadoForgeMesh:
 		return self._weightSets
 	def clearWeightSets(self):
 		self._weightSets = []
-	def addWeightSet(self,index,a):
+	def addWeightSet(self,a):
 		if not isinstance(a,list):
 			raise TypeError("expected a list, not a(n) "+str(type(a)))
-		self._weightSets[index] = a
+		self._weightSets.append(a)
 	def setWeightSets(self,d):
-		if not isinstance(d,dict):
-			raise TypeError("expected a dict, not a(n) "+str(type(d)))
+		if not isinstance(d,list):
+			raise TypeError("expected a list, not a(n) "+str(type(d)))
 		self._weightSets = d
 	
 	def getShapes(self):

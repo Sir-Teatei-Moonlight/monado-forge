@@ -1,6 +1,8 @@
 # Monado Forge
 An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds a tab in the 3D view's right-hand toolbox with a bunch of useful features.
 
+**General notice:** Keep the system console toggled on so you can see any potential warnings.
+
 ## Game support
 * :x: - Not supported, but planned (eventually).
 * :hash: - Partially supported; number is a basic "how done does this feel" estimate.
@@ -49,5 +51,5 @@ Roughly in order of priority.
 * Models entirely embedded in the .wimdo are not checked for yet.
 * Models without skeletons will probably not import correctly. (Should be an easy fix, but still counts as a "known issue".)
 * Outline meshes are not recognised or treated as anything special. If you get two entirely identical meshes, consider that one may be the outline, in which case you can delete one of them (probably the higher-numbered one).
-* Certain meshes have messed-up vertex weights (e.g. XC1DE pc082402). Believed to be a rare issue, no idea what the cause could be yet.
+* Some models have multiple weight tables, but the information about which one to use cannot yet be found. Use the "Weight Table Override" feature to select which one to use for all meshes, and re-import for each one so you can pick-and-choose which ones are correct.
 

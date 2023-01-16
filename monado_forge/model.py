@@ -9,6 +9,7 @@ from bpy.props import (
 						BoolProperty,
 						EnumProperty,
 						FloatProperty,
+						IntProperty,
 						PointerProperty,
 						StringProperty,
 						)
@@ -255,7 +256,7 @@ def import_wismt(f, wimdoResults, context):
 				textureIDList.append(readAndParseInt(f,2))
 	
 	meshes = []
-	vertexWeights = {}
+	vertexWeights = []
 	nextSubfileIndex = 0
 	hasRootSubfile = hasContentType[0] or hasContentType[1] or hasContentType[2]
 	hasUncachedTexSubfile = hasContentType[3]
@@ -336,6 +337,8 @@ def import_wismt(f, wimdoResults, context):
 							weightTables.append([wtDataOffset,wtDataCount,wtLOD])
 						if printProgress:
 							print("Found "+str(len(weightTables))+" weight tables.")
+						if len(weightTables) > 1:
+							print_warning("You may need to use the Weight Table Override feature to get correct weights for some meshes. Make a new import for each table, and keep only the valid meshes.")
 					if shapeDataOffset > 0:
 						sf.seek(shapeDataOffset)
 						shapeHeaderCount = readAndParseInt(sf,4)
@@ -474,15 +477,29 @@ def import_wismt(f, wimdoResults, context):
 					if weightDataOffset > 0: # has weights
 						unusedVertexTables.remove(weightVertTableIndex)
 						for v in range(len(vertexWeightData[weightVertTableIndex])):
-							vertexWeights[v] = [vertexWeightData[weightVertTableIndex][v][0],vertexWeightData[weightVertTableIndex][v][1]]
+							vertexWeights.append([vertexWeightData[weightVertTableIndex][v][0],vertexWeightData[weightVertTableIndex][v][1]])
+					# we don't know how to pick the right weight table, so for now we let the user pick which one to use for all (needing multiple imports to do it right)
+					forcedWeightTable = context.scene.xb_tools_model.tempWeightTableOverride
+					if forcedWeightTable > 0:
+						if forcedWeightTable >= len(weightTables):
+							print_warning("weight table override too high, ignoring and treating as 0")
+						else:
+							totalOffset = weightTables[forcedWeightTable][0]
+							vertexWeights = vertexWeights[totalOffset:]
 					# we can "bake" the vertices with their weights now (but they keep the index in case it's more useful later)
+					badWeightTable = False
 					for i,vertices in vertexData.items():
 						for v in vertices:
 							weightIndex = v.getWeightSetIndex()
 							if weightIndex == -1: continue
-							for j in range(len(vertexWeights[weightIndex][0])):
-								if vertexWeights[weightIndex][1][j] > 0:
-									v.setWeight(vertexWeights[weightIndex][0][j],vertexWeights[weightIndex][1][j])
+							try:
+								for j in range(len(vertexWeights[weightIndex][0])):
+									if vertexWeights[weightIndex][1][j] > 0:
+										v.setWeight(vertexWeights[weightIndex][0][j],vertexWeights[weightIndex][1][j])
+							except IndexError:
+								badWeightTable = True
+					if badWeightTable:
+						print_warning("some vertices will not have weights due to the chosen weight table being too small")
 					# now for the meshes themselves
 					for md in wimdoResults.getMeshHeaders():
 						vtIndex = md.getMeshVertTableIndex()
@@ -547,7 +564,7 @@ def import_wismt(f, wimdoResults, context):
 					sf.close()
 		del subfileData # just to ensure it's cleaned up as soon as possible
 		nextSubfileIndex += 1
-	if hasUncachedTexSubfile:
+	if hasUncachedTexSubfile and context.scene.xb_tools_model.importUncachedTextures:
 		subfileHeaderOffset = mainOffset+subfileHeadersOffset+nextSubfileIndex*3*4
 		subfileName,subfileData = extract_wismt_subfile(f,subfileHeaderOffset)
 		for cpi,cp in enumerate(contentPointers):
@@ -700,7 +717,10 @@ def realise_results(forgeResults, mainName, self, context):
 				vertexesInEachSet[i] = mesh.getVertexesWithWeightIndex(i)
 			weightSets = mesh.getWeightSets()
 			for weightIndex in weightIndexes:
-				weightSetData = weightSets[weightIndex]
+				try:
+					weightSetData = weightSets[weightIndex]
+				except IndexError: # can happen if the weight table override is high - the warning has already been given above
+					continue
 				for j in range(len(weightSetData[0])):
 					groupIndex = weightSetData[0][j]
 					groupValue = weightSetData[1][j]
@@ -824,6 +844,12 @@ class XBModelToolsProperties(PropertyGroup):
 		maxlen=1024,
 		subtype="FILE_PATH",
 	)
+	tempWeightTableOverride : IntProperty(
+		name="Weight Table Override",
+		description="Force all meshes to use this weight table (see readme for explanation)",
+		default=0,
+		min=0,
+	)
 	useSkeletonSettings : BoolProperty(
 		name="Use Skeleton Settings",
 		description="If model contains any bones, use settings from the Skeleton panel to import it (false: use default settings)",
@@ -837,6 +863,11 @@ class XBModelToolsProperties(PropertyGroup):
 	doCleanupOnImport : BoolProperty(
 		name="Clean Up After Import",
 		description="Perform selected cleanup tasks once import is complete",
+		default=True,
+	)
+	importUncachedTextures : BoolProperty(
+		name="Import Uncached Textures",
+		description="Uncheck to skip importing the large and slow textures",
 		default=True,
 	)
 	autoSaveTextures : BoolProperty(
@@ -897,9 +928,11 @@ class OBJECT_PT_XBModelToolsPanel(Panel):
 			defsRow.prop(scn.xb_tools_model, "defsPath", text=".wimdo")
 			dataRow = importPanel.row()
 			dataRow.prop(scn.xb_tools_model, "dataPath", text=".wismt")
+		importPanel.prop(scn.xb_tools_model, "tempWeightTableOverride")
 		importPanel.prop(scn.xb_tools_model, "useSkeletonSettings")
 		importPanel.prop(scn.xb_tools_model, "alsoImportLODs")
 		importPanel.prop(scn.xb_tools_model, "doCleanupOnImport")
+		importPanel.prop(scn.xb_tools_model, "importUncachedTextures")
 		importPanel.prop(scn.xb_tools_model, "autoSaveTextures")
 		importPanel.label(text="Texture Output Path")
 		importPanel.prop(scn.xb_tools_model, "texturePath", text="")
