@@ -7,7 +7,7 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 * :x: - Not supported, but planned (eventually).
 * :hash: - Partially supported; number is a basic "how done does this feel" estimate.
 * :o: - Not well-tested (if at all). _Ought_ to work just as well as the best-supported version, but no guarantees.
-* :heavy_check_mark: - Supported.
+* :heavy_check_mark: - Supported. Any problems should be noted in the Known Issues section.
 
 | | <img alt="XC1" src="https://www.xenoserieswiki.org/w/images/8/8d/Article_icon_-_Xenoblade_Chronicles.svg" width="24px"/> | <img alt="XCX" src="https://www.xenoserieswiki.org/w/images/3/3f/Article_icon_-_Xenoblade_Chronicles_X.svg" width="24px"/> | <img alt="XC2" src="https://www.xenoserieswiki.org/w/images/a/a8/Article_icon_-_Xenoblade_Chronicles_2.svg" width="24px"/> | <img alt="XC1DE" src="https://www.xenoserieswiki.org/w/images/6/6f/Article_icon_-_Xenoblade_Chronicles_Definitive_Edition.svg" width="24px"/> | <img alt="XC3" src="https://www.xenoserieswiki.org/w/images/b/bc/Article_icon_-_Xenoblade_Chronicles_3.svg" width="24px"/>
 | --- | :---: | :---: | :---: | :---: | :---: |
@@ -18,7 +18,7 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 | └ Vertex normals | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Vertex groups | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Shapes/Morphs | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
-| └ Textures | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | 10% |
+| └ Textures | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Materials | :x: | :x: | :x: | :x: | :x: |
 
 ## Current features
@@ -33,7 +33,7 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 
 ### Model
 * Imports .wimdo/.wismt model files. The .wimdo can be imported alone, which grabs only whatever bones are inside, while the .wismt import requires a .wimdo to go with it.
-* Supports normals, UVs, vertex colours, rigging (vertex groups), and shapes (morphs). Models are automatically parented to the skeleton found in the .wimdo.
+* Supports normals, UVs, vertex colours, rigging (vertex groups), and shapes (morphs). Models are automatically parented to the skeleton found in the .wimdo; if there is no skeleton, they are parented to a blank one.
 * Optionally also import lower-LOD models. Doesn't currently distinguish them in any way.
 * Optional mesh cleanup, erasing unused vertices, vertex groups, and shapes.
 * Imports textures and saves them to a specified folder. By default, keeps only the biggest of each, but provides the option to keep all resolutions (using subfolders). Supports all known-to-be-used formats (R8G8B8A8, BC1, BC3, BC4, BC5, BC7).
@@ -46,13 +46,11 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 ### Things with no workarounds
 * Blender does not support per-shape normals, so that information is lost. In theory it won't matter much.
 * Models entirely embedded in the .wimdo are not checked for yet. Very rare, so ought not to be a big deal.
-* Models without skeletons will probably not import correctly. Should be an easy fix, but still counts as a "known issue".
 * Outline meshes are not recognised or treated as anything special. If you get two entirely identical meshes, consider that one may be the outline, in which case you can delete one of them (probably the higher-numbered one). Unclear how to handle this as of yet (guessing it's material-related).
 * Outline data is not yet processed. Not quite sure how to be honest, perhaps will leverage a vertex colour layer for it.
 
 ## Planned features
 Roughly in order of priority.
-* (XC3) Getting textures from external folders
 * Better console feedback for super-long-running operations but without too many lines being printed
 * UV folding
 * Material assignment

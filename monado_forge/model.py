@@ -163,12 +163,14 @@ def import_wimdo(f, context):
 		print("Finished parsing .wimdo file.")
 	return results
 
-def extract_wismt_subfile(f, headerOffset):
+def extract_wismt_subfile(f, headerOffset, headless=False):
 	f.seek(headerOffset)
 	compressedSize = readAndParseInt(f,4)
 	uncompressedSize = readAndParseInt(f,4)
 	dataOffset = readAndParseInt(f,4)
 	f.seek(dataOffset)
+	if headless:
+		f.seek(headerOffset)
 	submagic = f.read(4)
 	if submagic != b"xbc1":
 		raise ValueError("subfile at "+str(headerOffset)+" has an invalid header (not \"xbc1\")")
@@ -183,10 +185,12 @@ def extract_wismt_subfile(f, headerOffset):
 	return subfileName,content
 
 def import_wismt(f, wimdoResults, context):
+	game = context.scene.xb_tools.game
 	printProgress = context.scene.xb_tools.printProgress
 	texPath = None
 	if context.scene.xb_tools_model.autoSaveTextures:
 		texPath = bpy.path.abspath(context.scene.xb_tools_model.texturePath)
+	listOfCachedTextureNames = [] # only needed for XC3 but no harm in building it regardless
 	# little endian assumed
 	# renamed some stuff from older programs to make more sense:
 	# data items -> content pointers
@@ -557,6 +561,7 @@ def import_wismt(f, wimdoResults, context):
 							sf.seek(textureOffset)
 							if printProgress:
 								print(f"Found cached texture: name {textureName}, size {imgWidth}x{imgHeight}, format {imgType}")
+							listOfCachedTextureNames.append(textureName)
 							if context.scene.xb_tools_model.keepAllResolutions:
 								textureName = os.path.join("res0",textureName)
 							parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,sf.read(textureFilesize),context.scene.xb_tools_model.blueBC5,saveTo=texPath)
@@ -564,7 +569,7 @@ def import_wismt(f, wimdoResults, context):
 					sf.close()
 		del subfileData # just to ensure it's cleaned up as soon as possible
 		nextSubfileIndex += 1
-	if hasUncachedTexSubfile and context.scene.xb_tools_model.importUncachedTextures:
+	if hasUncachedTexSubfile and context.scene.xb_tools_model.importUncachedTextures: # reminder: XC3 doesn't go in here at all (at least for most models)
 		subfileHeaderOffset = mainOffset+subfileHeadersOffset+nextSubfileIndex*3*4
 		subfileName,subfileData = extract_wismt_subfile(f,subfileHeaderOffset)
 		for cpi,cp in enumerate(contentPointers):
@@ -613,6 +618,57 @@ def import_wismt(f, wimdoResults, context):
 		del subfileData
 		nextSubfileIndex += 1
 	# at this point, any remaining subfiles ought to be unheadered data, so ignore them
+	# now, go fetch the external textures
+	# assumption: the external .wismt files here are literally copy-pastes of the previous-game stuff
+	# as in, the Ms have the typical headers, while the Hs are headerless and double the size
+	# there's probably a way to reduce the copy-pasted code here, but the necessary differences are subtle
+	texMPath = bpy.path.abspath(context.scene.xb_tools_model.textureRepoMPath)
+	texHPath = bpy.path.abspath(context.scene.xb_tools_model.textureRepoHPath)
+	if game == "XC3" and context.scene.xb_tools_model.importUncachedTextures and texMPath and texHPath:
+		for textureName in set(listOfCachedTextureNames):
+			mFilename = os.path.join(texMPath,textureName+".wismt")
+			hFilename = os.path.join(texHPath,textureName+".wismt")
+			if not os.path.exists(mFilename): continue
+			hasH = os.path.exists(hFilename)
+			with open(mFilename,"rb") as fM:
+				subfileName,subfileData = extract_wismt_subfile(fM,0,headless=True)
+				sf = io.BytesIO(subfileData)
+				try: # no except, just finally (to close sf)
+					sf.seek(len(subfileData)-0x4)
+					submagic = sf.read(4)
+					if submagic != b"LBIM":
+						print_error("Bad uncached texture (invalid subfilemagic); skipping "+str(textureName))
+						continue
+					sf.seek(len(subfileData)-0x28)
+					subfileUnknown5 = readAndParseInt(sf,4)
+					subfileUnknown4 = readAndParseInt(sf,4)
+					imgWidth = readAndParseInt(sf,4)
+					imgHeight = readAndParseInt(sf,4)
+					subfileUnknown3 = readAndParseInt(sf,4)
+					subfileUnknown2 = readAndParseInt(sf,4)
+					imgType = readAndParseInt(sf,4)
+					subfileUnknown1 = readAndParseInt(sf,4)
+					imgVersion = readAndParseInt(sf,4)
+					if context.scene.xb_tools_model.keepAllResolutions or not hasH: # if there's no hasH, this is the best resolution
+						sf.seek(0)
+						if printProgress:
+							print(f"Found uncached texture: name {textureName}, size {imgWidth}x{imgHeight}, format {imgType}")
+						nameToUse = textureName
+						if context.scene.xb_tools_model.keepAllResolutions:
+							nameToUse = os.path.join("res1",nameToUse)
+						parse_texture(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(),context.scene.xb_tools_model.blueBC5,saveTo=texPath)
+					# it is at this point where we need the data from the highest-resolution image
+					if hasH:
+						with open(hFilename,"rb") as fH:
+							hdfileName,hdfileData = extract_wismt_subfile(fH,0,headless=True)
+							if printProgress:
+								print(f"Found uncached texture: name {textureName}, size {imgWidth*2}x{imgHeight*2}, format {imgType}")
+							nameToUse = textureName
+							if context.scene.xb_tools_model.keepAllResolutions:
+								nameToUse = os.path.join("res2",nameToUse)
+							parse_texture(nameToUse,imgVersion,imgType,imgWidth*2,imgHeight*2,hdfileData,context.scene.xb_tools_model.blueBC5,saveTo=texPath)
+				finally:
+					sf.close()
 	
 	for m in meshes:
 		m.indexVertices()
@@ -768,13 +824,16 @@ class XBModelImportOperator(Operator):
 		return context.scene.xb_tools_model.singlePath or context.scene.xb_tools_model.defsPath # or context.scene.xb_tools_model.dataPath
 	
 	def execute(self, context):
-		# this isn't part of the poll because it's not a trivial check
+		game = context.scene.xb_tools.game
+		# this isn't part of the poll because it's not a trivial check and the fix needs to be more descriptive
 		if context.scene.xb_tools_model.autoSaveTextures:
 			if not os.path.isdir(bpy.path.abspath(context.scene.xb_tools_model.texturePath)):
-				self.report({"ERROR"}, "Auto-save selected but texture output path is not an existing folder")
+				self.report({"ERROR"}, "Auto-save selected, but texture output path is not an existing folder")
 				return {"CANCELLED"}
+		if game == "XC3" and not (os.path.isdir(bpy.path.abspath(context.scene.xb_tools_model.textureRepoMPath)) and os.path.isdir(bpy.path.abspath(context.scene.xb_tools_model.textureRepoHPath))):
+			self.report({"ERROR"}, "Import uncached textures selected, but no texture repositories provided (both are required)")
+			return {"CANCELLED"}
 		try:
-			game = context.scene.xb_tools.game
 			if game == "XC1" or game == "XCX":
 				self.report({"ERROR"}, "game not yet supported")
 				return {"CANCELLED"}
@@ -840,6 +899,20 @@ class XBModelToolsProperties(PropertyGroup):
 	dataPath : StringProperty(
 		name="Data Path",
 		description="Data file to import",
+		default="",
+		maxlen=1024,
+		subtype="FILE_PATH",
+	)
+	textureRepoMPath : StringProperty(
+		name=r"\m\ Path",
+		description=r"Path to \m\ texture repository",
+		default="",
+		maxlen=1024,
+		subtype="FILE_PATH",
+	)
+	textureRepoHPath : StringProperty(
+		name=r"\h\ Path",
+		description=r"Path to \h\ texture repository",
 		default="",
 		maxlen=1024,
 		subtype="FILE_PATH",
@@ -933,9 +1006,17 @@ class OBJECT_PT_XBModelToolsPanel(Panel):
 		importPanel.prop(scn.xb_tools_model, "alsoImportLODs")
 		importPanel.prop(scn.xb_tools_model, "doCleanupOnImport")
 		importPanel.prop(scn.xb_tools_model, "importUncachedTextures")
+		if scn.xb_tools.game == "XC3":
+			texMRow = importPanel.row()
+			texMRow.prop(scn.xb_tools_model, "textureRepoMPath", text="\\m\\")
+			texMRow.enabled = scn.xb_tools_model.importUncachedTextures
+			texHRow = importPanel.row()
+			texHRow.prop(scn.xb_tools_model, "textureRepoHPath", text="\\h\\")
+			texHRow.enabled = scn.xb_tools_model.importUncachedTextures
 		importPanel.prop(scn.xb_tools_model, "autoSaveTextures")
-		importPanel.label(text="Texture Output Path")
-		importPanel.prop(scn.xb_tools_model, "texturePath", text="")
+		texturePathRow = importPanel.row()
+		texturePathRow.prop(scn.xb_tools_model, "texturePath", text="...to")
+		texturePathRow.enabled = scn.xb_tools_model.autoSaveTextures
 		importPanel.separator()
 		importPanel.operator(XBModelImportOperator.bl_idname, text="Import Model", icon="IMPORT")
 		importPanel.separator()
