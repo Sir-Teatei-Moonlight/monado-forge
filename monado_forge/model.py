@@ -185,11 +185,13 @@ def extract_wismt_subfile(f, headerOffset, headless=False):
 	return subfileName,content
 
 def import_wismt(f, wimdoResults, context):
+	filename = os.path.splitext(os.path.basename(f.name))[0]
 	game = context.scene.xb_tools.game
 	printProgress = context.scene.xb_tools.printProgress
 	texPath = None
 	if context.scene.xb_tools_model.autoSaveTextures:
 		texPath = bpy.path.abspath(context.scene.xb_tools_model.texturePath)
+	differentiate = context.scene.xb_tools_model.differentiateTextures
 	listOfCachedTextureNames = [] # only needed for XC3 but no harm in building it regardless
 	# little endian assumed
 	# renamed some stuff from older programs to make more sense:
@@ -559,12 +561,12 @@ def import_wismt(f, wimdoResults, context):
 							subfileUnknown1 = readAndParseInt(sf,4)
 							imgVersion = readAndParseInt(sf,4)
 							sf.seek(textureOffset)
-							if printProgress:
-								print(f"Found cached texture: name {textureName}, size {imgWidth}x{imgHeight}, format {imgType}")
 							listOfCachedTextureNames.append(textureName)
+							if differentiate:
+								textureName = filename+"_"+textureName
 							if context.scene.xb_tools_model.keepAllResolutions:
 								textureName = os.path.join("res0",textureName)
-							parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,sf.read(textureFilesize),context.scene.xb_tools_model.blueBC5,saveTo=texPath)
+							parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,sf.read(textureFilesize),context.scene.xb_tools_model.blueBC5,printProgress,saveTo=texPath)
 				finally:
 					sf.close()
 		del subfileData # just to ensure it's cleaned up as soon as possible
@@ -597,22 +599,22 @@ def import_wismt(f, wimdoResults, context):
 						imgVersion = readAndParseInt(sf,4)
 						if context.scene.xb_tools_model.keepAllResolutions or highResSubfileIndex <= 0: # if there's no highResSubfileIndex, this is the best resolution
 							sf.seek(0)
-							if printProgress:
-								print(f"Found uncached texture: name {textureName}, size {imgWidth}x{imgHeight}, format {imgType}")
 							nameToUse = textureName
+							if differentiate:
+								nameToUse = filename+"_"+nameToUse
 							if context.scene.xb_tools_model.keepAllResolutions:
 								nameToUse = os.path.join("res1",nameToUse)
-							parse_texture(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(),context.scene.xb_tools_model.blueBC5,saveTo=texPath)
+							parse_texture(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(),context.scene.xb_tools_model.blueBC5,printProgress,saveTo=texPath)
 						# it is at this point where we need the data from the highest-resolution image
 						if highResSubfileIndex > 0:
 							hdfileHeaderOffset = mainOffset+subfileHeadersOffset+highResSubfileIndex*3*4
 							hdfileName,hdfileData = extract_wismt_subfile(f,hdfileHeaderOffset)
-							if printProgress:
-								print(f"Found uncached texture: name {textureName}, size {imgWidth*2}x{imgHeight*2}, format {imgType}")
 							nameToUse = textureName
+							if differentiate:
+								nameToUse = filename+"_"+nameToUse
 							if context.scene.xb_tools_model.keepAllResolutions:
 								nameToUse = os.path.join("res2",nameToUse)
-							parse_texture(nameToUse,imgVersion,imgType,imgWidth*2,imgHeight*2,hdfileData,context.scene.xb_tools_model.blueBC5,saveTo=texPath)
+							parse_texture(nameToUse,imgVersion,imgType,imgWidth*2,imgHeight*2,hdfileData,context.scene.xb_tools_model.blueBC5,printProgress,saveTo=texPath)
 				finally:
 					sf.close()
 		del subfileData
@@ -651,22 +653,22 @@ def import_wismt(f, wimdoResults, context):
 					imgVersion = readAndParseInt(sf,4)
 					if context.scene.xb_tools_model.keepAllResolutions or not hasH: # if there's no hasH, this is the best resolution
 						sf.seek(0)
-						if printProgress:
-							print(f"Found uncached texture: name {textureName}, size {imgWidth}x{imgHeight}, format {imgType}")
 						nameToUse = textureName
+						if differentiate:
+							nameToUse = filename+"_"+nameToUse
 						if context.scene.xb_tools_model.keepAllResolutions:
 							nameToUse = os.path.join("res1",nameToUse)
-						parse_texture(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(),context.scene.xb_tools_model.blueBC5,saveTo=texPath)
+						parse_texture(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(),context.scene.xb_tools_model.blueBC5,printProgress,saveTo=texPath)
 					# it is at this point where we need the data from the highest-resolution image
 					if hasH:
 						with open(hFilename,"rb") as fH:
 							hdfileName,hdfileData = extract_wismt_subfile(fH,0,headless=True)
-							if printProgress:
-								print(f"Found uncached texture: name {textureName}, size {imgWidth*2}x{imgHeight*2}, format {imgType}")
 							nameToUse = textureName
+							if differentiate:
+								nameToUse = filename+"_"+nameToUse
 							if context.scene.xb_tools_model.keepAllResolutions:
 								nameToUse = os.path.join("res2",nameToUse)
-							parse_texture(nameToUse,imgVersion,imgType,imgWidth*2,imgHeight*2,hdfileData,context.scene.xb_tools_model.blueBC5,saveTo=texPath)
+							parse_texture(nameToUse,imgVersion,imgType,imgWidth*2,imgHeight*2,hdfileData,context.scene.xb_tools_model.blueBC5,printProgress,saveTo=texPath)
 				finally:
 					sf.close()
 	
@@ -980,6 +982,11 @@ class XBModelToolsProperties(PropertyGroup):
 		description="Include all textures, even if there's a larger resolution of the same",
 		default=False,
 	)
+	differentiateTextures : BoolProperty(
+		name="Differentiate",
+		description="Appends the filename to the start of texture names (so they don't overwrite existing ones)",
+		default=True,
+	)
 
 class OBJECT_PT_XBModelToolsPanel(Panel):
 	bl_idname = "OBJECT_PT_XBModelToolsPanel"
@@ -1050,6 +1057,7 @@ class OBJECT_PT_XBModelToolsTexturePanel(Panel):
 		col = layout.column(align=True)
 		col.prop(scn.xb_tools_model, "blueBC5")
 		col.prop(scn.xb_tools_model, "keepAllResolutions")
+		col.prop(scn.xb_tools_model, "differentiateTextures")
 
 classes = (
 			XBModelImportOperator,

@@ -46,6 +46,24 @@ def print_error(s):
 	print_colour(s,"\033[91m")
 def print_warning(s):
 	print_colour(s,"\033[93m")
+def print_bar(p): # 0.0-1.0
+	barLength = 25
+	barsFilled = int(barLength*p)
+	barsUnfilled = barLength-barsFilled
+	print("["+"#"*barsFilled+"-"*barsUnfilled+"]",end="")
+def print_progress_bar(n,d,t): # numerator, denominator, text
+	if n == 0:
+		print(t+": ",end="")
+		print_bar(0)
+		print(" 0 / "+str(d)+" ")
+	elif n == d:
+		print("\033[F\r"+t+": ",end="")
+		print_bar(1)
+		print(" "+str(n)+" / "+str(d))
+	else:
+		print("\033[F\r"+t+": ",end="")
+		print_bar(n/d)
+		print(" "+str(n)+" / "+str(d))
 
 swizzleMapCache = {}
 
@@ -281,6 +299,7 @@ def cleanup_mesh(context,meshObj,looseVerts,emptyGroups,emptyShapes):
 # https://learn.microsoft.com/en-us/windows/win32/api/dxgiformat/ne-dxgiformat-dxgi_format
 # uses the "raw" values taken from the code rather than the ones in the MS enum (we aren't calling any MS code so we don't need it)
 # only contains things we know of (rather than future-proofing with extra entries) since how're we supposed to guess what the raw numbers equate to
+# (it's pretty obvious that 67 = BC2 and 76 = BC6, but those formats are rare anyway)
 # [formatName, bitsPerPixel]
 imageFormats = {
 				37:["R8G8B8A8_UNORM",32],
@@ -381,11 +400,12 @@ bc7AnchorIndexes = {
 # 	https://learn.microsoft.com/en-us/windows/win32/direct3d11/bc7-format
 # 	https://github.com/python-pillow/Pillow/blob/main/src/libImaging/BcnDecode.c
 # 	https://registry.khronos.org/DataFormat/specs/1.3/dataformat.1.3.html#bptc_bc7
-def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blueBC5,overwrite=True,saveTo=None):
+def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blueBC5,printProgress,overwrite=True,saveTo=None):
 	try:
 		imgFormat,bitsPerPixel = imageFormats[imgType]
 	except KeyError:
-		raise ValueError("unsupported image type: id# "+str(imgType))
+		print_error(textureName+" is of an unknown/unsupported image type (id "+str(imgType)+")")
+		return
 	
 	# first, check to see if image of the intended name exists already, and how to proceed
 	try:
@@ -460,6 +480,8 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 		if swizzlist[t] == -1:
 			unassignedCount += 1
 			continue
+		if printProgress and t % 64 == 0: # printing for every single t racks up the import time a lot (e.g. 12s to 20s)
+			print_progress_bar(t,tileCount,textureName)
 		d.seek(swizzlist[t]*(unswizzleBufferSize*tileWidth))
 		for t2 in range(tileWidth):
 			targetTile = t
@@ -729,6 +751,8 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 						b,a = a,b
 					pi = [12,13,14,15,8,9,10,11,4,5,6,7,0,1,2,3][p]
 					pixels[(blockRootPixelX + pi % 4) + ((blockRootPixelY + pi // 4) * virtImgWidth)] = [r/255.0,g/255.0,b/255.0,a/255.0]
+	if printProgress:
+		print_progress_bar(tileCount,tileCount,textureName)
 	if unassignedCount > 0:
 		print_error("Texture "+textureName+" didn't complete deswizzling correctly: "+str(unassignedCount)+" / "+str(tileCountY*tileCountX)+" tiles unassigned")
 	if bc7Mode8Flag:
