@@ -400,7 +400,7 @@ bc7AnchorIndexes = {
 # 	https://learn.microsoft.com/en-us/windows/win32/direct3d11/bc7-format
 # 	https://github.com/python-pillow/Pillow/blob/main/src/libImaging/BcnDecode.c
 # 	https://registry.khronos.org/DataFormat/specs/1.3/dataformat.1.3.html#bptc_bc7
-def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blueBC5,printProgress,overwrite=True,saveTo=None):
+def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blueBC5,printProgress,overwrite=True,saveTo=None,dechannelise=False):
 	try:
 		imgFormat,bitsPerPixel = imageFormats[imgType]
 	except KeyError:
@@ -759,11 +759,59 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 		print_warning("Texture "+textureName+" contained illegal BC7 blocks (rendered as transparent black)")
 	d.close()
 	
+	finalImages = [[newImage,pixels]]
+	channelMult = [
+					[[1,1,1,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],
+					[[0,0,0,0],[1,1,1,0],[0,0,0,0],[0,0,0,0]],
+					[[0,0,0,0],[0,0,0,0],[1,1,1,0],[0,0,0,0]],
+					[[0,0,0,0],[0,0,0,0],[0,0,0,0],[1,1,1,0]],
+					]
+	if dechannelise:
+		for i,c in enumerate(["r","g","b","a"]):
+			splitName = textureName+"_"+c
+			try:
+				existingSplitImage = bpy.data.images[splitName]
+				if overwrite:
+					bpy.data.images.remove(existingSplitImage)
+			except KeyError as e: # no existing image of the same name
+				pass # fine, move on
+			newSplitImage = bpy.data.images.new(splitName,imgWidth,imgHeight)
+			# don't really want to do any of this until the end, but apparently setting the filepath after setting the pixels clears the image for no good reason
+			newSplitImage.file_format = "PNG"
+			if saveTo:
+				newSplitImage.filepath = os.path.join(saveTo,splitName+".png")
+			# detect channels that are entirely black or white and don't include them
+			# if a channel is entirely some sort of grey, that's still worth including
+			mono = True
+			first = pixels[0][i]
+			if first != 0 and first != 1:
+				mono = False
+			splitPixels = numpy.zeros([virtImgHeight*virtImgWidth,4],dtype=float)
+			# this check is quick enough even on big images it can be done separately to avoid wasting time on creating an image that is later discarded
+			for j,p in enumerate(pixels):
+				if p[i] != first:
+					mono = False
+					break
+			if mono:
+				if printProgress:
+					print("Excluding channel "+c.upper()+" (all pixels "+str(first)+")")
+				bpy.data.images.remove(newSplitImage)
+				continue
+			barCount = len(pixels)
+			for j,p in enumerate(pixels):
+				splitPixels[j] = p @ channelMult[i] + [0,0,0,1] # the addition is to force alpha to be 1.0 in all cases (not really possible as part of the matmult)
+				if printProgress and j % 1024 == 0:
+					print_progress_bar(j,barCount,splitName)
+			finalImages.append([newSplitImage,splitPixels])
+			if printProgress:
+				print_progress_bar(barCount,barCount,splitName)
+	
 	# final pixel data must be flattened (and, if necessary, cropped)
-	newImage.pixels = pixels.reshape([virtImgHeight,virtImgWidth,4])[0:imgHeight,0:imgWidth].flatten()
-	newImage.update()
-	if saveTo:
-		newImage.save()
+	for fi,px in finalImages:
+		fi.pixels = px.reshape([virtImgHeight,virtImgWidth,4])[0:imgHeight,0:imgWidth].flatten()
+		fi.update()
+		if saveTo:
+			fi.save()
 	return None
 
 # Forge classes, because just packing/unpacking arrays gets old and error-prone
