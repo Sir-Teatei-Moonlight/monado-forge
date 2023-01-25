@@ -43,9 +43,11 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 
 ## Known issues
 ### Things with workarounds
-* The workflow for getting the proper skeleton setup is not the best. You have to import the .arc/.chr, then import the .wimdo+.wismt, and then use the skeleton merge feature to merge the .wimdo+.wismt skeleton into the .arc/.chr one. There's improvement to be made, but it works well enough and there are more important features to focus on.
+* The workflow for getting the proper skeleton setup is not the best. You have to import the .arc/.chr, then import the .wimdo+.wismt, and then use the skeleton merge feature to merge the .wimdo+.wismt skeleton into the .arc/.chr one.
 * Some models have multiple weight tables, but the information about which one to use per each mesh cannot yet be found. Use the "Weight Table Override" feature to select which one to use for all meshes, and re-import for each one so you can pick-and-choose which ones are correct.
 ### Things with no workarounds
+Roughly in order of badness.
+* If there are bones in the .arc/.chr that are missing from the .wimdo, any rigging for them is lost. Might have to completely redo how skeleton import works to fix.
 * Blender does not support per-shape normals, so that information is lost. In theory it won't matter much.
 * Models entirely embedded in the .wimdo are not checked for yet. Very rare, so ought not to be a big deal.
 * Outline meshes are not recognised or treated as anything special. If you get two entirely identical meshes, consider that one may be the outline, in which case you can delete one of them (probably the higher-numbered one). Unclear how to handle this as of yet (guessing it's material-related).
