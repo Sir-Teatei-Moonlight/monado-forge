@@ -812,7 +812,7 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 		fi.update()
 		if saveTo:
 			fi.save()
-	return None
+	return newImage.name # pass back whatever the final name of the image ended up being
 
 # Forge classes, because just packing/unpacking arrays gets old and error-prone
 
@@ -884,6 +884,151 @@ class MonadoForgeSkeleton:
 	def setBones(self,bones):
 		self.clearBones()
 		for b in bones: self.addBone(b)
+
+# this class is specifically for keeping hold of wimdo data to be passed to a wismt
+class MonadoForgeWimdoMaterial:
+	def __init__(self,i):
+		self._index = i
+		self._name = "Material"
+		self._baseColour = [1.0,1.0,1.0,1.0]
+		self._textureTable = [] # [[id,???,???,???]]
+		self._textureMirrorFlags = 0
+		self._extraData = []
+		self._extraDataIndex = 0 # needed because of how extra data needs to be read separately
+	
+	# no setter (index should be immutable)
+	def getIndex(self):
+		return self._index
+	
+	def getName(self):
+		return self._name
+	def setName(self,x):
+		if not isinstance(x,str):
+			raise TypeError("expected a string, not a(n) "+str(type(x)))
+		self._name = x
+	
+	def getBaseColour(self):
+		return self._baseColour
+	def setBaseColour(self,a):
+		if len(a) != 4:
+			raise ValueError("sequence must be length 4, not "+str(len(a)))
+		self._baseColour = a[:]
+	
+	def getTextureTable(self):
+		return self._textureTable
+	def clearTextureTable(self):
+		self._textureTable = []
+	def addTextureTableItem(self,a):
+		if len(a) != 4:
+			raise ValueError("sequence must be length 4, not "+str(len(a)))
+		self._textureTable.append(a)
+	def setTextureTable(self,ts):
+		if not isinstance(ts,list):
+			raise TypeError("expected a list, not a(n) "+str(type(ts)))
+		for t in ts: self.addTextureTableItem(t)
+	
+	def getTextureMirrorFlags(self):
+		return self._textureMirrorFlags
+	def setTextureMirrorFlags(self,x):
+		if not isinstance(x,int):
+			raise TypeError("expected an int, not a(n) "+str(type(x)))
+		self._textureMirrorFlags = x
+	
+	def getExtraData(self):
+		return self._extraData
+	def clearExtraData(self):
+		self._extraData = []
+	def addExtraData(self,ex):
+		if not isinstance(ex,float):
+			raise TypeError("expected a float, not a(n) "+str(type(ex)))
+		self._extraData.append(ex)
+	def setExtraData(self,exs):
+		self.clearExtraData()
+		for ex in exs: self.addExtraData(ex)
+	
+	def getExtraDataIndex(self):
+		return self._extraDataIndex
+	def setExtraDataIndex(self,x):
+		if not isinstance(x,int):
+			raise TypeError("expected an int, not a(n) "+str(type(x)))
+		self._extraDataIndex = x
+
+class MonadoForgeTexture:
+	def __init__(self):
+		self._name = "Texture"
+		self._mirroring = [False,False]
+	
+	def getName(self):
+		return self._name
+	def setName(self,x):
+		if not isinstance(x,str):
+			raise TypeError("expected a string, not a(n) "+str(type(x)))
+		self._name = x
+	
+	def getMirroring(self):
+		return self._mirroring
+	def setMirroring(self,a):
+		if len(a) != 2:
+			raise ValueError("sequence must be length 2, not "+str(len(a)))
+		self._mirroring = a[:]
+
+class MonadoForgeMaterial:
+	def __init__(self,i):
+		self._index = i
+		self._name = "Material"
+		self._baseColour = [1.0,1.0,1.0,1.0]
+		self._viewportColour = [0.5,0.5,0.5,1.0]
+		self._textures = []
+		self._extraData = []
+	
+	# no setter (index should be immutable)
+	def getIndex(self):
+		return self._index
+	
+	def getName(self):
+		return self._name
+	def setName(self,x):
+		if not isinstance(x,str):
+			raise TypeError("expected a string, not a(n) "+str(type(x)))
+		self._name = x
+	
+	def getBaseColour(self):
+		return self._baseColour
+	def setBaseColour(self,a):
+		if len(a) != 4:
+			raise ValueError("sequence must be length 4, not "+str(len(a)))
+		self._baseColour = a[:]
+	
+	def getViewportColour(self):
+		return self._viewportColour
+	def setViewportColour(self,a):
+		if len(a) != 4:
+			raise ValueError("sequence must be length 4, not "+str(len(a)))
+		self._viewportColour = a[:]
+	
+	def getTextures(self):
+		return self._textures
+	def clearTextures(self):
+		self._textures = []
+	def addTexture(self,x):
+		if not isinstance(x,MonadoForgeTexture):
+			raise TypeError("expected a MonadoForgeTexture, not a(n) "+str(type(x)))
+		self._textures.append(x)
+	def setTextures(self,a):
+		self.clearTextures()
+		for x in a: self.addTexture(x)
+	
+	def getExtraData(self):
+		return self._extraData
+	def clearExtraData(self):
+		self._extraData = []
+	def addExtraData(self,ex):
+		if not isinstance(ex,float):
+			raise TypeError("expected a float, not a(n) "+str(type(ex)))
+		self._extraData.append(ex)
+	def setExtraData(self,exs):
+		self.clearExtraData()
+		for ex in exs: self.addExtraData(ex)
 
 class MonadoForgeVertex:
 	def __init__(self):
@@ -1020,6 +1165,7 @@ class MonadoForgeMesh:
 		self._faces = []
 		self._weightSets = [] # because it can be convenient to hold these here and have vertexes just refer with index
 		self._shapes = [] # list of MonadoForgeMeshShapes
+		self._materialIndex = 0
 	
 	def getVertices(self):
 		return self._vertices
@@ -1069,6 +1215,13 @@ class MonadoForgeMesh:
 	def setShapes(self,shapeList):
 		self._shapes = []
 		for s in shapeList: self.addShape(s)
+	
+	def getMaterialIndex(self):
+		return self._materialIndex
+	def setMaterialIndex(self,i):
+		if not isinstance(i,int):
+			raise TypeError("expected an int, not a(n) "+str(type(i)))
+		self._materialIndex = i
 	
 	# assumption: if a single vertex has any of these, all the other vertices must also
 	def hasUVs(self):
@@ -1147,22 +1300,27 @@ class MonadoForgeMeshHeader:
 # this class is specifically for passing wimdo results to wismt import
 # assumption: there can be only one skeleton (it's just a collection of bones technically)
 class MonadoForgeWimdoPackage:
-	def __init__(self,skel,mh,sh):
+	def __init__(self,skel,mh,sh,mat):
 		if not isinstance(skel,MonadoForgeSkeleton):
 			raise TypeError("expected a MonadoForgeSkeleton, not a(n) "+str(type(skel)))
 		if not isinstance(mh,list):
 			raise TypeError("expected a list, not a(n) "+str(type(mh)))
 		if not isinstance(sh,list):
 			raise TypeError("expected a list, not a(n) "+str(type(sh)))
+		if not isinstance(mat,list):
+			raise TypeError("expected a list, not a(n) "+str(type(mat)))
 		self._skeleton = skel
 		self._meshHeaders = mh
 		self._shapeHeaders = sh
+		self._materials = mat
 	def getSkeleton(self):
 		return self._skeleton
 	def getMeshHeaders(self):
 		return self._meshHeaders
 	def getShapeHeaders(self):
 		return self._shapeHeaders
+	def getMaterials(self):
+		return self._materials
 	
 	def getLODList(self):
 		lods = []
@@ -1177,6 +1335,7 @@ class MonadoForgeImportedPackage:
 	def __init__(self):
 		self._skeletons = []
 		self._meshes = []
+		self._materials = []
 	
 	def getSkeletons(self):
 		return self._skeletons
@@ -1195,6 +1354,15 @@ class MonadoForgeImportedPackage:
 		self._meshes.append(mesh)
 	def setMeshes(self,meshes):
 		self._meshes = meshes[:]
+	
+	def getMaterials(self):
+		return self._materials
+	def clearMaterials(self):
+		self._materials = []
+	def addMaterial(self,material):
+		self._materials.append(material)
+	def setMaterials(self,material):
+		self._materials = material[:]
 
 def register():
 	pass

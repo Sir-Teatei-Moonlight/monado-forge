@@ -7,6 +7,7 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 * :x: - Not supported, but planned (eventually).
 * :hash: - Partially supported; number is a basic "how done does this feel" estimate.
 * :o: - Not well-tested (if at all). _Ought_ to work just as well as the best-supported version, but no guarantees.
+* :beginner: - Far from perfect, but works well enough that it can be considered "done" for the moment.
 * :heavy_check_mark: - Supported. Any problems should be noted in the Known Issues section.
 
 | | <img alt="XC1" src="https://www.xenoserieswiki.org/w/images/8/8d/Article_icon_-_Xenoblade_Chronicles.svg" width="24px"/> | <img alt="XCX" src="https://www.xenoserieswiki.org/w/images/3/3f/Article_icon_-_Xenoblade_Chronicles_X.svg" width="24px"/> | <img alt="XC2" src="https://www.xenoserieswiki.org/w/images/a/a8/Article_icon_-_Xenoblade_Chronicles_2.svg" width="24px"/> | <img alt="XC1DE" src="https://www.xenoserieswiki.org/w/images/6/6f/Article_icon_-_Xenoblade_Chronicles_Definitive_Edition.svg" width="24px"/> | <img alt="XC3" src="https://www.xenoserieswiki.org/w/images/b/bc/Article_icon_-_Xenoblade_Chronicles_3.svg" width="24px"/>
@@ -19,7 +20,7 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 | └ Vertex groups | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Shapes/Morphs | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Textures | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
-| └ Materials | :x: | :x: | :x: | :x: | :x: |
+| └ Materials | :x: | :x: | :beginner: | :beginner: | :o: |
 
 ## Current features
 ### Skeleton
@@ -40,21 +41,22 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 * Optionally assumes that BC5 textures are normal maps, and auto-calculates the blue channel for them.
 * By default, overwrites any existing textures of the same name. Can be set to differentiate via appending the .wismt's filename.
 * Has the ability to automatically split "temp" files into channels, but currently does so in a terribly slow and inefficient way, so it's off by default. Don't exactly recommend using it yet, but it's there if you need it.
+* Creates a basic material with all the correct textures and values in it, in which the first texture is assumed to be the base colour, and nothing else is plugged in. Anything more will have to wait for deeper shader parsing.
 
 ## Known issues
 ### Things with workarounds
-* The workflow for getting the proper skeleton setup is not the best. You have to import the .arc/.chr, then import the .wimdo+.wismt, and then use the skeleton merge feature to merge the .wimdo+.wismt skeleton into the .arc/.chr one.
+* The workflow for getting the proper skeleton setup is not the best. You have to import the .arc/.chr, then import the .wimdo+.wismt, and then use the skeleton merge feature to merge the .wimdo+.wismt skeleton into the .arc/.chr one. This will be improved in the near future.
 * Some models have multiple weight tables, but the information about which one to use per each mesh cannot yet be found. Use the "Weight Table Override" feature to select which one to use for all meshes, and re-import for each one so you can pick-and-choose which ones are correct.
 ### Things with no workarounds
 Roughly in order of badness.
 * If there are bones in the .arc/.chr that are missing from the .wimdo, any rigging for them is lost. Might have to completely redo how skeleton import works to fix.
 * Blender does not support per-shape normals, so that information is lost. In theory it won't matter much.
 * Models entirely embedded in the .wimdo are not checked for yet. Very rare, so ought not to be a big deal.
-* Outline meshes are not recognised or treated as anything special. If you get two entirely identical meshes, consider that one may be the outline, in which case you can delete one of them (probably the higher-numbered one). Unclear how to handle this as of yet (guessing it's material-related).
+* Outline meshes are not recognised or treated as anything special. If you get two entirely identical meshes, consider that one may be the outline, in which case you can delete one of them (probably the one with no textures in its material). Unclear how to handle this as of yet (guessing it's material-related).
 * Outline data is not yet processed. Not quite sure how to be honest, perhaps will leverage a vertex colour layer for it.
+* Some materials only have a base colour (no textures). These import as the Actual Raw Colour Values, and so might look incorrect when Blender's colour spaces get involved. Don't ask me how to fix this.
 
 ## Planned features
 Roughly in order of priority.
 * UV folding
-* Material assignment
 

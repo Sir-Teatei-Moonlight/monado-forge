@@ -42,6 +42,7 @@ def import_wimdo(f, context):
 	meshHeaders = []
 	shapeHeaders = []
 	shapeNames = []
+	materials = []
 	
 	if modelsOffset > 0:
 		f.seek(modelsOffset)
@@ -147,6 +148,78 @@ def import_wimdo(f, context):
 	
 	if materialsOffset > 0:
 		f.seek(materialsOffset)
+		materialHeadersOffset = readAndParseInt(f,4)
+		materialCount = readAndParseInt(f,4)
+		materialUnknown1 = readAndParseInt(f,4)
+		materialUnknown2 = readAndParseInt(f,4)
+		materialExtraDataOffset = readAndParseInt(f,4)
+		materialExtraDataCount = readAndParseInt(f,4)
+		# a bunch of unknowns follow (looks likely to be offset+count pairs), skipping entirely for the moment
+		f.seek(materialsOffset+materialHeadersOffset)
+		for m in range(materialCount):
+			matNameOffset = readAndParseInt(f,4)
+			matFlags1 = readAndParseInt(f,4)
+			matFlags2 = readAndParseInt(f,4)
+			matBaseColour = [readAndParseFloat(f),readAndParseFloat(f),readAndParseFloat(f),readAndParseFloat(f)]
+			matU1 = readAndParseFloat(f)
+			matTextureTableOffset = readAndParseInt(f,4)
+			matTextureCount = readAndParseInt(f,4)
+			matTextureMirrorFlags = readAndParseInt(f,4)
+			matU2 = readAndParseInt(f,4)
+			matU3 = readAndParseInt(f,4)
+			matU4 = readAndParseInt(f,4)
+			matU5 = readAndParseInt(f,4)
+			matU6 = readAndParseInt(f,4)
+			matExtraDataIndex = readAndParseInt(f,4)
+			matU7 = readAndParseInt(f,4)
+			matU8 = readAndParseInt(f,4)
+			matU9 = readAndParseInt(f,4) # this is an offset
+			matU10 = readAndParseInt(f,4)
+			matU11 = readAndParseInt(f,4)
+			matU12 = readAndParseInt(f,4)
+			matU13 = readAndParseInt(f,4)
+			matU14 = readAndParseInt(f,4)
+			matU15 = readAndParseInt(f,4)
+			matU16 = readAndParseInt(f,4)
+			matU17 = readAndParseInt(f,4)
+			matU18 = readAndParseInt(f,4)
+			ftemp = f.tell()
+			f.seek(materialsOffset+matNameOffset)
+			matName = readStr(f)
+			f.seek(materialsOffset+matTextureTableOffset)
+			matTextureTable = []
+			for t in range(matTextureCount):
+				matTextureTable.append([readAndParseInt(f,2),readAndParseInt(f,2),readAndParseInt(f,2),readAndParseInt(f,2)])
+			f.seek(ftemp)
+			#materials.append([matName,matBaseColour,matTextureTable,matTextureMirrorFlags,matExtraDataIndex])
+			mat = MonadoForgeWimdoMaterial(m)
+			mat.setName(matName)
+			mat.setBaseColour(matBaseColour)
+			mat.setTextureTable(matTextureTable)
+			mat.setTextureMirrorFlags(matTextureMirrorFlags)
+			mat.setExtraDataIndex(matExtraDataIndex)
+			materials.append(mat)
+		f.seek(materialsOffset+materialExtraDataOffset)
+		materialExtraData = []
+		for mx in range(materialExtraDataCount):
+			materialExtraData.append(readAndParseFloat(f))
+		splitExtraData = []
+		matCounter = -1
+		nextStart = materials[0].getExtraDataIndex()
+		for i,x in enumerate(materialExtraData):
+			if i >= nextStart:
+				splitExtraData.append([])
+				if len(splitExtraData) < len(materials):
+					nextStart = materials[len(splitExtraData)].getExtraDataIndex()
+				else:
+					nextStart = 10000000
+			splitExtraData[-1].append(x)
+		for i,sxd in enumerate(splitExtraData):
+			materials[i].setExtraData(sxd)
+		if printProgress:
+			print("Found "+str(len(materials))+" materials.")
+			#for m in materials:
+			#	print(m.getName(),m.getBaseColour(),m.getTextureTable(),m.getTextureMirrorFlags(),m.getExtraDataIndex(),m.getExtraData())
 	if vertexBufferOffset > 0:
 		f.seek(vertexBufferOffset)
 	if shadersOffset > 0:
@@ -158,7 +231,7 @@ def import_wimdo(f, context):
 	
 	skeleton = MonadoForgeSkeleton()
 	skeleton.setBones(forgeBones)
-	results = MonadoForgeWimdoPackage(skeleton,meshHeaders,shapeHeaders)
+	results = MonadoForgeWimdoPackage(skeleton,meshHeaders,shapeHeaders,materials)
 	if printProgress:
 		print("Finished parsing .wimdo file.")
 	return results
@@ -262,6 +335,8 @@ def import_wismt(f, wimdoResults, context):
 			for i in range(textureCount):
 				textureIDList.append(readAndParseInt(f,2))
 	
+	textureAlignment = {} # dict of {internal texture name : final name of image as it is in the Blender file}
+	
 	meshes = []
 	vertexWeights = []
 	nextSubfileIndex = 0
@@ -345,7 +420,7 @@ def import_wismt(f, wimdoResults, context):
 						if printProgress:
 							print("Found "+str(len(weightTables))+" weight tables.")
 						if len(weightTables) > 1:
-							print_warning("You may need to use the Weight Table Override feature to get correct weights for some meshes. Make a new import for each table, and keep only the valid meshes.")
+							print_warning("You may need to use the Weight Table Override feature to get correct weights for some meshes.\nMake a new import for each table, and keep only the valid meshes.")
 					if shapeDataOffset > 0:
 						sf.seek(shapeDataOffset)
 						shapeHeaderCount = readAndParseInt(sf,4)
@@ -511,6 +586,7 @@ def import_wismt(f, wimdoResults, context):
 					for md in wimdoResults.getMeshHeaders():
 						vtIndex = md.getMeshVertTableIndex()
 						ftIndex = md.getMeshFaceTableIndex()
+						mtIndex = md.getMeshMaterialIndex()
 						if vtIndex in unusedVertexTables:
 							unusedVertexTables.remove(vtIndex)
 						if ftIndex in unusedFaceTables:
@@ -523,6 +599,7 @@ def import_wismt(f, wimdoResults, context):
 						newMesh.setVertices(vertexData[vtIndex])
 						newMesh.setFaces(faceData[ftIndex])
 						newMesh.setWeightSets(vertexWeights)
+						newMesh.setMaterialIndex(mtIndex)
 						if vtIndex in shapesByVertexTableIndex.keys():
 							newMesh.setShapes(shapesByVertexTableIndex[vtIndex])
 						meshes.append(newMesh)
@@ -564,11 +641,13 @@ def import_wismt(f, wimdoResults, context):
 							sf.seek(textureOffset)
 							listOfCachedTextureNames.append(textureName)
 							dc = splitTemps and textureName.startswith("temp")
+							nameToUse = textureName
 							if differentiate:
-								textureName = filename+"_"+textureName
+								nameToUse = filename+"_"+nameToUse
 							if context.scene.xb_tools_model.keepAllResolutions:
-								textureName = os.path.join("res0",textureName)
-							parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,sf.read(textureFilesize),context.scene.xb_tools_model.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
+								nameToUse = os.path.join("res0",nameToUse)
+							finalName = parse_texture(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(textureFilesize),context.scene.xb_tools_model.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
+							textureAlignment[textureName] = finalName
 				finally:
 					sf.close()
 		del subfileData # just to ensure it's cleaned up as soon as possible
@@ -607,7 +686,8 @@ def import_wismt(f, wimdoResults, context):
 								nameToUse = filename+"_"+nameToUse
 							if context.scene.xb_tools_model.keepAllResolutions:
 								nameToUse = os.path.join("res1",nameToUse)
-							parse_texture(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(),context.scene.xb_tools_model.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
+							finalName = parse_texture(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(),context.scene.xb_tools_model.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
+							textureAlignment[textureName] = finalName
 						# it is at this point where we need the data from the highest-resolution image
 						if highResSubfileIndex > 0:
 							hdfileHeaderOffset = mainOffset+subfileHeadersOffset+highResSubfileIndex*3*4
@@ -617,7 +697,8 @@ def import_wismt(f, wimdoResults, context):
 								nameToUse = filename+"_"+nameToUse
 							if context.scene.xb_tools_model.keepAllResolutions:
 								nameToUse = os.path.join("res2",nameToUse)
-							parse_texture(nameToUse,imgVersion,imgType,imgWidth*2,imgHeight*2,hdfileData,context.scene.xb_tools_model.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
+							finalName = parse_texture(nameToUse,imgVersion,imgType,imgWidth*2,imgHeight*2,hdfileData,context.scene.xb_tools_model.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
+							textureAlignment[textureName] = finalName
 				finally:
 					sf.close()
 		del subfileData
@@ -662,7 +743,8 @@ def import_wismt(f, wimdoResults, context):
 							nameToUse = filename+"_"+nameToUse
 						if context.scene.xb_tools_model.keepAllResolutions:
 							nameToUse = os.path.join("res1",nameToUse)
-						parse_texture(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(),context.scene.xb_tools_model.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
+						finalName = parse_texture(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(),context.scene.xb_tools_model.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
+						textureAlignment[textureName] = finalName
 					# it is at this point where we need the data from the highest-resolution image
 					if hasH:
 						with open(hFilename,"rb") as fH:
@@ -672,15 +754,37 @@ def import_wismt(f, wimdoResults, context):
 								nameToUse = filename+"_"+nameToUse
 							if context.scene.xb_tools_model.keepAllResolutions:
 								nameToUse = os.path.join("res2",nameToUse)
-							parse_texture(nameToUse,imgVersion,imgType,imgWidth*2,imgHeight*2,hdfileData,context.scene.xb_tools_model.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
+							finalName = parse_texture(nameToUse,imgVersion,imgType,imgWidth*2,imgHeight*2,hdfileData,context.scene.xb_tools_model.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
+							textureAlignment[textureName] = finalName
 				finally:
 					sf.close()
 	
+	# time to ready materials
+	wimdoMaterials = wimdoResults.getMaterials()
+	resultMaterials = []
+	for mat in wimdoMaterials:
+		newMat = MonadoForgeMaterial(mat.getIndex())
+		newMat.setName(mat.getName())
+		newMat.setBaseColour(mat.getBaseColour())
+		newMat.setViewportColour(mat.getBaseColour())
+		newMat.setExtraData(mat.getExtraData())
+		# this is done in a way that "duplicates" texture references, but that's fairly harmless at this stage
+		for ti,t in enumerate(mat.getTextureTable()):
+			newTex = MonadoForgeTexture()
+			texIndex = t[0] # ignore the unknowns for now
+			newTex.setName(textureAlignment[textureHeaders[texIndex][3]])
+			# need to figure out how to convert mirror flags into [x,y] format; until then, default [False,False]
+			#newTex.setMirroring(mat.getTextureMirrorFlags())
+			newMat.addTexture(newTex)
+		resultMaterials.append(newMat)
+	
 	for m in meshes:
 		m.indexVertices()
+	
 	results = MonadoForgeImportedPackage()
 	results.addSkeleton(wimdoResults.getSkeleton())
 	results.setMeshes(meshes)
+	results.setMaterials(resultMaterials)
 	if printProgress:
 		print("Finished parsing .wismt file.")
 	return results
@@ -742,6 +846,30 @@ def realise_results(forgeResults, mainName, self, context):
 	targetArmature = armatures[0]
 	if printProgress:
 		print("Finished creating "+str(len(armatures))+" armatures.")
+	
+	materials = forgeResults.getMaterials()
+	newMatsByIndex = {}
+	for m,mat in enumerate(materials):
+		newMat = bpy.data.materials.new(name=mat.getName())
+		newMat.diffuse_color = mat.getViewportColour()
+		newMat.use_nodes = True # the default creation is "Principled BSDF" into "Material Output"
+		n = newMat.node_tree.nodes
+		bsdfNode = n.get("Principled BSDF")
+		bsdfNode.inputs["Base Color"].default_value = mat.getViewportColour()
+		for ti,t in enumerate(mat.getTextures()):
+			texNode = n.new(type="ShaderNodeTexImage")
+			texNode.extension = "EXTEND"
+			texNode.image = bpy.data.images[t.getName()]
+			texNode.location = [ti*250,0]
+			# guess: the first texture is the base colour
+			if ti == 0:
+				newMat.node_tree.links.new(texNode.outputs["Color"],bsdfNode.inputs["Base Color"])
+		for xi,x in enumerate(mat.getExtraData()):
+			extraDataNode = n.new(type="ShaderNodeValue")
+			extraDataNode.outputs["Value"].default_value = x
+			extraDataNode.location = [xi*150,100]
+		newMatsByIndex[mat.getIndex()] = newMat
+	
 	meshes = forgeResults.getMeshes()
 	for m,mesh in enumerate(meshes):
 		bpy.ops.object.add(type="MESH", enter_editmode=False, align="WORLD", location=context.scene.cursor.location, rotation=(0,0,0), scale=(1,1,1))
@@ -802,6 +930,7 @@ def realise_results(forgeResults, mainName, self, context):
 				newShape = newMeshObject.shape_key_add(name=s.getName(),from_mix=False)
 				for vertexIndex,vertex in s.getVertices().items():
 					newShape.data[vertexIndex].co += mathutils.Vector(vertex.getPosition())
+		meshData.materials.append(newMatsByIndex[mesh.getMaterialIndex()])
 		if printProgress:
 			print("Created mesh "+str(m)+".")
 		
