@@ -23,16 +23,15 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 | └ Materials | :x: | :x: | :beginner: | :beginner: | :o: |
 
 ## Current features
-### Skeleton
-* Imports skeletons from .arc and .chr files.
-* Controllable epsilon, for choosing whether 0.00001 should just be set to 0, and whether a pair of bones that differ by only that much should be treated as equal. Applies to position and rotation separately.
-* Choose whether to also import endpoints as bones, and puts them in a second bone layer.
-* One-click flipping and mirroring bones so _L and _R sides match. Auto-mirror skips bones that seem like they might be intentionally uneven.
-* Select individual bones for manual flipping/mirroring.
-* One-click renaming bones to move the _L/_R to the end, instead of sitting in the middle.
-* Merge two armatures, keeping only one copy of bones with the same name. Supports both "merge all" and "merge only if similar enough".
+### Import
+#### General
+* Controllable epsilon, for choosing whether 0.00001 should just be set to 0, and whether two things that differ by only that much should be treated as equal. Applies to position and rotation separately.
 
-### Model
+#### Skeleton
+* Imports skeletons from .arc and .chr files.
+* Choose whether to also import endpoints as bones, and puts them in a second bone layer.
+
+#### Model
 * Imports .wimdo/.wismt model files. The .wimdo can be imported alone, which grabs only whatever bones are inside, while the .wismt import requires a .wimdo to go with it.
 * Supports normals, UVs, vertex colours, rigging (vertex groups), and shapes (morphs). Models are automatically parented to the skeleton found in the .wimdo; if there is no skeleton, they are parented to a blank one.
 * Optionally also import lower-LOD models. Doesn't currently distinguish them in any way.
@@ -42,6 +41,12 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 * Differentiates newly-imported textures with same-named existing ones by appending the imported .wismt's filename. Can be turned off.
 * Has the ability to automatically split "temp" files into channels, but currently does so in a terribly slow and inefficient way, so it's off by default. Don't exactly recommend using it yet, but it's there if you need it.
 * Creates a basic material with all the correct textures and values in it, in which the first texture is assumed to be the base colour, and nothing else is plugged in. Anything more will have to wait for deeper shader parsing.
+
+### Modify
+* One-click flipping and mirroring bones so _L and _R sides match. Auto-mirror skips bones that seem like they might be intentionally uneven.
+* Select individual bones for manual flipping/mirroring.
+* One-click renaming bones to move the _L/_R to the end, instead of sitting in the middle.
+* Merge two armatures, keeping only one copy of bones with the same name. Supports both "merge all" and "merge only if similar enough".
 
 ## Known issues
 ### Things with workarounds
