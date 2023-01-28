@@ -1,13 +1,12 @@
 import bpy
 import io
-#import math
+import math
 import mathutils
 import os
 import traceback
 import zlib
 from bpy.props import (
 						BoolProperty,
-						EnumProperty,
 						FloatProperty,
 						IntProperty,
 						PointerProperty,
@@ -19,10 +18,11 @@ from bpy.types import (
 						PropertyGroup,
 						)
 
+from . classes import *
 from . utils import *
 
 def import_wimdo(f, context):
-	printProgress = context.scene.xb_tools.printProgress
+	printProgress = context.scene.monado_forge_main.printProgress
 	# little endian assumed
 	magic = f.read(4)
 	if magic != b"DMXM":
@@ -259,13 +259,13 @@ def extract_wismt_subfile(f, headerOffset, headless=False):
 
 def import_wismt(f, wimdoResults, context):
 	filename = os.path.splitext(os.path.basename(f.name))[0]
-	game = context.scene.xb_tools.game
-	printProgress = context.scene.xb_tools.printProgress
+	game = context.scene.monado_forge_main.game
+	printProgress = context.scene.monado_forge_main.printProgress
 	texPath = None
-	if context.scene.xb_tools_model.autoSaveTextures:
-		texPath = bpy.path.abspath(context.scene.xb_tools_model.texturePath)
-	differentiate = context.scene.xb_tools_model.differentiateTextures
-	splitTemps = context.scene.xb_tools_model.splitTemps
+	if context.scene.monado_forge_import.autoSaveTextures:
+		texPath = bpy.path.abspath(context.scene.monado_forge_import.texturePath)
+	differentiate = context.scene.monado_forge_import.differentiateTextures
+	splitTemps = context.scene.monado_forge_import.splitTemps
 	listOfCachedTextureNames = [] # only needed for XC3 but no harm in building it regardless
 	# little endian assumed
 	# renamed some stuff from older programs to make more sense:
@@ -561,7 +561,7 @@ def import_wismt(f, wimdoResults, context):
 						for v in range(len(vertexWeightData[weightVertTableIndex])):
 							vertexWeights.append([vertexWeightData[weightVertTableIndex][v][0],vertexWeightData[weightVertTableIndex][v][1]])
 					# we don't know how to pick the right weight table, so for now we let the user pick which one to use for all (needing multiple imports to do it right)
-					forcedWeightTable = context.scene.xb_tools_model.tempWeightTableOverride
+					forcedWeightTable = context.scene.monado_forge_import.tempWeightTableOverride
 					if forcedWeightTable > 0:
 						if forcedWeightTable >= len(weightTables):
 							print_warning("weight table override too high, ignoring and treating as 0")
@@ -592,7 +592,7 @@ def import_wismt(f, wimdoResults, context):
 						if ftIndex in unusedFaceTables:
 							unusedFaceTables.remove(ftIndex)
 						# this order of operations means that tables are still marked as "used" even if they're of dropped LODs
-						if not context.scene.xb_tools_model.alsoImportLODs:
+						if not context.scene.monado_forge_import.alsoImportLODs:
 							if md.getMeshLODValue() > bestLOD:
 								continue
 						newMesh = MonadoForgeMesh()
@@ -644,15 +644,15 @@ def import_wismt(f, wimdoResults, context):
 							nameToUse = textureName
 							if differentiate:
 								nameToUse = filename+"_"+nameToUse
-							if context.scene.xb_tools_model.keepAllResolutions:
+							if context.scene.monado_forge_import.keepAllResolutions:
 								nameToUse = os.path.join("res0",nameToUse)
-							finalName = parse_texture(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(textureFilesize),context.scene.xb_tools_model.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
+							finalName = parse_texture(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(textureFilesize),context.scene.monado_forge_import.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
 							textureAlignment[textureName] = finalName
 				finally:
 					sf.close()
 		del subfileData # just to ensure it's cleaned up as soon as possible
 		nextSubfileIndex += 1
-	if hasUncachedTexSubfile and context.scene.xb_tools_model.importUncachedTextures: # reminder: XC3 doesn't go in here at all (at least for most models)
+	if hasUncachedTexSubfile and context.scene.monado_forge_import.importUncachedTextures: # reminder: XC3 doesn't go in here at all (at least for most models)
 		subfileHeaderOffset = mainOffset+subfileHeadersOffset+nextSubfileIndex*3*4
 		subfileName,subfileData = extract_wismt_subfile(f,subfileHeaderOffset)
 		for cpi,cp in enumerate(contentPointers):
@@ -679,14 +679,14 @@ def import_wismt(f, wimdoResults, context):
 						subfileUnknown1 = readAndParseInt(sf,4)
 						imgVersion = readAndParseInt(sf,4)
 						dc = splitTemps and textureName.startswith("temp")
-						if context.scene.xb_tools_model.keepAllResolutions or highResSubfileIndex <= 0: # if there's no highResSubfileIndex, this is the best resolution
+						if context.scene.monado_forge_import.keepAllResolutions or highResSubfileIndex <= 0: # if there's no highResSubfileIndex, this is the best resolution
 							sf.seek(0)
 							nameToUse = textureName
 							if differentiate:
 								nameToUse = filename+"_"+nameToUse
-							if context.scene.xb_tools_model.keepAllResolutions:
+							if context.scene.monado_forge_import.keepAllResolutions:
 								nameToUse = os.path.join("res1",nameToUse)
-							finalName = parse_texture(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(),context.scene.xb_tools_model.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
+							finalName = parse_texture(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(),context.scene.monado_forge_import.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
 							textureAlignment[textureName] = finalName
 						# it is at this point where we need the data from the highest-resolution image
 						if highResSubfileIndex > 0:
@@ -695,9 +695,9 @@ def import_wismt(f, wimdoResults, context):
 							nameToUse = textureName
 							if differentiate:
 								nameToUse = filename+"_"+nameToUse
-							if context.scene.xb_tools_model.keepAllResolutions:
+							if context.scene.monado_forge_import.keepAllResolutions:
 								nameToUse = os.path.join("res2",nameToUse)
-							finalName = parse_texture(nameToUse,imgVersion,imgType,imgWidth*2,imgHeight*2,hdfileData,context.scene.xb_tools_model.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
+							finalName = parse_texture(nameToUse,imgVersion,imgType,imgWidth*2,imgHeight*2,hdfileData,context.scene.monado_forge_import.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
 							textureAlignment[textureName] = finalName
 				finally:
 					sf.close()
@@ -708,9 +708,9 @@ def import_wismt(f, wimdoResults, context):
 	# assumption: the external .wismt files here are literally copy-pastes of the previous-game stuff
 	# as in, the Ms have the typical headers, while the Hs are headerless and double the size
 	# there's probably a way to reduce the copy-pasted code here, but the necessary differences are subtle
-	texMPath = bpy.path.abspath(context.scene.xb_tools_model.textureRepoMPath)
-	texHPath = bpy.path.abspath(context.scene.xb_tools_model.textureRepoHPath)
-	if game == "XC3" and context.scene.xb_tools_model.importUncachedTextures and texMPath and texHPath:
+	texMPath = bpy.path.abspath(context.scene.monado_forge_import.textureRepoMPath)
+	texHPath = bpy.path.abspath(context.scene.monado_forge_import.textureRepoHPath)
+	if game == "XC3" and context.scene.monado_forge_import.importUncachedTextures and texMPath and texHPath:
 		for textureName in set(listOfCachedTextureNames):
 			mFilename = os.path.join(texMPath,textureName+".wismt")
 			hFilename = os.path.join(texHPath,textureName+".wismt")
@@ -736,14 +736,14 @@ def import_wismt(f, wimdoResults, context):
 					subfileUnknown1 = readAndParseInt(sf,4)
 					imgVersion = readAndParseInt(sf,4)
 					dc = splitTemps and textureName.startswith("temp")
-					if context.scene.xb_tools_model.keepAllResolutions or not hasH: # if there's no hasH, this is the best resolution
+					if context.scene.monado_forge_import.keepAllResolutions or not hasH: # if there's no hasH, this is the best resolution
 						sf.seek(0)
 						nameToUse = textureName
 						if differentiate:
 							nameToUse = filename+"_"+nameToUse
-						if context.scene.xb_tools_model.keepAllResolutions:
+						if context.scene.monado_forge_import.keepAllResolutions:
 							nameToUse = os.path.join("res1",nameToUse)
-						finalName = parse_texture(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(),context.scene.xb_tools_model.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
+						finalName = parse_texture(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(),context.scene.monado_forge_import.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
 						textureAlignment[textureName] = finalName
 					# it is at this point where we need the data from the highest-resolution image
 					if hasH:
@@ -752,9 +752,9 @@ def import_wismt(f, wimdoResults, context):
 							nameToUse = textureName
 							if differentiate:
 								nameToUse = filename+"_"+nameToUse
-							if context.scene.xb_tools_model.keepAllResolutions:
+							if context.scene.monado_forge_import.keepAllResolutions:
 								nameToUse = os.path.join("res2",nameToUse)
-							finalName = parse_texture(nameToUse,imgVersion,imgType,imgWidth*2,imgHeight*2,hdfileData,context.scene.xb_tools_model.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
+							finalName = parse_texture(nameToUse,imgVersion,imgType,imgWidth*2,imgHeight*2,hdfileData,context.scene.monado_forge_import.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
 							textureAlignment[textureName] = finalName
 				finally:
 					sf.close()
@@ -790,8 +790,8 @@ def import_wismt(f, wimdoResults, context):
 	return results
 
 def import_wimdo_only(self, context):
-	absoluteDefsPath = bpy.path.abspath(context.scene.xb_tools_model.defsPath)
-	if context.scene.xb_tools.printProgress:
+	absoluteDefsPath = bpy.path.abspath(context.scene.monado_forge_import.defsPath)
+	if context.scene.monado_forge_main.printProgress:
 		print("Importing model from: "+absoluteDefsPath)
 	
 	if os.path.splitext(absoluteDefsPath)[1] != ".wimdo":
@@ -803,9 +803,9 @@ def import_wimdo_only(self, context):
 	return realise_results(forgeResults, os.path.splitext(os.path.basename(absoluteDefsPath))[0], self, context)
 
 def import_wimdo_and_wismt(self, context):
-	absoluteDefsPath = bpy.path.abspath(context.scene.xb_tools_model.defsPath)
-	absoluteDataPath = bpy.path.abspath(context.scene.xb_tools_model.dataPath)
-	if context.scene.xb_tools.printProgress:
+	absoluteDefsPath = bpy.path.abspath(context.scene.monado_forge_import.defsPath)
+	absoluteDataPath = bpy.path.abspath(context.scene.monado_forge_import.dataPath)
+	if context.scene.monado_forge_main.printProgress:
 		print("Importing model from: "+absoluteDefsPath+" & "+absoluteDataPath)
 	
 	if os.path.splitext(absoluteDefsPath)[1] != ".wimdo":
@@ -822,7 +822,7 @@ def import_wimdo_and_wismt(self, context):
 	return realise_results(wismtResults, os.path.splitext(os.path.basename(absoluteDataPath))[0], self, context)
 
 def realise_results(forgeResults, mainName, self, context):
-	printProgress = context.scene.xb_tools.printProgress
+	printProgress = context.scene.monado_forge_main.printProgress
 	if not forgeResults:
 		self.report({"ERROR"}, "Compiled results were empty. There might be more information in the console.")
 		return {"CANCELLED"}
@@ -833,14 +833,9 @@ def realise_results(forgeResults, mainName, self, context):
 	for skeleton in skeletons:
 		boneList = skeleton.getBones()
 		armatureName = mainName
-		if context.scene.xb_tools_model.useSkeletonSettings:
-			boneSize = context.scene.xb_tools_skeleton.boneSize
-			positionEpsilon = context.scene.xb_tools_skeleton.positionEpsilon
-			angleEpsilon = context.scene.xb_tools_skeleton.angleEpsilon
-		else:
-			boneSize = 0.1
-			positionEpsilon = 0.0001
-			angleEpsilon = math.radians(0.1)
+		boneSize = context.scene.monado_forge_import.boneSize
+		positionEpsilon = context.scene.monado_forge_main.positionEpsilon
+		angleEpsilon = context.scene.monado_forge_main.angleEpsilon
 		armatures.append(create_armature_from_bones(boneList,armatureName,boneSize,positionEpsilon,angleEpsilon))
 	# attach to the first armature created (this logic might change later)
 	targetArmature = armatures[0]
@@ -938,7 +933,7 @@ def realise_results(forgeResults, mainName, self, context):
 		#meshData.validate(verbose=True)
 		meshData.validate()
 		meshData.transform(mathutils.Euler((math.radians(90),0,0)).to_matrix().to_4x4(),shape_keys=True) # transform from lying down (+Y up +Z forward) to standing up (+Z up -Y forward)
-		cleanup_mesh(context,newMeshObject,context.scene.xb_tools_model.cleanupLooseVertices,context.scene.xb_tools_model.cleanupEmptyGroups,context.scene.xb_tools_model.cleanupEmptyShapes)
+		cleanup_mesh(context,newMeshObject,context.scene.monado_forge_import.cleanupLooseVertices,context.scene.monado_forge_import.cleanupEmptyGroups,context.scene.monado_forge_import.cleanupEmptyShapes)
 		# attach mesh to armature
 		armatureMod = newMeshObject.modifiers.new("Armature","ARMATURE")
 		armatureMod.object = targetArmature
@@ -947,8 +942,233 @@ def realise_results(forgeResults, mainName, self, context):
 		print("Finished creating "+str(len(meshes))+" meshes.")
 	return {"FINISHED"}
 
-class XBModelImportOperator(Operator):
-	bl_idname = "object.xb_tools_model_operator"
+class MonadoForgeViewImportSkeletonOperator(Operator):
+	bl_idname = "object.monado_forge_skeleton_import_operator"
+	bl_label = "Xenoblade Skeleton Import Operator"
+	bl_description = "Imports a skeleton from a Xenoblade file"
+	bl_options = {"REGISTER","UNDO"}
+	
+	@classmethod
+	def poll(cls, context):
+		return context.scene.monado_forge_import.skeletonPath
+	
+	def execute(self, context):
+		try:
+			game = context.scene.monado_forge_main.game
+			printProgress = context.scene.monado_forge_main.printProgress
+			absolutePath = bpy.path.abspath(context.scene.monado_forge_import.skeletonPath)
+			boneSize = context.scene.monado_forge_import.boneSize
+			positionEpsilon = context.scene.monado_forge_main.positionEpsilon
+			angleEpsilon = context.scene.monado_forge_main.angleEpsilon
+			importEndpoints = context.scene.monado_forge_import.importEndpoints
+			if printProgress:
+				print("Importing skeleton from: "+absolutePath)
+			
+			filename, fileExtension = os.path.splitext(absolutePath)
+			expectedExtension = {"XC1":".brres","XCX":".xcx","XC2":".arc","XC1DE":".chr","XC3":".chr",}[game]
+			if fileExtension != expectedExtension:
+				self.report({"ERROR"}, "Unexpected file type (for "+game+", expected "+expectedExtension+")")
+				return {"CANCELLED"}
+			
+			# first, read in the data and store it in a game-agnostic way
+			if game == "XC1":
+				modelFormat = "BRES"
+				endian = "big"
+			elif game == "XCX":
+				modelFormat = "[xcx]"
+				endian = "big"
+			elif game == "XC2":
+				modelFormat = "SAR1"
+				endian = "little"
+			elif game == "XC1DE":
+				modelFormat = "SAR1"
+				endian = "little"
+			elif game == "XC3":
+				modelFormat = "SAR1"
+				endian = "little"
+			
+			importedSkeletons = []
+			with open(absolutePath, "rb") as f:
+				if modelFormat == "BRES":
+					self.report({"ERROR"}, ".brres format not yet supported")
+					return {"CANCELLED"}
+				elif modelFormat == ".xcx":
+					self.report({"ERROR"}, "(whatever XCX uses) format not yet supported")
+					return {"CANCELLED"}
+				elif modelFormat == "SAR1":
+					magic = f.read(4)
+					if magic != b"1RAS":
+						self.report({"ERROR"}, "Not a valid "+expectedExtension+" file (unexpected header)")
+						return {"CANCELLED"}
+					fileSize = readAndParseInt(f,4,endian)
+					version = readAndParseInt(f,4,endian)
+					numFiles = readAndParseInt(f,4,endian)
+					tocOffset = readAndParseInt(f,4,endian)
+					dataOffset = readAndParseInt(f,4,endian)
+					unknown1 = readAndParseInt(f,4,endian)
+					unknown2 = readAndParseInt(f,4,endian)
+					path = readStr(f)
+					
+					for i in range(numFiles):
+						f.seek(tocOffset+i*0x40)
+						offset = readAndParseInt(f,4,endian)
+						size = readAndParseInt(f,4,endian)
+						unknown = readAndParseInt(f,4,endian)
+						filename = readStr(f)
+						# todo: try to do this based on file type instead of name
+						if game == "XC3":
+							skelFilename = "skeleton"
+						else: # XC2, XC1DE
+							skelFilename = ".skl"
+						if skelFilename not in filename: # yes, we're just dropping everything that's not a skeleton, this ain't a general-purpose script
+							continue
+						
+						f.seek(offset)
+						bcMagic = f.read(4)
+						if bcMagic == b"LCHC": # some sort of special case I guess? (seen in XBC2ModelDecomp)
+							continue
+						if bcMagic != b"BC\x00\x00": # BC check
+							self.report({"ERROR"}, "BC check failed for "+filename+" (dunno what this means tbh, file probably bad in some way e.g. wrong endianness)")
+							continue
+						blockCount = readAndParseInt(f,4,endian)
+						fileSize = readAndParseInt(f,4,endian)
+						pointerCount = readAndParseInt(f,4,endian)
+						dataOffset = readAndParseInt(f,4,endian)
+						
+						f.seek(offset+dataOffset+4)
+						skelMagic = f.read(4)
+						if skelMagic != b"SKEL":
+							self.report({"ERROR"}, ".skl file "+filename+" has bad header")
+							return {"CANCELLED"}
+						
+						skelHeaderUnknown1 = readAndParseInt(f,4,endian)
+						skelHeaderUnknown2 = readAndParseInt(f,4,endian)
+						skelTocItems = []
+						for j in range(10): # yeah it's a magic number, deal with it
+							itemOffset = readAndParseInt(f,4,endian)
+							itemUnknown1 = readAndParseInt(f,4,endian)
+							itemCount = readAndParseInt(f,4,endian)
+							itemUnknown2 = readAndParseInt(f,4,endian)
+							skelTocItems.append([itemOffset,itemUnknown1,itemCount,itemUnknown2])
+						
+						# finally we have the datums
+						# TOC layout:
+						# [0]: ???
+						# [1]: ???
+						# [2]: bone parent IDs
+						# [3]: bone names
+						# [4]: bone data (posititon, rotation, scale)
+						# [5]: ???
+						# [6]: endpoint parent IDs
+						# [7]: endpoint names
+						# [8]: endpoint data (position, rotation, scale)
+						# [9]: ???
+						if (skelTocItems[2][2] != skelTocItems[3][2]) or (skelTocItems[3][2] != skelTocItems[4][2]):
+							print("bone parent entries: "+str(skelTocItems[2][2]))
+							print("bone name entries: "+str(skelTocItems[3][2]))
+							print("bone data entries: "+str(skelTocItems[4][2]))
+							self.report({"ERROR"}, ".skl file "+filename+" has inconsistent bone counts (see console)")
+							return {"CANCELLED"}
+						if importEndpoints:
+							if (skelTocItems[6][2] != skelTocItems[7][2]) or (skelTocItems[7][2] != skelTocItems[8][2]):
+								print("endpoint parent entries: "+str(skelTocItems[6][2]))
+								print("endpoint name entries: "+str(skelTocItems[7][2]))
+								print("endpoint data entries: "+str(skelTocItems[8][2]))
+								self.report({"WARNING"}, ".skl file "+filename+" has inconsistent endpoint counts (see console); endpoint import skipped")
+						forgeBones = []
+						for b in range(skelTocItems[2][2]):
+							# parent
+							f.seek(offset+skelTocItems[2][0]+b*2)
+							parent = readAndParseInt(f,2,endian)
+							# name
+							f.seek(offset+skelTocItems[3][0]+b*16)
+							nameOffset = readAndParseInt(f,4,endian)
+							f.seek(offset+nameOffset)
+							name = readStr(f)
+							# data
+							f.seek(offset+skelTocItems[4][0]+b*(4*12))
+							px = readAndParseFloat(f,endian)
+							py = readAndParseFloat(f,endian)
+							pz = readAndParseFloat(f,endian)
+							pw = readAndParseFloat(f,endian)
+							rx = readAndParseFloat(f,endian)
+							ry = readAndParseFloat(f,endian)
+							rz = readAndParseFloat(f,endian)
+							rw = readAndParseFloat(f,endian)
+							sx = readAndParseFloat(f,endian)
+							sy = readAndParseFloat(f,endian)
+							sz = readAndParseFloat(f,endian)
+							sw = readAndParseFloat(f,endian)
+							# reminder that the pos and scale are x,y,z,w but the rotation is w,x,y,z
+							fb = MonadoForgeBone()
+							fb.setParent(parent)
+							fb.setName(name)
+							fb.setPosition([px,py,pz,pw])
+							fb.setRotation([rw,rx,ry,rz])
+							fb.setScale([sx,sy,sz,sw])
+							fb.setEndpoint(False)
+							forgeBones.append(fb)
+						if importEndpoints:
+							for ep in range(skelTocItems[6][2]):
+								# parent
+								f.seek(offset+skelTocItems[6][0]+ep*2)
+								parent = readAndParseInt(f,2,endian)
+								# name
+								f.seek(offset+skelTocItems[7][0]+ep*8) # yeah endpoint names are packed tighter than "normal" bone names
+								nameOffset = readAndParseInt(f,4,endian)
+								f.seek(offset+nameOffset)
+								name = readStr(f)
+								# data
+								f.seek(offset+skelTocItems[8][0]+ep*(4*12))
+								px = readAndParseFloat(f,endian)
+								py = readAndParseFloat(f,endian)
+								pz = readAndParseFloat(f,endian)
+								pw = readAndParseFloat(f,endian)
+								rx = readAndParseFloat(f,endian)
+								ry = readAndParseFloat(f,endian)
+								rz = readAndParseFloat(f,endian)
+								rw = readAndParseFloat(f,endian)
+								sx = readAndParseFloat(f,endian)
+								sy = readAndParseFloat(f,endian)
+								sz = readAndParseFloat(f,endian)
+								sw = readAndParseFloat(f,endian)
+								# for some reason, endpoints tend to have pw = 0, which positions it relative to root instead of parent (and we don't want that)
+								if pw == 0.0: pw = 1.0
+								# reminder that the pos and scale are x,y,z,w but the rotation is w,x,y,z
+								fb = MonadoForgeBone()
+								fb.setParent(parent)
+								fb.setName(name)
+								fb.setPosition([px,py,pz,pw])
+								fb.setRotation([rw,rx,ry,rz])
+								fb.setScale([sx,sy,sz,sw])
+								fb.setEndpoint(True)
+								forgeBones.append(fb)
+						if printProgress:
+							print("Read "+str(len(forgeBones))+" bones.")
+						importedSkeletons.append(forgeBones)
+					if not importedSkeletons:
+						self.report({"ERROR"}, "No valid .skl items found in file")
+						return {"CANCELLED"}
+				else:
+					self.report({"ERROR"}, "Unknown format: "+modelFormat)
+					return {"CANCELLED"}
+			
+			# we now have the skeletons in generic format - create the armatures
+			for skeleton in importedSkeletons:
+				armatureName = skeleton[0].getName()
+				if armatureName.endswith("_top"):
+					armatureName = armatureName[:-4]
+				if armatureName.endswith("_Bone"):
+					armatureName = armatureName[:-5]
+				create_armature_from_bones(skeleton,armatureName,boneSize,positionEpsilon,angleEpsilon)
+		except Exception:
+			traceback.print_exc()
+			self.report({"ERROR"}, "Unexpected error; see console")
+			return {"CANCELLED"}
+		return {"FINISHED"}
+
+class MonadoForgeViewImportModelOperator(Operator):
+	bl_idname = "object.monado_forge_model_import_operator"
 	bl_label = "Xenoblade Model Import Operator"
 	bl_description = "Imports a model from a Xenoblade file"
 	bl_options = {"REGISTER","UNDO"}
@@ -956,25 +1176,25 @@ class XBModelImportOperator(Operator):
 	@classmethod
 	def poll(cls, context):
 		# can't import a .wismt without a .wimdo (requires vertex table + face table alignment)
-		return context.scene.xb_tools_model.singlePath or context.scene.xb_tools_model.defsPath # or context.scene.xb_tools_model.dataPath
+		return context.scene.monado_forge_import.singlePath or context.scene.monado_forge_import.defsPath # or context.scene.monado_forge_import.dataPath
 	
 	def execute(self, context):
-		game = context.scene.xb_tools.game
+		game = context.scene.monado_forge_main.game
 		# this isn't part of the poll because it's not a trivial check and the fix needs to be more descriptive
-		if context.scene.xb_tools_model.autoSaveTextures:
-			if not os.path.isdir(bpy.path.abspath(context.scene.xb_tools_model.texturePath)):
+		if context.scene.monado_forge_import.autoSaveTextures:
+			if not os.path.isdir(bpy.path.abspath(context.scene.monado_forge_import.texturePath)):
 				self.report({"ERROR"}, "Auto-save selected, but texture output path is not an existing folder")
 				return {"CANCELLED"}
-		if game == "XC3" and not (os.path.isdir(bpy.path.abspath(context.scene.xb_tools_model.textureRepoMPath)) and os.path.isdir(bpy.path.abspath(context.scene.xb_tools_model.textureRepoHPath))):
+		if game == "XC3" and not (os.path.isdir(bpy.path.abspath(context.scene.monado_forge_import.textureRepoMPath)) and os.path.isdir(bpy.path.abspath(context.scene.monado_forge_import.textureRepoHPath))):
 			self.report({"ERROR"}, "Import uncached textures selected, but no texture repositories provided (both are required)")
 			return {"CANCELLED"}
 		try:
 			if game == "XC1" or game == "XCX":
 				self.report({"ERROR"}, "game not yet supported")
 				return {"CANCELLED"}
-			if context.scene.xb_tools_model.defsPath and context.scene.xb_tools_model.dataPath:
+			if context.scene.monado_forge_import.defsPath and context.scene.monado_forge_import.dataPath:
 				return import_wimdo_and_wismt(self, context)
-			elif context.scene.xb_tools_model.defsPath:
+			elif context.scene.monado_forge_import.defsPath:
 				return import_wimdo_only(self, context)
 			self.report({"ERROR"}, "Unexpected error; code shouldn't be able to reach here")
 			return {"CANCELLED"}
@@ -983,8 +1203,8 @@ class XBModelImportOperator(Operator):
 			self.report({"ERROR"}, "Unexpected error; see console")
 			return {"CANCELLED"}
 
-class XBModelCleanupOperator(Operator):
-	bl_idname = "object.xb_tools_model_cleanup_operator"
+class MonadoForgeViewImportCleanupModelOperator(Operator):
+	bl_idname = "object.monado_forge_cleanup_model_operator"
 	bl_label = "Xenoblade Model Cleanup Operator"
 	bl_description = "Does selected clean up operations to all selected meshes"
 	bl_options = {"REGISTER","UNDO"}
@@ -1009,14 +1229,35 @@ class XBModelCleanupOperator(Operator):
 				if s.type == "MESH":
 					objList.append(s)
 			for obj in objList:
-				cleanup_mesh(context,obj,context.scene.xb_tools_model.cleanupLooseVertices,context.scene.xb_tools_model.cleanupEmptyGroups,context.scene.xb_tools_model.cleanupEmptyShapes)
+				cleanup_mesh(context,obj,context.scene.monado_forge_import.cleanupLooseVertices,context.scene.monado_forge_import.cleanupEmptyGroups,context.scene.monado_forge_import.cleanupEmptyShapes)
 			return {"FINISHED"}
 		except Exception:
 			traceback.print_exc()
 			self.report({"ERROR"}, "Unexpected error; see console")
 			return {"CANCELLED"}
 
-class XBModelToolsProperties(PropertyGroup):
+class MonadoForgeViewImportProperties(PropertyGroup):
+	skeletonPath : StringProperty(
+		name="Skeleton Path",
+		description="File to import",
+		default="",
+		maxlen=1024,
+		subtype="FILE_PATH",
+	)
+	boneSize : FloatProperty(
+		name="Bone Size",
+		description="Length of bones",
+		default=0.1,
+		min=0.01,
+		soft_min=0.01,
+		soft_max=10,
+		unit="LENGTH",
+	)
+	importEndpoints : BoolProperty(
+		name="Also Import Endpoints",
+		description="Imports endpoints as well and adds them to the skeleton (in layer 2)",
+		default=False,
+	)
 	singlePath : StringProperty(
 		name="Path",
 		description="File to import",
@@ -1057,11 +1298,6 @@ class XBModelToolsProperties(PropertyGroup):
 		description="Force all meshes to use this weight table (see readme for explanation)",
 		default=0,
 		min=0,
-	)
-	useSkeletonSettings : BoolProperty(
-		name="Use Skeleton Settings",
-		description="If model contains any bones, use settings from the Skeleton panel to import it (false: use default settings)",
-		default=True,
 	)
 	alsoImportLODs : BoolProperty(
 		name="Also Import LODs",
@@ -1126,85 +1362,95 @@ class XBModelToolsProperties(PropertyGroup):
 		default=False,
 	)
 
-class OBJECT_PT_XBModelToolsPanel(Panel):
-	bl_idname = "OBJECT_PT_XBModelToolsPanel"
-	bl_label = "Model"
+class OBJECT_PT_MonadoForgeViewImportPanel(Panel):
+	bl_idname = "OBJECT_PT_MonadoForgeViewImportPanel"
+	bl_label = "Import"
 	bl_space_type = "VIEW_3D"
 	bl_region_type = "UI"
-	bl_parent_id = "OBJECT_PT_XBToolsPanel"
+	bl_parent_id = "OBJECT_PT_MonadoForgePanel"
 
 	def draw(self, context):
 		layout = self.layout
 		scn = context.scene
 		col = layout.column(align=True)
-		importPanel = col.column(align=True)
-		importPanel.label(text="Import")
-		if scn.xb_tools.game == "XC1":
-			importPanel.prop(scn.xb_tools_model, "singlePath", text=".brres")
+		activeObject = bpy.context.view_layer.objects.active
+		col.label(text="Skeleton")
+		expectedSkeletonExtension = {"XC1":".brres","XCX":".xcx","XC2":".arc","XC1DE":".chr","XC3":".chr",}[scn.monado_forge_main.game]
+		col.prop(scn.monado_forge_import, "skeletonPath", text=expectedSkeletonExtension)
+		col.prop(scn.monado_forge_import, "boneSize")
+		epSubcol = col.column()
+		epSubcol.prop(scn.monado_forge_import, "importEndpoints")
+		if scn.monado_forge_main.game == "XC1": # endpoints are just normal bones, conceptually always selected
+			epSubcol.enabled = False
+		col.operator(MonadoForgeViewImportSkeletonOperator.bl_idname, text="Import Skeleton", icon="IMPORT")
+		col.separator(factor=2)
+		col.label(text="Model")
+		if scn.monado_forge_main.game == "XC1":
+			col.prop(scn.monado_forge_import, "singlePath", text=".brres")
 		else:
-			defsRow = importPanel.row()
-			defsRow.prop(scn.xb_tools_model, "defsPath", text=".wimdo")
-			dataRow = importPanel.row()
-			dataRow.prop(scn.xb_tools_model, "dataPath", text=".wismt")
-		importPanel.prop(scn.xb_tools_model, "tempWeightTableOverride")
-		importPanel.prop(scn.xb_tools_model, "useSkeletonSettings")
-		importPanel.prop(scn.xb_tools_model, "alsoImportLODs")
-		importPanel.prop(scn.xb_tools_model, "doCleanupOnImport")
-		importPanel.prop(scn.xb_tools_model, "importUncachedTextures")
-		if scn.xb_tools.game == "XC3":
-			texMRow = importPanel.row()
-			texMRow.prop(scn.xb_tools_model, "textureRepoMPath", text="\\m\\")
-			texMRow.enabled = scn.xb_tools_model.importUncachedTextures
-			texHRow = importPanel.row()
-			texHRow.prop(scn.xb_tools_model, "textureRepoHPath", text="\\h\\")
-			texHRow.enabled = scn.xb_tools_model.importUncachedTextures
-		importPanel.prop(scn.xb_tools_model, "autoSaveTextures")
-		texturePathRow = importPanel.row()
-		texturePathRow.prop(scn.xb_tools_model, "texturePath", text="...to")
-		texturePathRow.enabled = scn.xb_tools_model.autoSaveTextures
-		importPanel.separator()
-		importPanel.operator(XBModelImportOperator.bl_idname, text="Import Model", icon="IMPORT")
-		importPanel.separator()
-		importPanel.operator(XBModelCleanupOperator.bl_idname, text="Clean Up Selected Meshes", icon="BRUSH_DATA")
+			defsRow = col.row()
+			defsRow.prop(scn.monado_forge_import, "defsPath", text=".wimdo")
+			dataRow = col.row()
+			dataRow.prop(scn.monado_forge_import, "dataPath", text=".wismt")
+		col.prop(scn.monado_forge_import, "tempWeightTableOverride")
+		col.prop(scn.monado_forge_import, "alsoImportLODs")
+		col.prop(scn.monado_forge_import, "doCleanupOnImport")
+		col.prop(scn.monado_forge_import, "importUncachedTextures")
+		if scn.monado_forge_main.game == "XC3":
+			texMRow = col.row()
+			texMRow.prop(scn.monado_forge_import, "textureRepoMPath", text="\\m\\")
+			texMRow.enabled = scn.monado_forge_import.importUncachedTextures
+			texHRow = col.row()
+			texHRow.prop(scn.monado_forge_import, "textureRepoHPath", text="\\h\\")
+			texHRow.enabled = scn.monado_forge_import.importUncachedTextures
+		col.prop(scn.monado_forge_import, "autoSaveTextures")
+		texturePathRow = col.row()
+		texturePathRow.prop(scn.monado_forge_import, "texturePath", text="...to")
+		texturePathRow.enabled = scn.monado_forge_import.autoSaveTextures
+		col.separator()
+		col.operator(MonadoForgeViewImportModelOperator.bl_idname, text="Import Model", icon="IMPORT")
+		col.separator()
+		col.operator(MonadoForgeViewImportCleanupModelOperator.bl_idname, text="Clean Up Selected Meshes", icon="BRUSH_DATA")
 
-class OBJECT_PT_XBModelToolsTexturePanel(Panel):
-	bl_idname = "OBJECT_PT_XBModelToolsTexturePanel"
+class OBJECT_PT_MonadoForgeViewImportTexturePanel(Panel):
+	bl_idname = "OBJECT_PT_MonadoForgeViewImportTexturePanel"
 	bl_label = "Texture Import Options"
 	bl_space_type = "VIEW_3D"
 	bl_region_type = "UI"
-	bl_parent_id = "OBJECT_PT_XBModelToolsPanel"
+	bl_parent_id = "OBJECT_PT_MonadoForgeViewImportPanel"
 	
 	def draw(self, context):
 		layout = self.layout
 		scn = context.scene
 		col = layout.column(align=True)
-		col.prop(scn.xb_tools_model, "differentiateTextures")
-		col.prop(scn.xb_tools_model, "blueBC5")
-		col.prop(scn.xb_tools_model, "splitTemps")
-		col.prop(scn.xb_tools_model, "keepAllResolutions")
+		col.prop(scn.monado_forge_import, "differentiateTextures")
+		col.prop(scn.monado_forge_import, "blueBC5")
+		col.prop(scn.monado_forge_import, "splitTemps")
+		col.prop(scn.monado_forge_import, "keepAllResolutions")
 
-class OBJECT_PT_XBModelToolsCleanupPanel(Panel):
-	bl_idname = "OBJECT_PT_XBModelToolsCleanupPanel"
+class OBJECT_PT_MonadoForgeViewImportCleanupPanel(Panel):
+	bl_idname = "OBJECT_PT_MonadoForgeViewImportCleanupPanel"
 	bl_label = "Imported Model Cleanup"
 	bl_space_type = "VIEW_3D"
 	bl_region_type = "UI"
-	bl_parent_id = "OBJECT_PT_XBModelToolsPanel"
+	bl_parent_id = "OBJECT_PT_MonadoForgeViewImportPanel"
 	
 	def draw(self, context):
 		layout = self.layout
 		scn = context.scene
 		col = layout.column(align=True)
-		col.prop(scn.xb_tools_model, "cleanupLooseVertices")
-		col.prop(scn.xb_tools_model, "cleanupEmptyGroups")
-		col.prop(scn.xb_tools_model, "cleanupEmptyShapes")
+		col.prop(scn.monado_forge_import, "cleanupLooseVertices")
+		col.prop(scn.monado_forge_import, "cleanupEmptyGroups")
+		col.prop(scn.monado_forge_import, "cleanupEmptyShapes")
 
 classes = (
-			XBModelImportOperator,
-			XBModelCleanupOperator,
-			XBModelToolsProperties,
-			OBJECT_PT_XBModelToolsPanel,
-			OBJECT_PT_XBModelToolsTexturePanel,
-			OBJECT_PT_XBModelToolsCleanupPanel,
+			MonadoForgeViewImportSkeletonOperator,
+			MonadoForgeViewImportModelOperator,
+			MonadoForgeViewImportCleanupModelOperator,
+			MonadoForgeViewImportProperties,
+			OBJECT_PT_MonadoForgeViewImportPanel,
+			OBJECT_PT_MonadoForgeViewImportTexturePanel,
+			OBJECT_PT_MonadoForgeViewImportCleanupPanel,
 			)
 
 def register():
@@ -1212,12 +1458,12 @@ def register():
 	for cls in classes:
 		register_class(cls)
 
-	bpy.types.Scene.xb_tools_model = PointerProperty(type=XBModelToolsProperties)
+	bpy.types.Scene.monado_forge_import = PointerProperty(type=MonadoForgeViewImportProperties)
 
 def unregister():
 	from bpy.utils import unregister_class
 	for cls in reversed(classes):
 		unregister_class(cls)
-	del bpy.types.Scene.xb_tools_model
+	del bpy.types.Scene.monado_forge_import
 
 #[...]
