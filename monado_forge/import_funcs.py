@@ -8,6 +8,171 @@ import zlib
 from . classes import *
 from . utils import *
 
+def import_sar1_skel_subfile(f, context):
+	game = context.scene.monado_forge_main.game
+	printProgress = context.scene.monado_forge_main.printProgress
+	importEndpoints = context.scene.monado_forge_import.importEndpoints
+	
+	magic = f.read(4)
+	if magic != b"1RAS":
+		print_error(f.name+" is not a valid SAR1 file (unexpected header)")
+		return None
+	fileSize = readAndParseInt(f,4)
+	version = readAndParseInt(f,4)
+	numFiles = readAndParseInt(f,4)
+	tocOffset = readAndParseInt(f,4)
+	dataOffset = readAndParseInt(f,4)
+	unknown1 = readAndParseInt(f,4)
+	unknown2 = readAndParseInt(f,4)
+	path = readStr(f)
+	
+	importedSkeletons = []
+	for i in range(numFiles):
+		f.seek(tocOffset+i*0x40)
+		offset = readAndParseInt(f,4)
+		size = readAndParseInt(f,4)
+		unknown = readAndParseInt(f,4)
+		filename = readStr(f)
+		# todo: try to do this based on file type instead of name
+		if game == "XC3":
+			skelFilename = "skeleton"
+		else: # XC2, XC1DE
+			skelFilename = ".skl"
+		if skelFilename not in filename: # yes, we're just dropping everything that's not a skeleton, we ain't lookin for them
+			continue
+		
+		f.seek(offset)
+		bcMagic = f.read(4)
+		if bcMagic == b"LCHC": # some sort of special case I guess? (seen in XBC2ModelDecomp)
+			continue
+		if bcMagic != b"BC\x00\x00": # BC check
+			print_error("BC check failed for "+filename+" (dunno what this means tbh, file probably bad in some way e.g. wrong endianness)")
+			continue
+		blockCount = readAndParseInt(f,4)
+		fileSize = readAndParseInt(f,4)
+		pointerCount = readAndParseInt(f,4)
+		dataOffset = readAndParseInt(f,4)
+		
+		f.seek(offset+dataOffset+4)
+		skelMagic = f.read(4)
+		if skelMagic != b"SKEL":
+			print_error(".skl file "+filename+" has bad header")
+			return None
+		
+		skelHeaderUnknown1 = readAndParseInt(f,4)
+		skelHeaderUnknown2 = readAndParseInt(f,4)
+		skelTocItems = []
+		for j in range(10): # yeah it's a magic number, deal with it
+			itemOffset = readAndParseInt(f,4)
+			itemUnknown1 = readAndParseInt(f,4)
+			itemCount = readAndParseInt(f,4)
+			itemUnknown2 = readAndParseInt(f,4)
+			skelTocItems.append([itemOffset,itemUnknown1,itemCount,itemUnknown2])
+		
+		# finally we have the datums
+		# TOC layout:
+		# [0]: ???
+		# [1]: ???
+		# [2]: bone parent IDs
+		# [3]: bone names
+		# [4]: bone data (posititon, rotation, scale)
+		# [5]: ???
+		# [6]: endpoint parent IDs
+		# [7]: endpoint names
+		# [8]: endpoint data (position, rotation, scale)
+		# [9]: ???
+		if (skelTocItems[2][2] != skelTocItems[3][2]) or (skelTocItems[3][2] != skelTocItems[4][2]):
+			print("bone parent entries: "+str(skelTocItems[2][2]))
+			print("bone name entries: "+str(skelTocItems[3][2]))
+			print("bone data entries: "+str(skelTocItems[4][2]))
+			print_error(".skl file "+filename+" has inconsistent bone counts (see console)")
+			return None
+		if importEndpoints:
+			if (skelTocItems[6][2] != skelTocItems[7][2]) or (skelTocItems[7][2] != skelTocItems[8][2]):
+				print("endpoint parent entries: "+str(skelTocItems[6][2]))
+				print("endpoint name entries: "+str(skelTocItems[7][2]))
+				print("endpoint data entries: "+str(skelTocItems[8][2]))
+				print_warning(".skl file "+filename+" has inconsistent endpoint counts (see console); endpoint import skipped")
+		forgeBones = []
+		for b in range(skelTocItems[2][2]):
+			# parent
+			f.seek(offset+skelTocItems[2][0]+b*2)
+			parent = readAndParseInt(f,2)
+			# name
+			f.seek(offset+skelTocItems[3][0]+b*16)
+			nameOffset = readAndParseInt(f,4)
+			f.seek(offset+nameOffset)
+			name = readStr(f)
+			# data
+			f.seek(offset+skelTocItems[4][0]+b*(4*12))
+			px = readAndParseFloat(f)
+			py = readAndParseFloat(f)
+			pz = readAndParseFloat(f)
+			pw = readAndParseFloat(f)
+			rx = readAndParseFloat(f)
+			ry = readAndParseFloat(f)
+			rz = readAndParseFloat(f)
+			rw = readAndParseFloat(f)
+			sx = readAndParseFloat(f)
+			sy = readAndParseFloat(f)
+			sz = readAndParseFloat(f)
+			sw = readAndParseFloat(f)
+			# reminder that the pos and scale are x,y,z,w but the rotation is w,x,y,z
+			fb = MonadoForgeBone()
+			fb.setParent(parent)
+			fb.setName(name)
+			fb.setPosition([px,py,pz,pw])
+			fb.setRotation([rw,rx,ry,rz])
+			fb.setScale([sx,sy,sz,sw])
+			fb.setEndpoint(False)
+			forgeBones.append(fb)
+		if importEndpoints:
+			for ep in range(skelTocItems[6][2]):
+				# parent
+				f.seek(offset+skelTocItems[6][0]+ep*2)
+				parent = readAndParseInt(f,2)
+				# name
+				f.seek(offset+skelTocItems[7][0]+ep*8) # yeah endpoint names are packed tighter than "normal" bone names
+				nameOffset = readAndParseInt(f,4)
+				f.seek(offset+nameOffset)
+				name = readStr(f)
+				# data
+				f.seek(offset+skelTocItems[8][0]+ep*(4*12))
+				px = readAndParseFloat(f)
+				py = readAndParseFloat(f)
+				pz = readAndParseFloat(f)
+				pw = readAndParseFloat(f)
+				rx = readAndParseFloat(f)
+				ry = readAndParseFloat(f)
+				rz = readAndParseFloat(f)
+				rw = readAndParseFloat(f)
+				sx = readAndParseFloat(f)
+				sy = readAndParseFloat(f)
+				sz = readAndParseFloat(f)
+				sw = readAndParseFloat(f)
+				# for some reason, endpoints tend to have pw = 0, which positions it relative to root instead of parent (and we don't want that)
+				if pw == 0.0: pw = 1.0
+				# reminder that the pos and scale are x,y,z,w but the rotation is w,x,y,z
+				fb = MonadoForgeBone()
+				fb.setParent(parent)
+				fb.setName(name)
+				fb.setPosition([px,py,pz,pw])
+				fb.setRotation([rw,rx,ry,rz])
+				fb.setScale([sx,sy,sz,sw])
+				fb.setEndpoint(True)
+				forgeBones.append(fb)
+		if printProgress:
+			print("Read "+str(len(forgeBones))+" bones.")
+		importedSkeletons.append(forgeBones)
+	if not importedSkeletons:
+		print_error("No valid .skl items found in file")
+		return None
+	# assumption: there can only ever be a single skeleton in a file
+	# so why are we making a list? it'll be easier to pivot in the future if a counterexample is found
+	if len(importedSkeletons) > 1:
+		print_warning(".skl file has multiple skeletons; returning only the first (please report this issue)")
+	return importedSkeletons[0]
+
 def import_wimdo(f, context):
 	printProgress = context.scene.monado_forge_main.printProgress
 	# little endian assumed
@@ -776,8 +941,23 @@ def import_wismt(f, wimdoResults, context):
 		print("Finished parsing .wismt file.")
 	return results
 
-def import_skel_only(self, context):
-	pass
+def import_sar1_skeleton_only(self, context):
+	absolutePath = bpy.path.abspath(context.scene.monado_forge_import.skeletonPath)
+	boneSize = context.scene.monado_forge_import.boneSize
+	positionEpsilon = context.scene.monado_forge_main.positionEpsilon
+	angleEpsilon = context.scene.monado_forge_main.angleEpsilon
+	
+	with open(absolutePath, "rb") as f:
+		skeleton = import_sar1_skel_subfile(f, context)
+	
+	# we now have the skeleton in generic format - create the armature
+	armatureName = skeleton[0].getName()
+	if armatureName.endswith("_top"):
+		armatureName = armatureName[:-4]
+	if armatureName.endswith("_Bone"):
+		armatureName = armatureName[:-5]
+	create_armature_from_bones(skeleton,armatureName,boneSize,positionEpsilon,angleEpsilon)
+	return {"FINISHED"}
 
 def import_wimdo_only(self, context):
 	absoluteDefsPath = bpy.path.abspath(context.scene.monado_forge_import.defsPath)
@@ -811,7 +991,7 @@ def import_wimdo_and_wismt(self, context):
 		wismtResults = import_wismt(f, wimdoResults, context)
 	return realise_results(wismtResults, os.path.splitext(os.path.basename(absoluteDataPath))[0], self, context)
 
-def import_skel_and_wimdo_and_wismt(self, context):
+def import_sar1_skel_and_wimdo_and_wismt(self, context):
 	pass
 
 def realise_results(forgeResults, mainName, self, context):

@@ -35,10 +35,6 @@ class MonadoForgeViewImportSkeletonOperator(Operator):
 			game = context.scene.monado_forge_main.game
 			printProgress = context.scene.monado_forge_main.printProgress
 			absolutePath = bpy.path.abspath(context.scene.monado_forge_import.skeletonPath)
-			boneSize = context.scene.monado_forge_import.boneSize
-			positionEpsilon = context.scene.monado_forge_main.positionEpsilon
-			angleEpsilon = context.scene.monado_forge_main.angleEpsilon
-			importEndpoints = context.scene.monado_forge_import.importEndpoints
 			if printProgress:
 				print("Importing skeleton from: "+absolutePath)
 			
@@ -49,196 +45,29 @@ class MonadoForgeViewImportSkeletonOperator(Operator):
 				return {"CANCELLED"}
 			
 			# first, read in the data and store it in a game-agnostic way
-			if game == "XC1":
+			if game == "XC1": # big endian
 				modelFormat = "BRES"
-				endian = "big"
-			elif game == "XCX":
+			elif game == "XCX": # big endian
 				modelFormat = "[xcx]"
-				endian = "big"
 			elif game == "XC2":
 				modelFormat = "SAR1"
-				endian = "little"
 			elif game == "XC1DE":
 				modelFormat = "SAR1"
-				endian = "little"
 			elif game == "XC3":
 				modelFormat = "SAR1"
-				endian = "little"
 			
-			importedSkeletons = []
-			with open(absolutePath, "rb") as f:
-				if modelFormat == "BRES":
-					self.report({"ERROR"}, ".brres format not yet supported")
-					return {"CANCELLED"}
-				elif modelFormat == ".xcx":
-					self.report({"ERROR"}, "(whatever XCX uses) format not yet supported")
-					return {"CANCELLED"}
-				elif modelFormat == "SAR1":
-					magic = f.read(4)
-					if magic != b"1RAS":
-						self.report({"ERROR"}, "Not a valid "+expectedExtension+" file (unexpected header)")
-						return {"CANCELLED"}
-					fileSize = readAndParseInt(f,4,endian)
-					version = readAndParseInt(f,4,endian)
-					numFiles = readAndParseInt(f,4,endian)
-					tocOffset = readAndParseInt(f,4,endian)
-					dataOffset = readAndParseInt(f,4,endian)
-					unknown1 = readAndParseInt(f,4,endian)
-					unknown2 = readAndParseInt(f,4,endian)
-					path = readStr(f)
-					
-					for i in range(numFiles):
-						f.seek(tocOffset+i*0x40)
-						offset = readAndParseInt(f,4,endian)
-						size = readAndParseInt(f,4,endian)
-						unknown = readAndParseInt(f,4,endian)
-						filename = readStr(f)
-						# todo: try to do this based on file type instead of name
-						if game == "XC3":
-							skelFilename = "skeleton"
-						else: # XC2, XC1DE
-							skelFilename = ".skl"
-						if skelFilename not in filename: # yes, we're just dropping everything that's not a skeleton, this ain't a general-purpose script
-							continue
-						
-						f.seek(offset)
-						bcMagic = f.read(4)
-						if bcMagic == b"LCHC": # some sort of special case I guess? (seen in XBC2ModelDecomp)
-							continue
-						if bcMagic != b"BC\x00\x00": # BC check
-							self.report({"ERROR"}, "BC check failed for "+filename+" (dunno what this means tbh, file probably bad in some way e.g. wrong endianness)")
-							continue
-						blockCount = readAndParseInt(f,4,endian)
-						fileSize = readAndParseInt(f,4,endian)
-						pointerCount = readAndParseInt(f,4,endian)
-						dataOffset = readAndParseInt(f,4,endian)
-						
-						f.seek(offset+dataOffset+4)
-						skelMagic = f.read(4)
-						if skelMagic != b"SKEL":
-							self.report({"ERROR"}, ".skl file "+filename+" has bad header")
-							return {"CANCELLED"}
-						
-						skelHeaderUnknown1 = readAndParseInt(f,4,endian)
-						skelHeaderUnknown2 = readAndParseInt(f,4,endian)
-						skelTocItems = []
-						for j in range(10): # yeah it's a magic number, deal with it
-							itemOffset = readAndParseInt(f,4,endian)
-							itemUnknown1 = readAndParseInt(f,4,endian)
-							itemCount = readAndParseInt(f,4,endian)
-							itemUnknown2 = readAndParseInt(f,4,endian)
-							skelTocItems.append([itemOffset,itemUnknown1,itemCount,itemUnknown2])
-						
-						# finally we have the datums
-						# TOC layout:
-						# [0]: ???
-						# [1]: ???
-						# [2]: bone parent IDs
-						# [3]: bone names
-						# [4]: bone data (posititon, rotation, scale)
-						# [5]: ???
-						# [6]: endpoint parent IDs
-						# [7]: endpoint names
-						# [8]: endpoint data (position, rotation, scale)
-						# [9]: ???
-						if (skelTocItems[2][2] != skelTocItems[3][2]) or (skelTocItems[3][2] != skelTocItems[4][2]):
-							print("bone parent entries: "+str(skelTocItems[2][2]))
-							print("bone name entries: "+str(skelTocItems[3][2]))
-							print("bone data entries: "+str(skelTocItems[4][2]))
-							self.report({"ERROR"}, ".skl file "+filename+" has inconsistent bone counts (see console)")
-							return {"CANCELLED"}
-						if importEndpoints:
-							if (skelTocItems[6][2] != skelTocItems[7][2]) or (skelTocItems[7][2] != skelTocItems[8][2]):
-								print("endpoint parent entries: "+str(skelTocItems[6][2]))
-								print("endpoint name entries: "+str(skelTocItems[7][2]))
-								print("endpoint data entries: "+str(skelTocItems[8][2]))
-								self.report({"WARNING"}, ".skl file "+filename+" has inconsistent endpoint counts (see console); endpoint import skipped")
-						forgeBones = []
-						for b in range(skelTocItems[2][2]):
-							# parent
-							f.seek(offset+skelTocItems[2][0]+b*2)
-							parent = readAndParseInt(f,2,endian)
-							# name
-							f.seek(offset+skelTocItems[3][0]+b*16)
-							nameOffset = readAndParseInt(f,4,endian)
-							f.seek(offset+nameOffset)
-							name = readStr(f)
-							# data
-							f.seek(offset+skelTocItems[4][0]+b*(4*12))
-							px = readAndParseFloat(f,endian)
-							py = readAndParseFloat(f,endian)
-							pz = readAndParseFloat(f,endian)
-							pw = readAndParseFloat(f,endian)
-							rx = readAndParseFloat(f,endian)
-							ry = readAndParseFloat(f,endian)
-							rz = readAndParseFloat(f,endian)
-							rw = readAndParseFloat(f,endian)
-							sx = readAndParseFloat(f,endian)
-							sy = readAndParseFloat(f,endian)
-							sz = readAndParseFloat(f,endian)
-							sw = readAndParseFloat(f,endian)
-							# reminder that the pos and scale are x,y,z,w but the rotation is w,x,y,z
-							fb = MonadoForgeBone()
-							fb.setParent(parent)
-							fb.setName(name)
-							fb.setPosition([px,py,pz,pw])
-							fb.setRotation([rw,rx,ry,rz])
-							fb.setScale([sx,sy,sz,sw])
-							fb.setEndpoint(False)
-							forgeBones.append(fb)
-						if importEndpoints:
-							for ep in range(skelTocItems[6][2]):
-								# parent
-								f.seek(offset+skelTocItems[6][0]+ep*2)
-								parent = readAndParseInt(f,2,endian)
-								# name
-								f.seek(offset+skelTocItems[7][0]+ep*8) # yeah endpoint names are packed tighter than "normal" bone names
-								nameOffset = readAndParseInt(f,4,endian)
-								f.seek(offset+nameOffset)
-								name = readStr(f)
-								# data
-								f.seek(offset+skelTocItems[8][0]+ep*(4*12))
-								px = readAndParseFloat(f,endian)
-								py = readAndParseFloat(f,endian)
-								pz = readAndParseFloat(f,endian)
-								pw = readAndParseFloat(f,endian)
-								rx = readAndParseFloat(f,endian)
-								ry = readAndParseFloat(f,endian)
-								rz = readAndParseFloat(f,endian)
-								rw = readAndParseFloat(f,endian)
-								sx = readAndParseFloat(f,endian)
-								sy = readAndParseFloat(f,endian)
-								sz = readAndParseFloat(f,endian)
-								sw = readAndParseFloat(f,endian)
-								# for some reason, endpoints tend to have pw = 0, which positions it relative to root instead of parent (and we don't want that)
-								if pw == 0.0: pw = 1.0
-								# reminder that the pos and scale are x,y,z,w but the rotation is w,x,y,z
-								fb = MonadoForgeBone()
-								fb.setParent(parent)
-								fb.setName(name)
-								fb.setPosition([px,py,pz,pw])
-								fb.setRotation([rw,rx,ry,rz])
-								fb.setScale([sx,sy,sz,sw])
-								fb.setEndpoint(True)
-								forgeBones.append(fb)
-						if printProgress:
-							print("Read "+str(len(forgeBones))+" bones.")
-						importedSkeletons.append(forgeBones)
-					if not importedSkeletons:
-						self.report({"ERROR"}, "No valid .skl items found in file")
-						return {"CANCELLED"}
-				else:
-					self.report({"ERROR"}, "Unknown format: "+modelFormat)
-					return {"CANCELLED"}
+			if modelFormat == "BRES":
+				self.report({"ERROR"}, ".brres format not yet supported")
+				return {"CANCELLED"}
+			elif modelFormat == ".xcx":
+				self.report({"ERROR"}, "(whatever XCX uses) format not yet supported")
+				return {"CANCELLED"}
+			elif modelFormat == "SAR1":
+				return import_sar1_skeleton_only(self, context)
+			else:
+				self.report({"ERROR"}, "Unknown format: "+modelFormat)
+				return {"CANCELLED"}
 			
-			# we now have the skeletons in generic format - create the armatures
-			for skeleton in importedSkeletons:
-				armatureName = skeleton[0].getName()
-				if armatureName.endswith("_top"):
-					armatureName = armatureName[:-4]
-				if armatureName.endswith("_Bone"):
-					armatureName = armatureName[:-5]
-				create_armature_from_bones(skeleton,armatureName,boneSize,positionEpsilon,angleEpsilon)
 		except Exception:
 			traceback.print_exc()
 			self.report({"ERROR"}, "Unexpected error; see console")
