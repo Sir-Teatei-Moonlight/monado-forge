@@ -1203,10 +1203,24 @@ class MonadoForgeViewImportModelOperator(Operator):
 			self.report({"ERROR"}, "Unexpected error; see console")
 			return {"CANCELLED"}
 
+class MonadoForgeViewImportModelWithSkeletonOperator(Operator):
+	bl_idname = "object.monado_forge_model_with_skeleton_import_operator"
+	bl_label = "Xenoblade Model With Skeleton Import Operator"
+	#bl_description = "Imports a model and skeleton from a Xenoblade file"
+	bl_description = "to be continued.."
+	bl_options = {"REGISTER","UNDO"}
+	
+	@classmethod
+	def poll(cls, context):
+		return False
+	
+	def execute(self, context):
+		pass
+
 class MonadoForgeViewImportCleanupModelOperator(Operator):
 	bl_idname = "object.monado_forge_cleanup_model_operator"
 	bl_label = "Xenoblade Model Cleanup Operator"
-	bl_description = "Does selected clean up operations to all selected meshes"
+	bl_description = "Does selected cleanup operations to all selected meshes"
 	bl_options = {"REGISTER","UNDO"}
 	
 	@classmethod
@@ -1342,7 +1356,7 @@ class MonadoForgeViewImportProperties(PropertyGroup):
 		default=False,
 	)
 	differentiateTextures : BoolProperty(
-		name="Differentiate",
+		name="Differentiate Image Names",
 		description="Appends the filename to the start of texture names (so they don't overwrite existing ones)",
 		default=True,
 	)
@@ -1374,17 +1388,8 @@ class OBJECT_PT_MonadoForgeViewImportPanel(Panel):
 		scn = context.scene
 		col = layout.column(align=True)
 		activeObject = bpy.context.view_layer.objects.active
-		col.label(text="Skeleton")
 		expectedSkeletonExtension = {"XC1":".brres","XCX":".xcx","XC2":".arc","XC1DE":".chr","XC3":".chr",}[scn.monado_forge_main.game]
 		col.prop(scn.monado_forge_import, "skeletonPath", text=expectedSkeletonExtension)
-		col.prop(scn.monado_forge_import, "boneSize")
-		epSubcol = col.column()
-		epSubcol.prop(scn.monado_forge_import, "importEndpoints")
-		if scn.monado_forge_main.game == "XC1": # endpoints are just normal bones, conceptually always selected
-			epSubcol.enabled = False
-		col.operator(MonadoForgeViewImportSkeletonOperator.bl_idname, text="Import Skeleton", icon="IMPORT")
-		col.separator(factor=2)
-		col.label(text="Model")
 		if scn.monado_forge_main.game == "XC1":
 			col.prop(scn.monado_forge_import, "singlePath", text=".brres")
 		else:
@@ -1392,9 +1397,6 @@ class OBJECT_PT_MonadoForgeViewImportPanel(Panel):
 			defsRow.prop(scn.monado_forge_import, "defsPath", text=".wimdo")
 			dataRow = col.row()
 			dataRow.prop(scn.monado_forge_import, "dataPath", text=".wismt")
-		col.prop(scn.monado_forge_import, "tempWeightTableOverride")
-		col.prop(scn.monado_forge_import, "alsoImportLODs")
-		col.prop(scn.monado_forge_import, "doCleanupOnImport")
 		col.prop(scn.monado_forge_import, "importUncachedTextures")
 		if scn.monado_forge_main.game == "XC3":
 			texMRow = col.row()
@@ -1408,12 +1410,45 @@ class OBJECT_PT_MonadoForgeViewImportPanel(Panel):
 		texturePathRow.prop(scn.monado_forge_import, "texturePath", text="...to")
 		texturePathRow.enabled = scn.monado_forge_import.autoSaveTextures
 		col.separator()
-		col.operator(MonadoForgeViewImportModelOperator.bl_idname, text="Import Model", icon="IMPORT")
-		col.separator()
+		col.operator(MonadoForgeViewImportSkeletonOperator.bl_idname, text="Import Skeleton Only", icon="IMPORT")
+		col.operator(MonadoForgeViewImportModelOperator.bl_idname, text="Import Model Only", icon="IMPORT")
+		col.operator(MonadoForgeViewImportModelWithSkeletonOperator.bl_idname, text="Import Model With Skeleton", icon="IMPORT")
+
+class OBJECT_PT_MonadoForgeViewImportSkeletonOptionsPanel(Panel):
+	bl_idname = "OBJECT_PT_MonadoForgeViewImportSkeletonOptionsPanel"
+	bl_label = "Skeleton Import Options"
+	bl_space_type = "VIEW_3D"
+	bl_region_type = "UI"
+	bl_parent_id = "OBJECT_PT_MonadoForgeViewImportPanel"
+	
+	def draw(self, context):
+		layout = self.layout
+		scn = context.scene
+		col = layout.column(align=True)
+		col.prop(scn.monado_forge_import, "boneSize")
+		epSubcol = col.column()
+		epSubcol.prop(scn.monado_forge_import, "importEndpoints")
+		if scn.monado_forge_main.game == "XC1": # endpoints are just normal bones, conceptually always selected
+			epSubcol.enabled = False
+
+class OBJECT_PT_MonadoForgeViewImportModelOptionsPanel(Panel):
+	bl_idname = "OBJECT_PT_MonadoForgeViewImportModelOptionsPanel"
+	bl_label = "Model Import Options"
+	bl_space_type = "VIEW_3D"
+	bl_region_type = "UI"
+	bl_parent_id = "OBJECT_PT_MonadoForgeViewImportPanel"
+	
+	def draw(self, context):
+		layout = self.layout
+		scn = context.scene
+		col = layout.column(align=True)
+		col.prop(scn.monado_forge_import, "tempWeightTableOverride")
+		col.prop(scn.monado_forge_import, "alsoImportLODs")
+		col.prop(scn.monado_forge_import, "doCleanupOnImport")
 		col.operator(MonadoForgeViewImportCleanupModelOperator.bl_idname, text="Clean Up Selected Meshes", icon="BRUSH_DATA")
 
-class OBJECT_PT_MonadoForgeViewImportTexturePanel(Panel):
-	bl_idname = "OBJECT_PT_MonadoForgeViewImportTexturePanel"
+class OBJECT_PT_MonadoForgeViewImportTextureOptionsPanel(Panel):
+	bl_idname = "OBJECT_PT_MonadoForgeViewImportTextureOptionsPanel"
 	bl_label = "Texture Import Options"
 	bl_space_type = "VIEW_3D"
 	bl_region_type = "UI"
@@ -1430,10 +1465,10 @@ class OBJECT_PT_MonadoForgeViewImportTexturePanel(Panel):
 
 class OBJECT_PT_MonadoForgeViewImportCleanupPanel(Panel):
 	bl_idname = "OBJECT_PT_MonadoForgeViewImportCleanupPanel"
-	bl_label = "Imported Model Cleanup"
+	bl_label = "Model Cleanup Options"
 	bl_space_type = "VIEW_3D"
 	bl_region_type = "UI"
-	bl_parent_id = "OBJECT_PT_MonadoForgeViewImportPanel"
+	bl_parent_id = "OBJECT_PT_MonadoForgeViewImportModelOptionsPanel"
 	
 	def draw(self, context):
 		layout = self.layout
@@ -1446,10 +1481,13 @@ class OBJECT_PT_MonadoForgeViewImportCleanupPanel(Panel):
 classes = (
 			MonadoForgeViewImportSkeletonOperator,
 			MonadoForgeViewImportModelOperator,
+			MonadoForgeViewImportModelWithSkeletonOperator,
 			MonadoForgeViewImportCleanupModelOperator,
 			MonadoForgeViewImportProperties,
 			OBJECT_PT_MonadoForgeViewImportPanel,
-			OBJECT_PT_MonadoForgeViewImportTexturePanel,
+			OBJECT_PT_MonadoForgeViewImportSkeletonOptionsPanel,
+			OBJECT_PT_MonadoForgeViewImportModelOptionsPanel,
+			OBJECT_PT_MonadoForgeViewImportTextureOptionsPanel,
 			OBJECT_PT_MonadoForgeViewImportCleanupPanel,
 			)
 

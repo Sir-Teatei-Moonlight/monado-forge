@@ -39,7 +39,7 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 * Optional mesh cleanup, erasing unused vertices, vertex groups, and shapes.
 * Imports textures and saves them to a specified folder. By default, keeps only the biggest of each, but provides the option to keep all resolutions (using subfolders). Supports all known-to-be-used formats (R8G8B8A8, BC1, BC3, BC4, BC5, BC7).
 * Optionally assumes that BC5 textures are normal maps, and auto-calculates the blue channel for them.
-* By default, overwrites any existing textures of the same name. Can be set to differentiate via appending the .wismt's filename.
+* Differentiates newly-imported textures with same-named existing ones by appending the imported .wismt's filename. Can be turned off.
 * Has the ability to automatically split "temp" files into channels, but currently does so in a terribly slow and inefficient way, so it's off by default. Don't exactly recommend using it yet, but it's there if you need it.
 * Creates a basic material with all the correct textures and values in it, in which the first texture is assumed to be the base colour, and nothing else is plugged in. Anything more will have to wait for deeper shader parsing.
 

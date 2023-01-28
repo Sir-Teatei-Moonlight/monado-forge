@@ -262,7 +262,7 @@ class MonadoForgeNonFinalLRFixSelectedOperator(Operator):
 class MonadoForgeMergeSelectedToActiveOperator(Operator):
 	bl_idname = "object.monado_forge_merge_selected_to_active_operator"
 	bl_label = "Xenoblade Skeleton Merge Selected To Active Operator"
-	bl_description = "Joins armatures, merging bones of the same name"
+	bl_description = "Joins selected armatures into the active one, merging bones of the same name"
 	bl_options = {"REGISTER","UNDO"}
 	
 	@classmethod
@@ -363,7 +363,7 @@ class OBJECT_PT_MonadoForgeViewModifyPanel(Panel):
 		col = layout.column(align=True)
 		activeObject = bpy.context.view_layer.objects.active
 		col.label(text="Skeleton")
-		settingsPanel = col.column(align=True)
+		settingsPanel = col.column(align=True) # note to self: remove this later when non-skeleton modifiers exist (and thus there are subpanels)
 		settingsPanel.prop(scn.monado_forge_modify, "nonFinalMirror")
 		modifyPanel = col.column(align=True)
 		if activeObject and activeObject.mode == "EDIT":
