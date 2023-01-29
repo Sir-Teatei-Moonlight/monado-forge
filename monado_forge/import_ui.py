@@ -83,7 +83,7 @@ class MonadoForgeViewImportModelOperator(Operator):
 	@classmethod
 	def poll(cls, context):
 		# can't import a .wismt without a .wimdo (requires vertex table + face table alignment)
-		return context.scene.monado_forge_import.singlePath or context.scene.monado_forge_import.defsPath # or context.scene.monado_forge_import.dataPath
+		return context.scene.monado_forge_import.singlePath or context.scene.monado_forge_import.defsPath
 	
 	def execute(self, context):
 		game = context.scene.monado_forge_main.game
@@ -113,16 +113,42 @@ class MonadoForgeViewImportModelOperator(Operator):
 class MonadoForgeViewImportModelWithSkeletonOperator(Operator):
 	bl_idname = "object.monado_forge_model_with_skeleton_import_operator"
 	bl_label = "Xenoblade Model With Skeleton Import Operator"
-	#bl_description = "Imports a model and skeleton from a Xenoblade file"
-	bl_description = "to be continued.."
+	bl_description = "Imports a model using an external skeleton from a Xenoblade file"
 	bl_options = {"REGISTER","UNDO"}
 	
 	@classmethod
 	def poll(cls, context):
-		return False
+		# require all of .arc/.chr, .wimdo, and .wismt (there are no known situations where a .wimdo with an embedded model has a .arc/.chr but no .wismt)
+		return context.scene.monado_forge_import.singlePath or (context.scene.monado_forge_import.skeletonPath and context.scene.monado_forge_import.defsPath and context.scene.monado_forge_import.dataPath)
 	
 	def execute(self, context):
-		pass
+		game = context.scene.monado_forge_main.game
+		# this isn't part of the poll because it's not a trivial check and the fix needs to be more descriptive
+		if context.scene.monado_forge_import.autoSaveTextures:
+			if not os.path.isdir(bpy.path.abspath(context.scene.monado_forge_import.texturePath)):
+				self.report({"ERROR"}, "Auto-save selected, but texture output path is not an existing folder")
+				return {"CANCELLED"}
+		if game == "XC3" and not (os.path.isdir(bpy.path.abspath(context.scene.monado_forge_import.textureRepoMPath)) and os.path.isdir(bpy.path.abspath(context.scene.monado_forge_import.textureRepoHPath))):
+			self.report({"ERROR"}, "Import uncached textures selected, but no texture repositories provided (both are required)")
+			return {"CANCELLED"}
+		
+		filename, fileExtension = os.path.splitext(bpy.path.abspath(context.scene.monado_forge_import.skeletonPath))
+		expectedExtension = {"XC1":".brres","XCX":".xcx","XC2":".arc","XC1DE":".chr","XC3":".chr",}[game]
+		if fileExtension != expectedExtension:
+			self.report({"ERROR"}, "Unexpected file type (for "+game+", expected "+expectedExtension+")")
+			return {"CANCELLED"}
+		
+		try:
+			if game == "XC1" or game == "XCX":
+				self.report({"ERROR"}, "game not yet supported")
+				return {"CANCELLED"}
+			return import_sar1_skel_and_wimdo_and_wismt(self, context)
+			self.report({"ERROR"}, "Unexpected error; code shouldn't be able to reach here")
+			return {"CANCELLED"}
+		except Exception:
+			traceback.print_exc()
+			self.report({"ERROR"}, "Unexpected error; see console")
+			return {"CANCELLED"}
 
 class MonadoForgeViewImportCleanupModelOperator(Operator):
 	bl_idname = "object.monado_forge_cleanup_model_operator"

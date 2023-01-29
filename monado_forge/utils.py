@@ -7,6 +7,8 @@ import os
 import struct
 from contextlib import redirect_stdout
 
+from . classes import *
+
 # math constants
 
 rad90 = math.radians(90)
@@ -220,6 +222,8 @@ def isBonePairIdentical(thisBone,otherBone,positionEpsilon,angleEpsilon,mirrorab
 	return True,""
 
 def create_armature_from_bones(boneList,name,boneSize,positionEpsilon,angleEpsilon):
+	if isinstance(boneList,MonadoForgeSkeleton): # this way either "a Forge skeleton object" or "a list of Forge bone objects" can be used
+		boneList = boneList.getBones()
 	bpy.ops.object.select_all(action="DESELECT")
 	bpy.ops.object.armature_add(enter_editmode=True, align="WORLD", location=(0,0,0), rotation=(0,0,0), scale=(1,1,1))
 	skelObj = bpy.context.view_layer.objects.active

@@ -34,6 +34,7 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 #### Model
 * Imports .wimdo/.wismt model files. The .wimdo can be imported alone, which grabs only whatever bones are inside, while the .wismt import requires a .wimdo to go with it.
 * Supports normals, UVs, vertex colours, rigging (vertex groups), and shapes (morphs). Models are automatically parented to the skeleton found in the .wimdo; if there is no skeleton, they are parented to a blank one.
+* By using the import-with-skeleton button instead, both the .wimdo's skeleton and the .arc/.chr skeleton will be imported, and then merged into one (giving the .arc/.chr one priority).
 * Optionally also import lower-LOD models. Doesn't currently distinguish them in any way.
 * Optional mesh cleanup, erasing unused vertices, vertex groups, and shapes.
 * Imports textures and saves them to a specified folder. By default, keeps only the biggest of each, but provides the option to keep all resolutions (using subfolders). Supports all known-to-be-used formats (R8G8B8A8, BC1, BC3, BC4, BC5, BC7).
@@ -50,7 +51,6 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 
 ## Known issues
 ### Things with workarounds
-* The workflow for getting the proper skeleton setup is not the best. You have to import the .arc/.chr, then import the .wimdo+.wismt, and then use the skeleton merge feature to merge the .wimdo+.wismt skeleton into the .arc/.chr one. This will be improved in the near future.
 * Some models have multiple weight tables, but the information about which one to use per each mesh cannot yet be found. Use the "Weight Table Override" feature to select which one to use for all meshes, and re-import for each one so you can pick-and-choose which ones are correct.
 ### Things with no workarounds
 Roughly in order of badness.

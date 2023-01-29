@@ -482,11 +482,13 @@ class MonadoForgeMeshHeader:
 		return self._meshLODValue
 
 # this class is specifically for passing wimdo results to wismt import
-# assumption: there can be only one skeleton (it's just a collection of bones technically)
+# assumption: there can only be one skeleton from the .wimdo and a second from an external source (i.e. an .arc/.chr file)
 class MonadoForgeWimdoPackage:
-	def __init__(self,skel,mh,sh,mat):
+	def __init__(self,skel,skelEx,mh,sh,mat):
 		if not isinstance(skel,MonadoForgeSkeleton):
 			raise TypeError("expected a MonadoForgeSkeleton, not a(n) "+str(type(skel)))
+		if skelEx and not isinstance(skelEx,MonadoForgeSkeleton):
+			raise TypeError("expected a MonadoForgeSkeleton, not a(n) "+str(type(skelEx)))
 		if not isinstance(mh,list):
 			raise TypeError("expected a list, not a(n) "+str(type(mh)))
 		if not isinstance(sh,list):
@@ -494,11 +496,14 @@ class MonadoForgeWimdoPackage:
 		if not isinstance(mat,list):
 			raise TypeError("expected a list, not a(n) "+str(type(mat)))
 		self._skeleton = skel
+		self._externalSkeleton = skelEx
 		self._meshHeaders = mh
 		self._shapeHeaders = sh
 		self._materials = mat
 	def getSkeleton(self):
 		return self._skeleton
+	def getExternalSkeleton(self):
+		return self._externalSkeleton
 	def getMeshHeaders(self):
 		return self._meshHeaders
 	def getShapeHeaders(self):
@@ -515,20 +520,23 @@ class MonadoForgeWimdoPackage:
 		return min(self.getLODList())
 
 # this is intended to be used only once everything game-specific is done and the data is fully in agnostic format
+# same skeleton assumptions as the wimdo package
 class MonadoForgeImportedPackage:
 	def __init__(self):
-		self._skeletons = []
+		self._skeleton = None
+		self._externalSkeleton = None
 		self._meshes = []
 		self._materials = []
 	
-	def getSkeletons(self):
-		return self._skeletons
-	def clearSkeletons(self):
-		self._skeletons = []
-	def addSkeleton(self,skeleton):
-		self._skeletons.append(skeleton)
-	def setSkeletons(self,skeletons):
-		self._skeletons = skeletons[:]
+	def getSkeleton(self):
+		return self._skeleton
+	def setSkeleton(self,skeleton):
+		self._skeleton = skeleton
+	
+	def getExternalSkeleton(self):
+		return self._externalSkeleton
+	def setExternalSkeleton(self,externalSkeleton):
+		self._externalSkeleton = externalSkeleton
 	
 	def getMeshes(self):
 		return self._meshes

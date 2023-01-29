@@ -7,6 +7,7 @@ import zlib
 
 from . classes import *
 from . utils import *
+from . modify_funcs import *
 
 def import_sar1_skel_subfile(f, context):
 	game = context.scene.monado_forge_main.game
@@ -171,9 +172,11 @@ def import_sar1_skel_subfile(f, context):
 	# so why are we making a list? it'll be easier to pivot in the future if a counterexample is found
 	if len(importedSkeletons) > 1:
 		print_warning(".skl file has multiple skeletons; returning only the first (please report this issue)")
-	return importedSkeletons[0]
+	skeleton = MonadoForgeSkeleton()
+	skeleton.setBones(importedSkeletons[0])
+	return skeleton
 
-def import_wimdo(f, context):
+def import_wimdo(f, context, externalSkeleton=None):
 	printProgress = context.scene.monado_forge_main.printProgress
 	# little endian assumed
 	magic = f.read(4)
@@ -383,7 +386,7 @@ def import_wimdo(f, context):
 	
 	skeleton = MonadoForgeSkeleton()
 	skeleton.setBones(forgeBones)
-	results = MonadoForgeWimdoPackage(skeleton,meshHeaders,shapeHeaders,materials)
+	results = MonadoForgeWimdoPackage(skeleton,externalSkeleton,meshHeaders,shapeHeaders,materials)
 	if printProgress:
 		print("Finished parsing .wimdo file.")
 	return results
@@ -934,7 +937,8 @@ def import_wismt(f, wimdoResults, context):
 		m.indexVertices()
 	
 	results = MonadoForgeImportedPackage()
-	results.addSkeleton(wimdoResults.getSkeleton())
+	results.setSkeleton(wimdoResults.getSkeleton())
+	results.setExternalSkeleton(wimdoResults.getExternalSkeleton())
 	results.setMeshes(meshes)
 	results.setMaterials(resultMaterials)
 	if printProgress:
@@ -951,7 +955,7 @@ def import_sar1_skeleton_only(self, context):
 		skeleton = import_sar1_skel_subfile(f, context)
 	
 	# we now have the skeleton in generic format - create the armature
-	armatureName = skeleton[0].getName()
+	armatureName = skeleton.getBones()[0].getName()
 	if armatureName.endswith("_top"):
 		armatureName = armatureName[:-4]
 	if armatureName.endswith("_Bone"):
@@ -992,7 +996,29 @@ def import_wimdo_and_wismt(self, context):
 	return realise_results(wismtResults, os.path.splitext(os.path.basename(absoluteDataPath))[0], self, context)
 
 def import_sar1_skel_and_wimdo_and_wismt(self, context):
-	pass
+	absoluteSkelPath = bpy.path.abspath(context.scene.monado_forge_import.skeletonPath)
+	absoluteDefsPath = bpy.path.abspath(context.scene.monado_forge_import.defsPath)
+	absoluteDataPath = bpy.path.abspath(context.scene.monado_forge_import.dataPath)
+	if context.scene.monado_forge_main.printProgress:
+		print("Importing model from: "+absoluteSkelPath+" & "+absoluteDefsPath+" & "+absoluteDataPath)
+	
+	# will check skel file validity later
+	if os.path.splitext(absoluteDefsPath)[1] != ".wimdo":
+		self.report({"ERROR"}, "Second file was not a .wimdo file")
+		return {"CANCELLED"}
+	if os.path.splitext(absoluteDataPath)[1] != ".wismt":
+		self.report({"ERROR"}, "Third file was not a .wismt file")
+		return {"CANCELLED"}
+	
+	# we can't actually use the .arc/.chr in the .wimdo/.wismt importing (since everything's based on the indices of the internal bones)
+	# thus, we just do a merge into it after the fact
+	with open(absoluteSkelPath, "rb") as f:
+		skelResult = import_sar1_skel_subfile(f, context)
+	with open(absoluteDefsPath, "rb") as f:
+		wimdoResults = import_wimdo(f, context, externalSkeleton=skelResult)
+	with open(absoluteDataPath, "rb") as f:
+		wismtResults = import_wismt(f, wimdoResults, context)
+	return realise_results(wismtResults, os.path.splitext(os.path.basename(absoluteDataPath))[0], self, context)
 
 def realise_results(forgeResults, mainName, self, context):
 	printProgress = context.scene.monado_forge_main.printProgress
@@ -1001,19 +1027,29 @@ def realise_results(forgeResults, mainName, self, context):
 		return {"CANCELLED"}
 	if printProgress:
 		print("Converting processed data into Blender objects.")
-	skeletons = forgeResults.getSkeletons()
-	armatures = []
-	for skeleton in skeletons:
-		boneList = skeleton.getBones()
+	boneSize = context.scene.monado_forge_import.boneSize
+	positionEpsilon = context.scene.monado_forge_main.positionEpsilon
+	angleEpsilon = context.scene.monado_forge_main.angleEpsilon
+	armaturesCreated = 0
+	# we create the external armature (if any) first so it gets name priority
+	externalSkeleton = forgeResults.getExternalSkeleton()
+	if externalSkeleton:
+		boneList = externalSkeleton.getBones()
 		armatureName = mainName
-		boneSize = context.scene.monado_forge_import.boneSize
-		positionEpsilon = context.scene.monado_forge_main.positionEpsilon
-		angleEpsilon = context.scene.monado_forge_main.angleEpsilon
-		armatures.append(create_armature_from_bones(boneList,armatureName,boneSize,positionEpsilon,angleEpsilon))
-	# attach to the first armature created (this logic might change later)
-	targetArmature = armatures[0]
+		externalArmature = create_armature_from_bones(boneList,armatureName,boneSize,positionEpsilon,angleEpsilon)
+		armaturesCreated += 1
+	else:
+		externalArmature = None
+	baseSkeleton = forgeResults.getSkeleton()
+	if baseSkeleton:
+		boneList = baseSkeleton.getBones()
+		armatureName = mainName
+		baseArmature = create_armature_from_bones(boneList,armatureName,boneSize,positionEpsilon,angleEpsilon)
+		armaturesCreated += 1
+	else:
+		baseArmature = None
 	if printProgress:
-		print("Finished creating "+str(len(armatures))+" armatures.")
+		print("Finished creating "+str(armaturesCreated)+" armatures.")
 	
 	materials = forgeResults.getMaterials()
 	newMatsByIndex = {}
@@ -1064,11 +1100,11 @@ def realise_results(forgeResults, mainName, self, context):
 			vertCols = meshData.color_attributes.new("VertexColours","BYTE_COLOR","POINT")
 			for i in range(len(coloursList)):
 				vertCols.data[i].color = coloursList[i]
-		if mesh.hasWeightIndexes(): # try the indexes method first (faster)
+		if mesh.hasWeightIndexes() and baseArmature: # try the indexes method first (faster) (and also needs a baseArmature or it makes no sense)
 			weightIndexes = set(mesh.getVertexWeightIndexesList())
 			vertexesInEachGroup = {}
-			for i in range(len(targetArmature.data.bones)):
-				newMeshObject.vertex_groups.new(name=targetArmature.data.bones[i].name)
+			for i in range(len(baseArmature.data.bones)):
+				newMeshObject.vertex_groups.new(name=baseArmature.data.bones[i].name)
 				vertexesInEachGroup[i] = mesh.getVertexesInWeightGroup(i)
 			vertexesInEachSet = {}
 			for i in weightIndexes:
@@ -1107,10 +1143,18 @@ def realise_results(forgeResults, mainName, self, context):
 		meshData.validate()
 		meshData.transform(mathutils.Euler((math.radians(90),0,0)).to_matrix().to_4x4(),shape_keys=True) # transform from lying down (+Y up +Z forward) to standing up (+Z up -Y forward)
 		cleanup_mesh(context,newMeshObject,context.scene.monado_forge_import.cleanupLooseVertices,context.scene.monado_forge_import.cleanupEmptyGroups,context.scene.monado_forge_import.cleanupEmptyShapes)
-		# attach mesh to armature
+		# attach mesh to base armature
 		armatureMod = newMeshObject.modifiers.new("Armature","ARMATURE")
-		armatureMod.object = targetArmature
-		newMeshObject.parent = targetArmature
+		armatureMod.object = baseArmature
+		newMeshObject.parent = baseArmature
+		# end of per-mesh loop
+	# and finally, if there is an external armature, merge the base one into it
+	if externalArmature:
+		bpy.ops.object.select_all(action="DESELECT")
+		baseArmature.select_set(True)
+		externalArmature.select_set(True)
+		bpy.context.view_layer.objects.active = externalArmature
+		merge_selected_to_active_armatures(self, context, force=True)
 	if printProgress:
 		print("Finished creating "+str(len(meshes))+" meshes.")
 	return {"FINISHED"}

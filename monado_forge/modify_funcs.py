@@ -121,7 +121,7 @@ def fix_non_final_lr_bones_active_object(self, context):
 	bpy.ops.object.mode_set(mode="OBJECT")
 	return {"FINISHED"}
 
-def merge_selected_to_active_armatures(self, context):
+def merge_selected_to_active_armatures(self, context, force=False):
 	# based on the UI calling this, we can assume all selected objects are armatures and there's more than one of them
 	positionEpsilon = context.scene.monado_forge_main.positionEpsilon
 	angleEpsilon = context.scene.monado_forge_main.angleEpsilon
@@ -151,7 +151,7 @@ def merge_selected_to_active_armatures(self, context):
 				continue
 			targetBone = targetBones[otherBone.name]
 			areTheSame,message = isBonePairIdentical(targetBone,otherBone,positionEpsilon,angleEpsilon)
-			if areTheSame or not safeMerge:
+			if areTheSame or not safeMerge or force:
 				toss.append(otherBone)
 			else:
 				print(targetObject.name+"."+targetBone.name+" != "+otherObject.name+"."+otherBone.name+" ~ "+message)
