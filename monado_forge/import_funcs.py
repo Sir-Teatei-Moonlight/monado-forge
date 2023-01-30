@@ -1076,11 +1076,8 @@ def realise_results(forgeResults, mainName, self, context):
 	
 	meshes = forgeResults.getMeshes()
 	for m,mesh in enumerate(meshes):
-		printNom = 0
-		printDenom = 7
 		if printProgress:
-			print_progress_bar(printNom,printDenom,"mesh "+str(m))
-			printNom += 1
+			print_progress_bar(m,len(meshes),"Mesh creation")
 		bpy.ops.object.add(type="MESH", enter_editmode=False, align="WORLD", location=context.scene.cursor.location, rotation=(0,0,0), scale=(1,1,1))
 		newMeshObject = bpy.context.view_layer.objects.active
 		newMeshObject.name = f"{mainName}_mesh{m:03d}"
@@ -1091,32 +1088,20 @@ def realise_results(forgeResults, mainName, self, context):
 		for f in meshData.polygons:
 			f.use_smooth = True
 		meshData.use_auto_smooth = True
-		if printProgress:
-			print_progress_bar(printNom,printDenom,"mesh "+str(m))
-			printNom += 1
 		if mesh.hasUVs():
 			for layer in mesh.getUVLayerList():
 				meshUVs = mesh.getVertexUVsLayer(layer)
 				newUVsLayer = meshData.uv_layers.new(name="UV"+str(layer+1))
 				for l in meshData.loops:
 					newUVsLayer.data[l.index].uv = meshUVs[l.vertex_index]
-		if printProgress:
-			print_progress_bar(printNom,printDenom,"mesh "+str(m))
-			printNom += 1
 		if mesh.hasNormals():
 			normalsList = mesh.getVertexNormalsList()
 			meshData.normals_split_custom_set_from_vertices(normalsList)
-		if printProgress:
-			print_progress_bar(printNom,printDenom,"mesh "+str(m))
-			printNom += 1
 		if mesh.hasColours():
 			coloursList = mesh.getVertexColoursList()
 			vertCols = meshData.color_attributes.new("VertexColours","BYTE_COLOR","POINT")
 			for i in range(len(coloursList)):
 				vertCols.data[i].color = coloursList[i]
-		if printProgress:
-			print_progress_bar(printNom,printDenom,"mesh "+str(m))
-			printNom += 1
 		if mesh.hasWeightIndexes() and baseArmature: # try the indexes method first (faster) (and also needs a baseArmature or it makes no sense)
 			weightIndexes = set(mesh.getVertexWeightIndexesList())
 			vertexesInEachGroup = {}
@@ -1142,9 +1127,6 @@ def realise_results(forgeResults, mainName, self, context):
 					newMeshObject.vertex_groups[groupIndex].add(vertexIDsToAdd,groupValue,"ADD")
 		elif mesh.hasWeights(): # no indexes, but do have directly-applied weights
 			pass # not needed at the present time
-		if printProgress:
-			print_progress_bar(printNom,printDenom,"mesh "+str(m))
-			printNom += 1
 		if mesh.hasShapes():
 			shapes = mesh.getShapes()
 			if not meshData.shape_keys:
@@ -1155,9 +1137,6 @@ def realise_results(forgeResults, mainName, self, context):
 				for vertexIndex,vertex in s.getVertices().items():
 					newShape.data[vertexIndex].co += mathutils.Vector(vertex.getPosition())
 		meshData.materials.append(newMatsByIndex[mesh.getMaterialIndex()])
-		if printProgress:
-			print_progress_bar(printNom,printDenom,"mesh "+str(m))
-			printNom += 1
 		
 		# import complete, cleanup time
 		#meshData.validate(verbose=True)
@@ -1168,10 +1147,9 @@ def realise_results(forgeResults, mainName, self, context):
 		armatureMod = newMeshObject.modifiers.new("Armature","ARMATURE")
 		armatureMod.object = baseArmature
 		newMeshObject.parent = baseArmature
-		if printProgress:
-			print_progress_bar(printNom,printDenom,"mesh "+str(m))
-			printNom += 1
 		# end of per-mesh loop
+	if printProgress:
+		print_progress_bar(len(meshes),len(meshes),"Mesh creation")
 	# and finally, if there is an external armature, merge the base one into it
 	if externalArmature:
 		bpy.ops.object.select_all(action="DESELECT")
