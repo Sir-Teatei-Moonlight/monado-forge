@@ -923,13 +923,17 @@ def import_wismt(f, wimdoResults, context):
 		newMat.setBaseColour(mat.getBaseColour())
 		newMat.setViewportColour(mat.getBaseColour())
 		newMat.setExtraData(mat.getExtraData())
+		matMirrorFlags = mat.getTextureMirrorFlags()
 		# this is done in a way that "duplicates" texture references, but that's fairly harmless at this stage
 		for ti,t in enumerate(mat.getTextureTable()):
 			newTex = MonadoForgeTexture()
 			texIndex = t[0] # ignore the unknowns for now
 			newTex.setName(textureAlignment[textureHeaders[texIndex][3]])
-			# need to figure out how to convert mirror flags into [x,y] format; until then, default [False,False]
-			#newTex.setMirroring(mat.getTextureMirrorFlags())
+			# presumably there's more nuance somewhere, but for now this is all we know
+			if matMirrorFlags == 2:
+				newTex.setMirroring([True,True])
+			else:
+				newTex.setMirroring([False,False])
 			newMat.addTexture(newTex)
 		resultMaterials.append(newMat)
 	
@@ -1056,20 +1060,71 @@ def realise_results(forgeResults, mainName, self, context):
 	for m,mat in enumerate(materials):
 		newMat = bpy.data.materials.new(name=mat.getName())
 		newMat.diffuse_color = mat.getViewportColour()
+		newMat.blend_method = "OPAQUE" # the most likely option
+		newMat.shadow_method = "OPAQUE"
 		newMat.use_nodes = True # the default creation is "Principled BSDF" into "Material Output"
 		n = newMat.node_tree.nodes
 		bsdfNode = n.get("Principled BSDF")
 		bsdfNode.inputs["Base Color"].default_value = mat.getViewportColour()
+		uvInputNode = n.new("ShaderNodeUVMap")
+		uvInputNode.location = [-500,300]
+		mirroring = {"":[],"x":[],"y":[],"xy":[]}
 		for ti,t in enumerate(mat.getTextures()):
-			texNode = n.new(type="ShaderNodeTexImage")
-			texNode.extension = "EXTEND"
+			texNode = n.new("ShaderNodeTexImage")
+			texNode.extension = "REPEAT" # statistically more likely than EXTEND
 			texNode.image = bpy.data.images[t.getName()]
 			texNode.location = [ti*250,0]
 			# guess: the first texture is the base colour
 			if ti == 0:
 				newMat.node_tree.links.new(texNode.outputs["Color"],bsdfNode.inputs["Base Color"])
+			newMat.node_tree.links.new(uvInputNode.outputs["UV"],texNode.inputs["Vector"])
+			mir = t.getMirroring()
+			mX = "x" if mir[0] else ""
+			mY = "y" if mir[1] else ""
+			mirroring[mX+mY].append(texNode)
+		if mirroring["x"]:
+			print_warning("X-only texture mirror not yet supported (how'd you even get here)")
+		if mirroring["y"]:
+			print_warning("Y-only texture mirror not yet supported (how'd you even get here)")
+		if mirroring["xy"]:
+			try:
+				mirrorNodeGroup = bpy.data.node_groups["TexMirrorXY"]
+			except KeyError:
+				mirrorNodeGroup = bpy.data.node_groups.new("TexMirrorXY","ShaderNodeTree")
+				mirrorNodeGroup.inputs.new("NodeSocketVector","Vector")
+				mirrorNodeGroup.outputs.new("NodeSocketVector","Vector")
+				mirN = mirrorNodeGroup.nodes
+				mirInput = mirN.new("NodeGroupInput")
+				mirInput.location = [-400,0]
+				mirOutput = mirN.new("NodeGroupOutput")
+				mirOutput.location = [400,0]
+				sepNode = mirN.new("ShaderNodeSeparateXYZ")
+				sepNode.location = [-200,0]
+				merNode = mirN.new("ShaderNodeCombineXYZ")
+				merNode.location = [200,0]
+				mirXNode = mirN.new("ShaderNodeMath")
+				mirXNode.operation = "PINGPONG"
+				mirXNode.inputs[1].default_value = 1.0 # yay magic numbers (they're all called "Value")
+				mirXNode.location = [0,-100]
+				mirYNode = mirN.new("ShaderNodeMath")
+				mirYNode.operation = "PINGPONG"
+				mirYNode.inputs[1].default_value = 1.0
+				mirYNode.location = [0,100]
+				mirrorNodeGroup.links.new(mirInput.outputs[0],sepNode.inputs[0])
+				mirrorNodeGroup.links.new(sepNode.outputs["X"],mirXNode.inputs["Value"])
+				mirrorNodeGroup.links.new(sepNode.outputs["Y"],mirYNode.inputs["Value"])
+				mirrorNodeGroup.links.new(mirXNode.outputs[0],merNode.inputs["X"])
+				mirrorNodeGroup.links.new(mirYNode.outputs[0],merNode.inputs["Y"])
+				mirrorNodeGroup.links.new(sepNode.outputs["Z"],merNode.inputs["Z"])
+				mirrorNodeGroup.links.new(merNode.outputs[0],mirOutput.inputs[0])
+			mirrorNode = n.new("ShaderNodeGroup")
+			mirrorNode.node_tree = mirrorNodeGroup
+			mirrorNode.location = [-500,0]
+			for mt in mirroring["xy"]:
+				newMat.node_tree.links.new(uvInputNode.outputs["UV"],mirrorNode.inputs[0])
+				newMat.node_tree.links.new(mirrorNode.outputs[0],mt.inputs["Vector"])
 		for xi,x in enumerate(mat.getExtraData()):
-			extraDataNode = n.new(type="ShaderNodeValue")
+			extraDataNode = n.new("ShaderNodeValue")
 			extraDataNode.outputs["Value"].default_value = x
 			extraDataNode.location = [xi*150,100]
 		newMatsByIndex[mat.getIndex()] = newMat
