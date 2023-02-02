@@ -1062,18 +1062,23 @@ def realise_results(forgeResults, mainName, self, context):
 		newMat.diffuse_color = mat.getViewportColour()
 		newMat.blend_method = "OPAQUE" # the most likely option
 		newMat.shadow_method = "OPAQUE"
+		newMat.use_backface_culling = True # more likely than not
 		newMat.use_nodes = True # the default creation is "Principled BSDF" into "Material Output"
 		n = newMat.node_tree.nodes
 		bsdfNode = n.get("Principled BSDF")
 		bsdfNode.inputs["Base Color"].default_value = mat.getViewportColour()
+		bsdfNode.location = [700,300]
+		n.get("Material Output").location = [950,300]
 		uvInputNode = n.new("ShaderNodeUVMap")
-		uvInputNode.location = [-500,300]
+		uvInputNode.location = [-650,300]
 		mirroring = {"":[],"x":[],"y":[],"xy":[]}
 		for ti,t in enumerate(mat.getTextures()):
 			texNode = n.new("ShaderNodeTexImage")
 			texNode.extension = "REPEAT" # statistically more likely than EXTEND
 			texNode.image = bpy.data.images[t.getName()]
-			texNode.location = [ti*250,0]
+			tx = ti%4
+			ty = ti//4
+			texNode.location = [tx*250-325,ty*-250+300]
 			# guess: the first texture is the base colour
 			if ti == 0:
 				newMat.node_tree.links.new(texNode.outputs["Color"],bsdfNode.inputs["Base Color"])
@@ -1119,14 +1124,14 @@ def realise_results(forgeResults, mainName, self, context):
 				mirrorNodeGroup.links.new(merNode.outputs[0],mirOutput.inputs[0])
 			mirrorNode = n.new("ShaderNodeGroup")
 			mirrorNode.node_tree = mirrorNodeGroup
-			mirrorNode.location = [-500,0]
+			mirrorNode.location = [-650,150]
 			for mt in mirroring["xy"]:
 				newMat.node_tree.links.new(uvInputNode.outputs["UV"],mirrorNode.inputs[0])
 				newMat.node_tree.links.new(mirrorNode.outputs[0],mt.inputs["Vector"])
 		for xi,x in enumerate(mat.getExtraData()):
 			extraDataNode = n.new("ShaderNodeValue")
 			extraDataNode.outputs["Value"].default_value = x
-			extraDataNode.location = [xi*150,100]
+			extraDataNode.location = [-475,xi*-100+300]
 		newMatsByIndex[mat.getIndex()] = newMat
 	
 	meshes = forgeResults.getMeshes()
