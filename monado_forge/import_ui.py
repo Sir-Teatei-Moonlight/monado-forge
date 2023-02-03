@@ -273,6 +273,11 @@ class MonadoForgeViewImportProperties(PropertyGroup):
 		maxlen=1024,
 		subtype="FILE_PATH",
 	)
+	createDummyShader : BoolProperty(
+		name="Create Dummy Shader",
+		description="Run new materials through a simple base-colour-only Principled BSDF (false: use an empty group node instead)",
+		default=True,
+	)
 	cleanupLooseVertices : BoolProperty(
 		name="Loose Vertices",
 		description="Erase vertices not connected to anything",
@@ -342,6 +347,7 @@ class OBJECT_PT_MonadoForgeViewImportPanel(Panel):
 		texturePathRow = col.row()
 		texturePathRow.prop(scn.monado_forge_import, "texturePath", text="...to")
 		texturePathRow.enabled = scn.monado_forge_import.autoSaveTextures
+		col.prop(scn.monado_forge_import, "createDummyShader")
 		col.separator()
 		col.operator(MonadoForgeViewImportSkeletonOperator.bl_idname, text="Import Skeleton Only", icon="IMPORT")
 		col.operator(MonadoForgeViewImportModelOperator.bl_idname, text="Import Model Only", icon="IMPORT")

@@ -1034,6 +1034,7 @@ def realise_results(forgeResults, mainName, self, context):
 	boneSize = context.scene.monado_forge_import.boneSize
 	positionEpsilon = context.scene.monado_forge_main.positionEpsilon
 	angleEpsilon = context.scene.monado_forge_main.angleEpsilon
+	createDummyShader = context.scene.monado_forge_import.createDummyShader
 	armaturesCreated = 0
 	# we create the external armature (if any) first so it gets name priority
 	externalSkeleton = forgeResults.getExternalSkeleton()
@@ -1065,13 +1066,41 @@ def realise_results(forgeResults, mainName, self, context):
 		newMat.use_backface_culling = True # more likely than not
 		newMat.use_nodes = True # the default creation is "Principled BSDF" into "Material Output"
 		n = newMat.node_tree.nodes
-		bsdfNode = n.get("Principled BSDF")
-		bsdfNode.inputs["Base Color"].default_value = mat.getViewportColour()
-		bsdfNode.location = [700,300]
+		n.remove(n.get("Principled BSDF"))
+		shaderSubnode = n.new("ShaderNodeGroup")
+		shaderSubnode.location = [700,300]
+		if createDummyShader:
+			try:
+				dummyShader = bpy.data.node_groups["DummyShader"]
+			except KeyError:
+				dummyShader = bpy.data.node_groups.new("DummyShader","ShaderNodeTree")
+				dummyShader.inputs.new("NodeSocketColor","Base Color")
+				dummyShader.outputs.new("NodeSocketShader","BSDF")
+				dummyN = dummyShader.nodes
+				dummyInput = dummyN.new("NodeGroupInput")
+				dummyInput.location = [-400,0]
+				dummyOutput = dummyN.new("NodeGroupOutput")
+				dummyOutput.location = [400,0]
+				dummyBSDF = dummyN.new("ShaderNodeBsdfPrincipled")
+				dummyBSDF.location = [0,300]
+				dummyShader.links.new(dummyInput.outputs[0],dummyBSDF.inputs["Base Color"])
+				dummyShader.links.new(dummyBSDF.outputs["BSDF"],dummyOutput.inputs[0])
+			shaderSubnode.node_tree = dummyShader
+			newMat.node_tree.links.new(shaderSubnode.outputs[0],n.get("Material Output").inputs[0])
+		baseColourNode = n.new("ShaderNodeRGB")
+		baseColourNode.outputs[0].default_value = mat.getBaseColour()
+		baseColourNode.label = "Base Colour"
+		baseColourNode.location = [-650,175]
 		n.get("Material Output").location = [950,300]
+		# gonna have to figure out how to know how many UV maps are being involved
+		# (it's based on the mesh data, but we can't know anything about the meshes at this point)
+		# for now just assumes 1, it's the most common case at least
 		uvInputNode = n.new("ShaderNodeUVMap")
+		uvInputNode.label = "UV Map 1"
 		uvInputNode.location = [-650,300]
 		mirroring = {"":[],"x":[],"y":[],"xy":[]}
+		if not mat.getTextures(): # no textures, plug in the base colour directly
+			newMat.node_tree.links.new(baseColourNode.outputs[0],shaderSubnode.inputs["Base Color"])
 		for ti,t in enumerate(mat.getTextures()):
 			texNode = n.new("ShaderNodeTexImage")
 			texNode.extension = "REPEAT" # statistically more likely than EXTEND
@@ -1080,8 +1109,8 @@ def realise_results(forgeResults, mainName, self, context):
 			ty = ti//4
 			texNode.location = [tx*250-325,ty*-250+300]
 			# guess: the first texture is the base colour
-			if ti == 0:
-				newMat.node_tree.links.new(texNode.outputs["Color"],bsdfNode.inputs["Base Color"])
+			if ti == 0 and createDummyShader:
+				newMat.node_tree.links.new(texNode.outputs["Color"],shaderSubnode.inputs["Base Color"])
 			newMat.node_tree.links.new(uvInputNode.outputs["UV"],texNode.inputs["Vector"])
 			mir = t.getMirroring()
 			mX = "x" if mir[0] else ""
@@ -1124,13 +1153,14 @@ def realise_results(forgeResults, mainName, self, context):
 				mirrorNodeGroup.links.new(merNode.outputs[0],mirOutput.inputs[0])
 			mirrorNode = n.new("ShaderNodeGroup")
 			mirrorNode.node_tree = mirrorNodeGroup
-			mirrorNode.location = [-650,150]
+			mirrorNode.location = [-650,-25]
 			for mt in mirroring["xy"]:
 				newMat.node_tree.links.new(uvInputNode.outputs["UV"],mirrorNode.inputs[0])
 				newMat.node_tree.links.new(mirrorNode.outputs[0],mt.inputs["Vector"])
 		for xi,x in enumerate(mat.getExtraData()):
 			extraDataNode = n.new("ShaderNodeValue")
 			extraDataNode.outputs["Value"].default_value = x
+			extraDataNode.label = "Extra Data Value"
 			extraDataNode.location = [-475,xi*-100+300]
 		newMatsByIndex[mat.getIndex()] = newMat
 	
