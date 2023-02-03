@@ -164,6 +164,7 @@ class MonadoForgeMaterial:
 		self._viewportColour = [0.5,0.5,0.5,1.0]
 		self._textures = []
 		self._extraData = []
+		self._uvLayerCount = 0 # not actually part of the material, but the material needs to know
 	
 	# no setter (index should be immutable)
 	def getIndex(self):
@@ -213,6 +214,13 @@ class MonadoForgeMaterial:
 	def setExtraData(self,exs):
 		self.clearExtraData()
 		for ex in exs: self.addExtraData(ex)
+	
+	def getUVLayerCount(self):
+		return self._uvLayerCount
+	def setUVLayerCount(self,x):
+		if not isinstance(x,int):
+			raise TypeError("expected an int, not a(n) "+str(type(x)))
+		self._uvLayerCount = x
 
 class MonadoForgeVertex:
 	def __init__(self):

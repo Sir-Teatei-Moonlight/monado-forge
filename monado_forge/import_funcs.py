@@ -494,6 +494,7 @@ def import_wismt(f, wimdoResults, context):
 	
 	meshes = []
 	vertexWeights = []
+	maxUVLayers = 0 # materials will need to know this without knowing what meshes they're on
 	nextSubfileIndex = 0
 	hasRootSubfile = hasContentType[0] or hasContentType[1] or hasContentType[2]
 	hasUncachedTexSubfile = hasContentType[3]
@@ -615,6 +616,7 @@ def import_wismt(f, wimdoResults, context):
 						for j in range(vtDataCount):
 							newVertex = MonadoForgeVertex()
 							weightVertex = [[],[]]
+							hasUVLayers = [False,False,False]
 							for vd in vertexDescriptors:
 								vdType,vdSize = vd
 								if vdType == 0: # position
@@ -623,10 +625,13 @@ def import_wismt(f, wimdoResults, context):
 									newVertex.setWeightSetIndex(readAndParseInt(sf,4))
 								elif vdType == 5: # UV 1 (inverted Y reminder) (yes this is copy/pasted for other layers but this is kind of easier actually)
 									newVertex.setUV(0,[readAndParseFloat(sf),1.0-readAndParseFloat(sf)])
+									hasUVLayers[0] = True
 								elif vdType == 6: # UV 2
 									newVertex.setUV(1,[readAndParseFloat(sf),1.0-readAndParseFloat(sf)])
+									hasUVLayers[1] = True
 								elif vdType == 7: # UV 3
 									newVertex.setUV(2,[readAndParseFloat(sf),1.0-readAndParseFloat(sf)])
+									hasUVLayers[2] = True
 								elif vdType == 17: # colour
 									a,r,g,b = readAndParseInt(sf,1),readAndParseInt(sf,1),readAndParseInt(sf,1),readAndParseInt(sf,1)
 									newVertex.setColour([r,g,b,a])
@@ -645,6 +650,7 @@ def import_wismt(f, wimdoResults, context):
 							newMesh.addVertex(newVertex)
 							vertexData[i].append(newVertex)
 							vertexWeightData[i].append(weightVertex)
+							maxUVLayers = max(maxUVLayers,sum(hasUVLayers))
 					if printProgress and vertexData != {}:
 						print("Finished reading vertex data.")
 					if unknownVDTypes:
@@ -923,6 +929,7 @@ def import_wismt(f, wimdoResults, context):
 		newMat.setBaseColour(mat.getBaseColour())
 		newMat.setViewportColour(mat.getBaseColour())
 		newMat.setExtraData(mat.getExtraData())
+		newMat.setUVLayerCount(maxUVLayers)
 		matMirrorFlags = mat.getTextureMirrorFlags()
 		# this is done in a way that "duplicates" texture references, but that's fairly harmless at this stage
 		for ti,t in enumerate(mat.getTextureTable()):
@@ -1090,14 +1097,9 @@ def realise_results(forgeResults, mainName, self, context):
 		baseColourNode = n.new("ShaderNodeRGB")
 		baseColourNode.outputs[0].default_value = mat.getBaseColour()
 		baseColourNode.label = "Base Colour"
-		baseColourNode.location = [-650,175]
+		baseColourNode.location = [-650,300]
 		n.get("Material Output").location = [950,300]
-		# gonna have to figure out how to know how many UV maps are being involved
-		# (it's based on the mesh data, but we can't know anything about the meshes at this point)
-		# for now just assumes 1, it's the most common case at least
-		uvInputNode = n.new("ShaderNodeUVMap")
-		uvInputNode.label = "UV Map 1"
-		uvInputNode.location = [-650,300]
+		texNodes = []
 		mirroring = {"":[],"x":[],"y":[],"xy":[]}
 		if not mat.getTextures(): # no textures, plug in the base colour directly
 			newMat.node_tree.links.new(baseColourNode.outputs[0],shaderSubnode.inputs["Base Color"])
@@ -1111,52 +1113,63 @@ def realise_results(forgeResults, mainName, self, context):
 			# guess: the first texture is the base colour
 			if ti == 0 and createDummyShader:
 				newMat.node_tree.links.new(texNode.outputs["Color"],shaderSubnode.inputs["Base Color"])
-			newMat.node_tree.links.new(uvInputNode.outputs["UV"],texNode.inputs["Vector"])
 			mir = t.getMirroring()
 			mX = "x" if mir[0] else ""
 			mY = "y" if mir[1] else ""
 			mirroring[mX+mY].append(texNode)
-		if mirroring["x"]:
-			print_warning("X-only texture mirror not yet supported (how'd you even get here)")
-		if mirroring["y"]:
-			print_warning("Y-only texture mirror not yet supported (how'd you even get here)")
-		if mirroring["xy"]:
-			try:
-				mirrorNodeGroup = bpy.data.node_groups["TexMirrorXY"]
-			except KeyError:
-				mirrorNodeGroup = bpy.data.node_groups.new("TexMirrorXY","ShaderNodeTree")
-				mirrorNodeGroup.inputs.new("NodeSocketVector","Vector")
-				mirrorNodeGroup.outputs.new("NodeSocketVector","Vector")
-				mirN = mirrorNodeGroup.nodes
-				mirInput = mirN.new("NodeGroupInput")
-				mirInput.location = [-400,0]
-				mirOutput = mirN.new("NodeGroupOutput")
-				mirOutput.location = [400,0]
-				sepNode = mirN.new("ShaderNodeSeparateXYZ")
-				sepNode.location = [-200,0]
-				merNode = mirN.new("ShaderNodeCombineXYZ")
-				merNode.location = [200,0]
-				mirXNode = mirN.new("ShaderNodeMath")
-				mirXNode.operation = "PINGPONG"
-				mirXNode.inputs[1].default_value = 1.0 # yay magic numbers (they're all called "Value")
-				mirXNode.location = [0,-100]
-				mirYNode = mirN.new("ShaderNodeMath")
-				mirYNode.operation = "PINGPONG"
-				mirYNode.inputs[1].default_value = 1.0
-				mirYNode.location = [0,100]
-				mirrorNodeGroup.links.new(mirInput.outputs[0],sepNode.inputs[0])
-				mirrorNodeGroup.links.new(sepNode.outputs["X"],mirXNode.inputs["Value"])
-				mirrorNodeGroup.links.new(sepNode.outputs["Y"],mirYNode.inputs["Value"])
-				mirrorNodeGroup.links.new(mirXNode.outputs[0],merNode.inputs["X"])
-				mirrorNodeGroup.links.new(mirYNode.outputs[0],merNode.inputs["Y"])
-				mirrorNodeGroup.links.new(sepNode.outputs["Z"],merNode.inputs["Z"])
-				mirrorNodeGroup.links.new(merNode.outputs[0],mirOutput.inputs[0])
-			mirrorNode = n.new("ShaderNodeGroup")
-			mirrorNode.node_tree = mirrorNodeGroup
-			mirrorNode.location = [-650,-25]
-			for mt in mirroring["xy"]:
-				newMat.node_tree.links.new(uvInputNode.outputs["UV"],mirrorNode.inputs[0])
-				newMat.node_tree.links.new(mirrorNode.outputs[0],mt.inputs["Vector"])
+		uvCount = mat.getUVLayerCount() # this will probably result in overestimation, but that's okay
+		for uv in range(uvCount):
+			uvInputNode = n.new("ShaderNodeUVMap")
+			uvInputNode.label = "UV Map "+str(uv+1)
+			if mirroring[""]:
+				uvInputNode.location = [-650,-125*uv+100]
+				if uv == 0:
+					for mt in mirroring[""]:
+						newMat.node_tree.links.new(uvInputNode.outputs["UV"],mt.inputs["Vector"])
+			if mirroring["x"]:
+				print_warning("X-only texture mirror not yet supported (how'd you even get here)")
+			if mirroring["y"]:
+				print_warning("Y-only texture mirror not yet supported (how'd you even get here)")
+			if mirroring["xy"]:
+				uvInputNode.location = [-650,-175*uv+100]
+				try:
+					mirrorNodeGroup = bpy.data.node_groups["TexMirrorXY"]
+				except KeyError:
+					mirrorNodeGroup = bpy.data.node_groups.new("TexMirrorXY","ShaderNodeTree")
+					mirrorNodeGroup.inputs.new("NodeSocketVector","Vector")
+					mirrorNodeGroup.outputs.new("NodeSocketVector","Vector")
+					mirN = mirrorNodeGroup.nodes
+					mirInput = mirN.new("NodeGroupInput")
+					mirInput.location = [-400,0]
+					mirOutput = mirN.new("NodeGroupOutput")
+					mirOutput.location = [400,0]
+					sepNode = mirN.new("ShaderNodeSeparateXYZ")
+					sepNode.location = [-200,0]
+					merNode = mirN.new("ShaderNodeCombineXYZ")
+					merNode.location = [200,0]
+					mirXNode = mirN.new("ShaderNodeMath")
+					mirXNode.operation = "PINGPONG"
+					mirXNode.inputs[1].default_value = 1.0 # yay magic numbers (they're all called "Value")
+					mirXNode.location = [0,-100]
+					mirYNode = mirN.new("ShaderNodeMath")
+					mirYNode.operation = "PINGPONG"
+					mirYNode.inputs[1].default_value = 1.0
+					mirYNode.location = [0,100]
+					mirrorNodeGroup.links.new(mirInput.outputs[0],sepNode.inputs[0])
+					mirrorNodeGroup.links.new(sepNode.outputs["X"],mirXNode.inputs["Value"])
+					mirrorNodeGroup.links.new(sepNode.outputs["Y"],mirYNode.inputs["Value"])
+					mirrorNodeGroup.links.new(mirXNode.outputs[0],merNode.inputs["X"])
+					mirrorNodeGroup.links.new(mirYNode.outputs[0],merNode.inputs["Y"])
+					mirrorNodeGroup.links.new(sepNode.outputs["Z"],merNode.inputs["Z"])
+					mirrorNodeGroup.links.new(merNode.outputs[0],mirOutput.inputs[0])
+				mirrorNode = n.new("ShaderNodeGroup")
+				mirrorNode.node_tree = mirrorNodeGroup
+				mirrorNode.location = [-650,-175*uv-25]
+				mirrorNode.hide = True
+				for mt in mirroring["xy"]:
+					newMat.node_tree.links.new(uvInputNode.outputs["UV"],mirrorNode.inputs[0])
+					if uv == 0:
+						newMat.node_tree.links.new(mirrorNode.outputs[0],mt.inputs["Vector"])
 		for xi,x in enumerate(mat.getExtraData()):
 			extraDataNode = n.new("ShaderNodeValue")
 			extraDataNode.outputs["Value"].default_value = x
