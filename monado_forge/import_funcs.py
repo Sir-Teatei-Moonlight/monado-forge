@@ -1067,7 +1067,10 @@ def realise_results(forgeResults, mainName, self, context):
 	newMatsByIndex = {}
 	for m,mat in enumerate(materials):
 		newMat = bpy.data.materials.new(name=mat.getName())
-		newMat.diffuse_color = mat.getViewportColour()
+		if context.scene.monado_forge_import.fixedViewportColour:
+			newMat.diffuse_color = context.scene.monado_forge_import.viewportColour
+		else:
+			newMat.diffuse_color = mat.getViewportColour()
 		newMat.blend_method = "OPAQUE" # the most likely option
 		newMat.shadow_method = "OPAQUE"
 		newMat.use_backface_culling = True # more likely than not

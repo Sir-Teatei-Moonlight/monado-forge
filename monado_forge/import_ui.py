@@ -6,6 +6,7 @@ import traceback
 from bpy.props import (
 						BoolProperty,
 						FloatProperty,
+						FloatVectorProperty,
 						IntProperty,
 						PointerProperty,
 						StringProperty,
@@ -278,6 +279,20 @@ class MonadoForgeViewImportProperties(PropertyGroup):
 		description="Run new materials through a simple base-colour-only Principled BSDF (false: use an empty group node instead)",
 		default=True,
 	)
+	fixedViewportColour : BoolProperty(
+		name="Set Viewport Colour",
+		description="Set imported meshes to use a specific import colour (false: use material's base colour)",
+		default=False,
+	)
+	viewportColour : FloatVectorProperty(
+		name="Viewport Colour",
+		description="Imported meshes have this viewport colour",
+		default=[1.0,1.0,1.0,1.0],
+		size=4,
+		min=0.0,
+		max=1.0,
+		subtype="COLOR",
+	)
 	cleanupLooseVertices : BoolProperty(
 		name="Loose Vertices",
 		description="Erase vertices not connected to anything",
@@ -348,6 +363,9 @@ class OBJECT_PT_MonadoForgeViewImportPanel(Panel):
 		texturePathRow.prop(scn.monado_forge_import, "texturePath", text="...to")
 		texturePathRow.enabled = scn.monado_forge_import.autoSaveTextures
 		col.prop(scn.monado_forge_import, "createDummyShader")
+		col.prop(scn.monado_forge_import, "fixedViewportColour")
+		if scn.monado_forge_import.fixedViewportColour:
+			col.prop(scn.monado_forge_import, "viewportColour", text="")
 		col.separator()
 		col.operator(MonadoForgeViewImportSkeletonOperator.bl_idname, text="Import Skeleton Only", icon="IMPORT")
 		col.operator(MonadoForgeViewImportModelOperator.bl_idname, text="Import Model Only", icon="IMPORT")
