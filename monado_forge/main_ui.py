@@ -22,8 +22,8 @@ class MonadoForgeProperties(PropertyGroup):
 			("XC3","XC3","Xenoblade 3"),
 		)
 	def gameListSelectionCallback(self, context):
-		if self.game == "XC1":
-			context.scene.monado_forge_import.importEndpoints = True # not technically true, but conceptually true (endpoints are not a separate bone type, they're just in with the rest)
+		# used to have "if XC1 importEndpoints = True" here but that's roundabout and unnecessary
+		pass
 
 	game : EnumProperty(
 		name="Game",

@@ -346,18 +346,14 @@ class OBJECT_PT_MonadoForgeViewImportPanel(Panel):
 		if scn.monado_forge_main.game == "XC1":
 			col.prop(scn.monado_forge_import, "singlePath", text=".brres")
 		else:
-			defsRow = col.row()
-			defsRow.prop(scn.monado_forge_import, "defsPath", text=".wimdo")
-			dataRow = col.row()
-			dataRow.prop(scn.monado_forge_import, "dataPath", text=".wismt")
+			col.prop(scn.monado_forge_import, "defsPath", text=".wimdo")
+			col.prop(scn.monado_forge_import, "dataPath", text=".wismt")
 		col.prop(scn.monado_forge_import, "importUncachedTextures")
 		if scn.monado_forge_main.game == "XC3":
-			texMRow = col.row()
-			texMRow.prop(scn.monado_forge_import, "textureRepoMPath", text="\\m\\")
-			texMRow.enabled = scn.monado_forge_import.importUncachedTextures
-			texHRow = col.row()
-			texHRow.prop(scn.monado_forge_import, "textureRepoHPath", text="\\h\\")
-			texHRow.enabled = scn.monado_forge_import.importUncachedTextures
+			texMHGroup = col.column(align=True)
+			texMHGroup.prop(scn.monado_forge_import, "textureRepoMPath", text="\\m\\")
+			texMHGroup.prop(scn.monado_forge_import, "textureRepoHPath", text="\\h\\")
+			texMHGroup.enabled = scn.monado_forge_import.importUncachedTextures
 		col.prop(scn.monado_forge_import, "autoSaveTextures")
 		texturePathRow = col.row()
 		texturePathRow.prop(scn.monado_forge_import, "texturePath", text="...to")

@@ -1,7 +1,7 @@
 # Monado Forge
 An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds a tab in the 3D view's right-hand toolbox with a bunch of useful features.
 
-**General notice:** Keep the system console toggled on so you can see any potential warnings.
+**General notice:** Keep the system console toggled on so you can see any potential warnings and non-fatal errors.
 
 ## Game support
 * :x: - Not supported, but planned (eventually).
@@ -52,15 +52,19 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 ## Known issues
 ### Things with workarounds
 * Some models have multiple weight tables, but the information about which one to use per each mesh cannot yet be found. Use the "Weight Table Override" feature to select which one to use for all meshes, and re-import for each one so you can pick-and-choose which ones are correct.
+* All images import as whatever the default colour setting is. You will have to manually set things like normal maps and intensity maps to be "non-colour" data. This will make them look wrong, for whatever dumb reason, but they will behave correctly.
 ### Things with no workarounds
 Roughly in order of badness.
 * Blender does not support per-shape normals, so that information is lost. In theory it won't matter much.
-* Models entirely embedded in the .wimdo are not checked for yet. Very rare, so ought not to be a big deal.
-* Outline meshes are not recognised or treated as anything special. If you get two entirely identical meshes, consider that one may be the outline, in which case you can delete one of them (probably the one with no textures in its material). Unclear how to handle this as of yet (guessing it's material-related).
+* Models entirely embedded in the .wimdo are not checked for yet. (Normally, the model itself is in the .wismt and the .wimdo is just definitions, but putting a model in the .wimdo is also legal.) Very rare, so ought not to be a big deal.
+* Outline meshes are not recognised or treated as anything special. If you get two entirely identical meshes, consider that one may be the outline, in which case you can delete one of them (probably the one with no textures in its material). Unclear how to automatically handle this, it's not immediately obvious how the game treats it (annd guessing based on the name containing "outline" is not ideal).
 * Outline data is not yet processed. Not quite sure how to be honest, perhaps will leverage a vertex colour layer for it.
+* There's an extra bit of data that we don't know what it does. It shows up as a "29,4" warning in the console. You can ignore it.
 * Some materials only have a base colour (no textures). These import as the Actual Raw Colour Values, and so might look incorrect when Blender's colour spaces get involved. Don't ask me how to fix this.
 
 ## Planned features
 Roughly in order of priority.
-* UV folding
+* Better channel splitting (current one is hella slow/inefficient)
+* Bone scaler (e.g. "set all selected bones to have a length of 0.5")
+* UV folding (moving points to within the (0,1) range where possible)
 
