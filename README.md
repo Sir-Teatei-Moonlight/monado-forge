@@ -50,11 +50,12 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 * Merge two armatures, keeping only one copy of bones with the same name. Supports both "merge all" and "merge only if similar enough".
 
 ## Known issues
+Roughly in order of badness.
 ### Things with workarounds
 * Some models have multiple weight tables, but the information about which one to use per each mesh cannot yet be found. Use the "Weight Table Override" feature to select which one to use for all meshes, and re-import for each one so you can pick-and-choose which ones are correct.
+* The guessing for whether a material is mirrored is wrong - it gets some right, but not all. It isn't too hard to manually fix.
 * All images import as whatever the default colour setting is. You will have to manually set things like normal maps and intensity maps to be "non-colour" data. This will make them look wrong, for whatever dumb reason, but they will behave correctly.
 ### Things with no workarounds
-Roughly in order of badness.
 * Blender does not support per-shape normals, so that information is lost. In theory it won't matter much.
 * Models entirely embedded in the .wimdo are not checked for yet. (Normally, the model itself is in the .wismt and the .wimdo is just definitions, but putting a model in the .wimdo is also legal.) Very rare, so ought not to be a big deal.
 * Outline meshes are not recognised or treated as anything special. If you get two entirely identical meshes, consider that one may be the outline, in which case you can delete one of them (probably the one with no textures in its material). Unclear how to automatically handle this, it's not immediately obvious how the game treats it (annd guessing based on the name containing "outline" is not ideal).
