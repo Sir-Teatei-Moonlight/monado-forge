@@ -41,7 +41,7 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 * Optionally assumes that BC5 textures are normal maps, and auto-calculates the blue channel for them.
 * Differentiates newly-imported textures with same-named existing ones by appending the imported .wismt's filename. Can be turned off.
 * Has the ability to automatically split "temp" files into channels, but currently does so in a terribly slow and inefficient way, so it's off by default. Don't exactly recommend using it yet, but it's there if you need it.
-* Creates a basic material with all the correct textures and values in it, in which the first texture is assumed to be the base colour, and nothing else is plugged in. Also reads what's believed to be a mirror flag from the material, and plugs textures into a TexMirrorXY node accordingly (creating it if it doesn't exist already). Anything more will have to wait for deeper shader parsing.
+* Creates a basic material with all the correct textures and values in it, in which the first texture is assumed to be the base colour, and nothing else is plugged in. Also guesses whether the textures should be mirrored, and plugs textures into a TexMirrorXY node accordingly (creating it if it doesn't exist already). Anything more will have to wait for deeper shader parsing.
 
 ### Modify
 * One-click flipping and mirroring bones so _L and _R sides match. Auto-mirror skips bones that seem like they might be intentionally uneven.
@@ -54,7 +54,7 @@ Roughly in order of badness.
 ### Things with workarounds
 * Some models have multiple weight tables, but the information about which one to use per each mesh cannot yet be found. Use the "Weight Table Override" feature to select which one to use for all meshes, and re-import for each one so you can pick-and-choose which ones are correct.
 * The guessing for whether a material is mirrored is wrong - it gets some right, but not all. It isn't too hard to manually fix.
-* All images import as whatever the default colour setting is. You will have to manually set things like normal maps and intensity maps to be "non-colour" data. This will make them look wrong, for whatever dumb reason, but they will behave correctly.
+* By default, images import as whatever the default colour setting is. It guesses whether they are non-colour data based on the name, so it can always get it wrong, and you'll have to manually notice and correct them. This will make them _look_ wrong, for whatever dumb reason, but they will _behave_ correctly.
 ### Things with no workarounds
 * Blender does not support per-shape normals, so that information is lost. In theory it won't matter much.
 * Models entirely embedded in the .wimdo are not checked for yet. (Normally, the model itself is in the .wismt and the .wimdo is just definitions, but putting a model in the .wimdo is also legal.) Very rare, so ought not to be a big deal.

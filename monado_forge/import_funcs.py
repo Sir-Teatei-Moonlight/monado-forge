@@ -1110,6 +1110,18 @@ def realise_results(forgeResults, mainName, self, context):
 			texNode = n.new("ShaderNodeTexImage")
 			texNode.extension = "REPEAT" # statistically more likely than EXTEND
 			texNode.image = bpy.data.images[t.getName()]
+			# use the name to make a guess for whether this is colour data or not
+			if any([
+				"_NRM" in t.getName(),"_NML" in t.getName(), # normal
+				"_MTL" in t.getName(), # metal
+				"_SHY" in t.getName(), # gloss
+				"_ALP" in t.getName(), # alpha
+				"_GLO" in t.getName(), # glow/emit
+				"_MSK" in t.getName(), # mask
+				"_VEL" in t.getName(), # velocity (fur/hair map)
+				"temp" in t.getName(), # channelised
+				]):
+					texNode.image.colorspace_settings.name = "Non-Color"
 			tx = ti%4
 			ty = ti//4
 			texNode.location = [tx*250-325,ty*-250+300]
@@ -1120,6 +1132,12 @@ def realise_results(forgeResults, mainName, self, context):
 			mX = "x" if mir[0] else ""
 			mY = "y" if mir[1] else ""
 			mirroring[mX+mY].append(texNode)
+			# for temp files, add a colour splitter for convenience
+			if "temp" in t.getName():
+				sepNode = n.new("ShaderNodeSeparateColor")
+				sepNode.location = texNode.location + mathutils.Vector([125,-25])
+				sepNode.hide = True
+				newMat.node_tree.links.new(texNode.outputs["Color"],sepNode.inputs[0])
 		uvCount = mat.getUVLayerCount() # this will probably result in overestimation, but that's okay
 		for uv in range(uvCount):
 			uvInputNode = n.new("ShaderNodeUVMap")
