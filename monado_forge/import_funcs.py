@@ -1108,7 +1108,7 @@ def realise_results(forgeResults, mainName, self, context):
 			newMat.node_tree.links.new(baseColourNode.outputs[0],shaderSubnode.inputs["Base Color"])
 		for ti,t in enumerate(mat.getTextures()):
 			texNode = n.new("ShaderNodeTexImage")
-			texNode.extension = "REPEAT" # statistically more likely than EXTEND
+			texNode.extension = "EXTEND" # it's easier to find cases of "I need this to be REPEAT because the UVs are out there" than "I need this to be EXTEND because REPEAT is causing cross-edge bleeding"
 			texNode.image = bpy.data.images[t.getName()]
 			# use the name to make a guess for whether this is colour data or not
 			if any([
@@ -1119,6 +1119,7 @@ def realise_results(forgeResults, mainName, self, context):
 				"_GLO" in t.getName(), # glow/emit
 				"_MSK" in t.getName(), # mask
 				"_VEL" in t.getName(), # velocity (fur/hair map)
+				"_DPS" in t.getName(), # displacement?
 				"temp" in t.getName(), # channelised
 				]):
 					texNode.image.colorspace_settings.name = "Non-Color"
