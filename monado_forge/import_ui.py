@@ -93,7 +93,8 @@ class MonadoForgeViewImportModelOperator(Operator):
 			if not os.path.isdir(bpy.path.abspath(context.scene.monado_forge_import.texturePath)):
 				self.report({"ERROR"}, "Auto-save selected, but texture output path is not an existing folder")
 				return {"CANCELLED"}
-		if game == "XC3" and not (os.path.isdir(bpy.path.abspath(context.scene.monado_forge_import.textureRepoMPath)) and os.path.isdir(bpy.path.abspath(context.scene.monado_forge_import.textureRepoHPath))):
+		if game == "XC3" and (context.scene.monado_forge_import.importUncachedTextures and
+				not (os.path.isdir(bpy.path.abspath(context.scene.monado_forge_import.textureRepoMPath)) and os.path.isdir(bpy.path.abspath(context.scene.monado_forge_import.textureRepoHPath)))):
 			self.report({"ERROR"}, "Import uncached textures selected, but no texture repositories provided (both are required)")
 			return {"CANCELLED"}
 		try:
@@ -129,7 +130,8 @@ class MonadoForgeViewImportModelWithSkeletonOperator(Operator):
 			if not os.path.isdir(bpy.path.abspath(context.scene.monado_forge_import.texturePath)):
 				self.report({"ERROR"}, "Auto-save selected, but texture output path is not an existing folder")
 				return {"CANCELLED"}
-		if game == "XC3" and not (os.path.isdir(bpy.path.abspath(context.scene.monado_forge_import.textureRepoMPath)) and os.path.isdir(bpy.path.abspath(context.scene.monado_forge_import.textureRepoHPath))):
+		if game == "XC3" and (context.scene.monado_forge_import.importUncachedTextures and
+				not (os.path.isdir(bpy.path.abspath(context.scene.monado_forge_import.textureRepoMPath)) and os.path.isdir(bpy.path.abspath(context.scene.monado_forge_import.textureRepoHPath)))):
 			self.report({"ERROR"}, "Import uncached textures selected, but no texture repositories provided (both are required)")
 			return {"CANCELLED"}
 		
