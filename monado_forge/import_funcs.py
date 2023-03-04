@@ -971,7 +971,13 @@ def import_sar1_skeleton_only(self, context):
 		armatureName = armatureName[:-4]
 	if armatureName.endswith("_Bone"):
 		armatureName = armatureName[:-5]
-	create_armature_from_bones(skeleton,armatureName,boneSize,positionEpsilon,angleEpsilon)
+	if context.scene.monado_forge_import.importToCursor:
+		pos = context.scene.cursor.location
+		rot = context.scene.cursor.rotation_euler
+	else:
+		pos = (0,0,0)
+		rot = (0,0,0)
+	create_armature_from_bones(skeleton,armatureName,pos,rot,boneSize,positionEpsilon,angleEpsilon)
 	return {"FINISHED"}
 
 def import_wimdo_only(self, context):
@@ -1044,11 +1050,17 @@ def realise_results(forgeResults, mainName, self, context):
 	createDummyShader = context.scene.monado_forge_import.createDummyShader
 	armaturesCreated = 0
 	# we create the external armature (if any) first so it gets name priority
+	if context.scene.monado_forge_import.importToCursor:
+		pos = context.scene.cursor.location
+		rot = context.scene.cursor.rotation_euler
+	else:
+		pos = (0,0,0)
+		rot = (0,0,0)
 	externalSkeleton = forgeResults.getExternalSkeleton()
 	if externalSkeleton:
 		boneList = externalSkeleton.getBones()
 		armatureName = mainName
-		externalArmature = create_armature_from_bones(boneList,armatureName,boneSize,positionEpsilon,angleEpsilon)
+		externalArmature = create_armature_from_bones(boneList,armatureName,pos,rot,boneSize,positionEpsilon,angleEpsilon)
 		armaturesCreated += 1
 	else:
 		externalArmature = None
@@ -1056,7 +1068,7 @@ def realise_results(forgeResults, mainName, self, context):
 	if baseSkeleton:
 		boneList = baseSkeleton.getBones()
 		armatureName = mainName
-		baseArmature = create_armature_from_bones(boneList,armatureName,boneSize,positionEpsilon,angleEpsilon)
+		baseArmature = create_armature_from_bones(boneList,armatureName,pos,rot,boneSize,positionEpsilon,angleEpsilon)
 		armaturesCreated += 1
 	else:
 		baseArmature = None
@@ -1203,7 +1215,7 @@ def realise_results(forgeResults, mainName, self, context):
 	for m,mesh in enumerate(meshes):
 		if printProgress:
 			print_progress_bar(m,len(meshes),"Mesh creation")
-		bpy.ops.object.add(type="MESH", enter_editmode=False, align="WORLD", location=context.scene.cursor.location, rotation=(0,0,0), scale=(1,1,1))
+		bpy.ops.object.add(type="MESH", enter_editmode=False, align="WORLD", location=(0,0,0), rotation=(0,0,0), scale=(1,1,1))
 		newMeshObject = bpy.context.view_layer.objects.active
 		newMeshObject.name = f"{mainName}_mesh{m:03d}"
 		meshData = newMeshObject.data

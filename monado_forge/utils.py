@@ -221,11 +221,11 @@ def isBonePairIdentical(thisBone,otherBone,positionEpsilon,angleEpsilon,mirrorab
 		return False,"roll angle diff. of "+str(math.degrees(angleDiff))+"d (out of tolerance by "+str(math.degrees(angleEpsilon-angleDiff))+"d)"
 	return True,""
 
-def create_armature_from_bones(boneList,name,boneSize,positionEpsilon,angleEpsilon):
+def create_armature_from_bones(boneList,name,pos,rot,boneSize,positionEpsilon,angleEpsilon):
 	if isinstance(boneList,MonadoForgeSkeleton): # this way either "a Forge skeleton object" or "a list of Forge bone objects" can be used
 		boneList = boneList.getBones()
 	bpy.ops.object.select_all(action="DESELECT")
-	bpy.ops.object.armature_add(enter_editmode=True, align="WORLD", location=(0,0,0), rotation=(0,0,0), scale=(1,1,1))
+	bpy.ops.object.armature_add(enter_editmode=True, align="WORLD", location=pos, rotation=rot, scale=(1,1,1))
 	skelObj = bpy.context.view_layer.objects.active
 	skeleton = skelObj.data
 	skeleton.show_names = True

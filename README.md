@@ -12,7 +12,7 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 
 | | <img alt="XC1" src="https://www.xenoserieswiki.org/w/images/8/8d/Article_icon_-_Xenoblade_Chronicles.svg" width="24px"/> | <img alt="XCX" src="https://www.xenoserieswiki.org/w/images/3/3f/Article_icon_-_Xenoblade_Chronicles_X.svg" width="24px"/> | <img alt="XC2" src="https://www.xenoserieswiki.org/w/images/a/a8/Article_icon_-_Xenoblade_Chronicles_2.svg" width="24px"/> | <img alt="XC1DE" src="https://www.xenoserieswiki.org/w/images/6/6f/Article_icon_-_Xenoblade_Chronicles_Definitive_Edition.svg" width="24px"/> | <img alt="XC3" src="https://www.xenoserieswiki.org/w/images/b/bc/Article_icon_-_Xenoblade_Chronicles_3.svg" width="24px"/>
 | --- | :---: | :---: | :---: | :---: | :---: |
-| Skeleton import | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
+| Skeleton import | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | 65% |
 | Model import | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Vertex colours | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ UVs | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
@@ -57,6 +57,7 @@ Roughly in order of badness.
 * By default, images import as whatever the default colour setting is. It guesses whether they are non-colour data based on the name, so it can always get it wrong, and you'll have to manually notice and correct them. This will make them _look_ wrong, for whatever dumb reason, but they will _behave_ correctly.
 ### Things with no workarounds
 * Blender does not support per-shape normals, so that information is lost. In theory it won't matter much.
+* Many XC3 models for party members (and possibly others) appear to use an unknown parenting mechanism for several bones (believed to be constraint-related), so they end up not being parented at all. You'll have to guess how things need to be attached.
 * Models entirely embedded in the .wimdo are not checked for yet. (Normally, the model itself is in the .wismt and the .wimdo is just definitions, but putting a model in the .wimdo is also legal.) Very rare, so ought not to be a big deal.
 * Outline meshes are not recognised or treated as anything special. If you get two entirely identical meshes, consider that one may be the outline, in which case you can delete one of them (probably the one with no textures in its material). Unclear how to automatically handle this, it's not immediately obvious how the game treats it (annd guessing based on the name containing "outline" is not ideal).
 * Outline data is not yet processed. Not quite sure how to be honest, perhaps will leverage a vertex colour layer for it.

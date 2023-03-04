@@ -243,6 +243,11 @@ class MonadoForgeViewImportProperties(PropertyGroup):
 		maxlen=1024,
 		subtype="FILE_PATH",
 	)
+	importToCursor : BoolProperty(
+		name="Import To Cursor",
+		description="Place the import at the 3D cursor (false: place it at [0,0,0])",
+		default=False,
+	)
 	tempWeightTableOverride : IntProperty(
 		name="Weight Table Override",
 		description="Force all meshes to use this weight table (see readme for explanation)",
@@ -398,6 +403,7 @@ class OBJECT_PT_MonadoForgeViewImportModelOptionsPanel(Panel):
 		scn = context.scene
 		col = layout.column(align=True)
 		col.prop(scn.monado_forge_import, "tempWeightTableOverride")
+		col.prop(scn.monado_forge_import, "importToCursor")
 		col.prop(scn.monado_forge_import, "alsoImportLODs")
 		col.prop(scn.monado_forge_import, "doCleanupOnImport")
 		col.operator(MonadoForgeViewImportCleanupModelOperator.bl_idname, text="Clean Up Selected Meshes", icon="BRUSH_DATA")
