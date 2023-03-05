@@ -44,9 +44,10 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 * Creates a basic material with all the correct textures and values in it, in which the first texture is assumed to be the base colour, and nothing else is plugged in. Also guesses whether the textures should be mirrored, and plugs textures into a TexMirrorXY node accordingly (creating it if it doesn't exist already). Anything more will have to wait for deeper shader parsing.
 
 ### Modify
+* One-click setting all bones to be the same size.
 * One-click flipping and mirroring bones so _L and _R sides match. Auto-mirror skips bones that seem like they might be intentionally uneven.
-* Select individual bones for manual flipping/mirroring.
 * One-click renaming bones to move the _L/_R to the end, instead of sitting in the middle.
+* All the above operate on the whole armature by default. Going into edit mode allows selecting individual bones to change.
 * Merge two armatures, keeping only one copy of bones with the same name. Supports both "merge all" and "merge only if similar enough".
 
 ## Known issues
@@ -67,6 +68,5 @@ Roughly in order of badness.
 ## Planned features
 Roughly in order of priority.
 * Better channel splitting (current one is hella slow/inefficient)
-* Bone scaler (e.g. "set all selected bones to have a length of 0.5")
 * UV folding (moving points to within the (0,1) range where possible)
 

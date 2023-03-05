@@ -18,6 +18,53 @@ from . classes import *
 from . utils import *
 from . modify_funcs import *
 
+class MonadoForgeBoneResizeAllOperator(Operator):
+	bl_idname = "object.monado_forge_bone_resize_all_operator"
+	bl_label = "Xenoblade Skeleton Bone Resize All Operator"
+	bl_description = "Resizes all bones to the given length"
+	bl_options = {"REGISTER","UNDO"}
+	
+	@classmethod
+	def poll(cls, context):
+		activeObject = context.view_layer.objects.active
+		if not activeObject: return False
+		if activeObject.type != "ARMATURE": return False
+		if activeObject.mode == "POSE": return False
+		return True
+	
+	def execute(self, context):
+		try:
+			resize_all_bones_active_object(self, context)
+		except Exception:
+			traceback.print_exc()
+			self.report({"ERROR"}, "Unexpected error; see console")
+			return {"CANCELLED"}
+		return {"FINISHED"}
+
+class MonadoForgeBoneResizeSelectedOperator(Operator):
+	bl_idname = "object.monado_forge_bone_resize_selected_operator"
+	bl_label = "Xenoblade Skeleton Bone Resize Selected Operator"
+	bl_description = "Resizes all selected bones to tthe given length"
+	bl_options = {"REGISTER","UNDO"}
+	
+	@classmethod
+	def poll(cls, context):
+		activeObject = context.view_layer.objects.active
+		if not activeObject: return False
+		if activeObject.type != "ARMATURE": return False
+		if activeObject.mode != "EDIT": return False
+		return True
+	
+	def execute(self, context):
+		try:
+			# edit mode is assumed (button is edit mode limited)
+			resize_selected_bones(self, context)
+		except Exception:
+			traceback.print_exc()
+			self.report({"ERROR"}, "Unexpected error; see console")
+			return {"CANCELLED"}
+		return {"FINISHED"}
+
 class MonadoForgeBoneFlipAllOperator(Operator):
 	bl_idname = "object.monado_forge_bone_flip_all_operator"
 	bl_label = "Xenoblade Skeleton Bone Flip All Operator"
@@ -193,6 +240,15 @@ class MonadoForgeViewModifyToolsProperties(PropertyGroup):
 		description="Treat non-final _L_ and _R_ in bone names as being mirrored",
 		default=True,
 	)
+	boneResizeSize : FloatProperty(
+		name="Bone Resize",
+		description="New length of bones",
+		default=0.1,
+		min=0.01,
+		soft_min=0.01,
+		soft_max=10,
+		unit="LENGTH",
+	)
 	safeMerge : BoolProperty(
 		name="Safe Merge",
 		description="Only merges bones of the same name if they have the same position and rotation (false: merge them no matter what)",
@@ -215,12 +271,17 @@ class OBJECT_PT_MonadoForgeViewModifyPanel(Panel):
 		settingsPanel = col.column(align=True) # note to self: remove this later when non-skeleton modifiers exist (and thus there are subpanels)
 		settingsPanel.prop(scn.monado_forge_modify, "nonFinalMirror")
 		modifyPanel = col.column(align=True)
+		settingsPanel.prop(scn.monado_forge_modify, "boneResizeSize")
 		if activeObject and activeObject.mode == "EDIT":
+			modifyPanel.operator(MonadoForgeBoneResizeSelectedOperator.bl_idname, text="Resize Selected Bones", icon="FIXED_SIZE")
+			modifyPanel.separator()
 			modifyPanel.operator(MonadoForgeBoneFlipSelectedOperator.bl_idname, text="Flip Selected Bones", icon="ARROW_LEFTRIGHT")
 			modifyPanel.operator(MonadoForgeBoneMirrorSelectedOperator.bl_idname, text="Mirror Selected Bones", icon="MOD_MIRROR")
 			modifyPanel.separator()
 			modifyPanel.operator(MonadoForgeNonFinalLRFixSelectedOperator.bl_idname, text="Fix Non-Final L/R Names", icon="TRACKING_FORWARDS_SINGLE")
 		else:
+			modifyPanel.operator(MonadoForgeBoneResizeAllOperator.bl_idname, text="Resize Bones", icon="FIXED_SIZE")
+			modifyPanel.separator()
 			modifyPanel.operator(MonadoForgeBoneFlipAllOperator.bl_idname, text="Flip _R Bones", icon="ARROW_LEFTRIGHT")
 			modifyPanel.operator(MonadoForgeBoneMirrorAutoOperator.bl_idname, text="Mirror _R Bones", icon="MOD_MIRROR")
 			modifyPanel.separator()
@@ -230,6 +291,8 @@ class OBJECT_PT_MonadoForgeViewModifyPanel(Panel):
 			modifyPanel.prop(scn.monado_forge_modify, "safeMerge")
 
 classes = (
+			MonadoForgeBoneResizeAllOperator,
+			MonadoForgeBoneResizeSelectedOperator,
 			MonadoForgeBoneFlipAllOperator,
 			MonadoForgeBoneFlipSelectedOperator,
 			MonadoForgeBoneMirrorAutoOperator,

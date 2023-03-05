@@ -5,6 +5,26 @@ import mathutils
 from . classes import *
 from . utils import *
 
+def resize_selected_bones(self, context):
+	targetLength = context.scene.monado_forge_modify.boneResizeSize
+	for bone in bpy.context.selected_bones:
+		bone.length = targetLength
+	return {"FINISHED"}
+
+def resize_all_bones_active_object(self, context):
+	skeleton = bpy.context.view_layer.objects.active.data
+	bpy.ops.object.mode_set(mode="EDIT")
+	editBones = skeleton.edit_bones
+	for bone in editBones:
+		bone.select = True
+	resize_selected_bones(self, context)
+	for bone in editBones:
+			bone.select = False
+			bone.select_head = False
+			bone.select_tail = False
+	bpy.ops.object.mode_set(mode="OBJECT")
+	return {"FINISHED"}
+
 def flip_selected_bones(self, context):
 	angleEpsilon = context.scene.monado_forge_main.angleEpsilon
 	for bone in bpy.context.selected_bones:
