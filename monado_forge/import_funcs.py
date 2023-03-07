@@ -301,7 +301,7 @@ def import_wimdo(f, context, externalSkeleton=None):
 				f.seek(modelsOffset+shapeNamesOffset+shapeNameOffset)
 				shapeNames.append(readStr(f))
 	
-	if materialsOffset > 0:
+	if materialsOffset > 0 and not context.scene.monado_forge_import.skipMaterialImport:
 		f.seek(materialsOffset)
 		materialHeadersOffset = readAndParseInt(f,4)
 		materialCount = readAndParseInt(f,4)
@@ -462,12 +462,12 @@ def import_wismt(f, wimdoResults, context):
 			hasContentType[contentType] = True
 			contentPointers.append([internalOffset,contentSize,highResSubfileIndex,contentType])
 	textureIDList = []
-	if textureIDsOffset > 0:
+	if textureIDsOffset > 0 and not context.scene.monado_forge_import.skipMaterialImport:
 		f.seek(mainOffset+textureIDsOffset)
 		for i in range(textureIDsCount):
 			textureIDList.append(readAndParseInt(f,2))
 	textureHeaders = []
-	if textureCountOffset > 0:
+	if textureCountOffset > 0 and not context.scene.monado_forge_import.skipMaterialImport:
 		f.seek(mainOffset+textureCountOffset)
 		textureCount = readAndParseInt(f,4)
 		textureChunkSize = readAndParseInt(f,4)
@@ -777,7 +777,7 @@ def import_wismt(f, wimdoResults, context):
 				if printProgress:
 					print("Found shader chunk of size "+str(contentSize)+" (not supported, skipping)")
 				pass
-			if contentType == 2: # cached texture
+			if contentType == 2 and not context.scene.monado_forge_import.skipMaterialImport: # cached texture
 				data = subfileData[internalOffset:internalOffset+contentSize]
 				sf = io.BytesIO(data)
 				try: # no except, just finally (to close sf)
@@ -813,7 +813,8 @@ def import_wismt(f, wimdoResults, context):
 					sf.close()
 		del subfileData # just to ensure it's cleaned up as soon as possible
 		nextSubfileIndex += 1
-	if hasUncachedTexSubfile and context.scene.monado_forge_import.importUncachedTextures: # reminder: XC3 doesn't go in here at all (at least for most models)
+	# reminder: XC3 doesn't go in here at all (at least for most models)
+	if hasUncachedTexSubfile and context.scene.monado_forge_import.importUncachedTextures and not context.scene.monado_forge_import.skipMaterialImport:
 		subfileHeaderOffset = mainOffset+subfileHeadersOffset+nextSubfileIndex*3*4
 		subfileName,subfileData = extract_wismt_subfile(f,subfileHeaderOffset)
 		for cpi,cp in enumerate(contentPointers):
@@ -871,7 +872,7 @@ def import_wismt(f, wimdoResults, context):
 	# there's probably a way to reduce the copy-pasted code here, but the necessary differences are subtle
 	texMPath = bpy.path.abspath(context.scene.monado_forge_import.textureRepoMPath)
 	texHPath = bpy.path.abspath(context.scene.monado_forge_import.textureRepoHPath)
-	if game == "XC3" and context.scene.monado_forge_import.importUncachedTextures and texMPath and texHPath:
+	if game == "XC3" and context.scene.monado_forge_import.importUncachedTextures and not context.scene.monado_forge_import.skipMaterialImport and texMPath and texHPath:
 		for textureName in set(listOfCachedTextureNames):
 			mFilename = os.path.join(texMPath,textureName+".wismt")
 			hFilename = os.path.join(texHPath,textureName+".wismt")
@@ -1273,7 +1274,8 @@ def realise_results(forgeResults, mainName, self, context):
 				newShape = newMeshObject.shape_key_add(name=s.getName(),from_mix=False)
 				for vertexIndex,vertex in s.getVertices().items():
 					newShape.data[vertexIndex].co += mathutils.Vector(vertex.getPosition())
-		meshData.materials.append(newMatsByIndex[mesh.getMaterialIndex()])
+		if not context.scene.monado_forge_import.skipMaterialImport:
+			meshData.materials.append(newMatsByIndex[mesh.getMaterialIndex()])
 		
 		# import complete, cleanup time
 		#meshData.validate(verbose=True)

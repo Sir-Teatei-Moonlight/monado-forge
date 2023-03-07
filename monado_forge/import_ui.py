@@ -281,6 +281,11 @@ class MonadoForgeViewImportProperties(PropertyGroup):
 		maxlen=1024,
 		subtype="FILE_PATH",
 	)
+	skipMaterialImport : BoolProperty(
+		name="Skip Material Import",
+		description="Skips importing textures and materials entirely",
+		default=False,
+	)
 	createDummyShader : BoolProperty(
 		name="Create Dummy Shader",
 		description="Run new materials through a simple base-colour-only Principled BSDF (false: use an empty group node instead)",
@@ -365,6 +370,7 @@ class OBJECT_PT_MonadoForgeViewImportPanel(Panel):
 		texturePathRow = col.row()
 		texturePathRow.prop(scn.monado_forge_import, "texturePath", text="...to")
 		texturePathRow.enabled = scn.monado_forge_import.autoSaveTextures
+		col.prop(scn.monado_forge_import, "skipMaterialImport")
 		col.prop(scn.monado_forge_import, "createDummyShader")
 		col.prop(scn.monado_forge_import, "fixedViewportColour")
 		if scn.monado_forge_import.fixedViewportColour:
