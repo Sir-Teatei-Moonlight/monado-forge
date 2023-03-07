@@ -251,13 +251,23 @@ def create_armature_from_bones(boneList,name,pos,rot,boneSize,positionEpsilon,an
 		newBone.layers[0] = not b.isEndpoint()
 	# now that the bones are in, spin them around so they point in a more logical-for-Blender direction
 	for b in editBones:
-		b.transform(mathutils.Euler((math.radians(90),0,0)).to_matrix()) # transform from lying down (+Y up +Z forward) to standing up (+Z up -Y forward)
-		roll = b.y_axis # roll gets lost after the following matrix mult for some reason, so preserve it
-		b.matrix = b.matrix @ mathutils.Matrix([[0,1,0,0],[1,0,0,0],[0,0,1,0],[0,0,0,1]]) # change from +X being the "main axis" to +Y
-		b.align_roll(roll)
-		# everything done, now apply epsilons
+		# transform from lying down (+Y up +Z forward) to standing up (+Z up -Y forward)
+		b.transform(mathutils.Euler((math.radians(90),0,0)).to_matrix())
+		# change from +X being the "main axis" (game format) to +Y (Blender format)
+		b.matrix = b.matrix @ mathutils.Matrix([[0,1,0,0],[0,0,1,0],[1,0,0,0],[0,0,0,1]])
+		# now apply epsilons
+		# part 1: if a position is close enough to 0, make it 0
 		b.head = [(0 if abs(p) < positionEpsilon else p) for p in b.head]
 		b.tail = [(0 if abs(p) < positionEpsilon else p) for p in b.tail]
+		# part 2: if a tail position is close enough to the head position, make it equal
+		newTail = b.tail
+		for i in range(3):
+			h = b.head[i]
+			t = b.tail[i]
+			if abs(h-t) < positionEpsilon:
+				newTail[i] = h
+		b.tail = newTail
+		# part 3: if the roll is close enough to 0, make it 0
 		clampBoneRoll(b,angleEpsilon)
 	skelObj.name = name
 	skelObj.data.name = name

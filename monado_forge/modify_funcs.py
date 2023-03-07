@@ -28,10 +28,7 @@ def resize_all_bones_active_object(self, context):
 def flip_selected_bones(self, context):
 	angleEpsilon = context.scene.monado_forge_main.angleEpsilon
 	for bone in bpy.context.selected_bones:
-		roll = bone.roll
-		bone.matrix = bone.matrix @ mathutils.Matrix([[-1,0,0,0],[0,-1,0,0],[0,0,-1,0],[0,0,0,1]])
-		bone.roll = flipRoll(roll)
-		clampBoneRoll(bone,angleEpsilon)
+		bone.matrix = bone.matrix @ mathutils.Matrix([[1,0,0,0],[0,-1,0,0],[0,0,-1,0],[0,0,0,1]])
 	self.report({"INFO"}, "Flipped "+str(len(bpy.context.selected_bones))+" bones.")
 	return {"FINISHED"}
 
