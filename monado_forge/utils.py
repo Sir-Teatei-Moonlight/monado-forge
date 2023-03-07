@@ -184,8 +184,6 @@ def clampBoneRoll(editBone,angleEpsilon):
 
 def mirrorBone(editBone,otherBone):
 	# replaces editBone's position and rotation with a mirrored version of otherBone's
-	roll = editBone.roll
-	editBone.matrix = otherBone.matrix @ mathutils.Matrix([[-1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]])
 	editBone.head = otherBone.head * mathutils.Vector((-1,1,1))
 	editBone.tail = otherBone.tail * mathutils.Vector((-1,1,1))
 	editBone.roll = -otherBone.roll
