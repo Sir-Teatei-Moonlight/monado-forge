@@ -20,6 +20,8 @@ from bpy.types import (
 from . classes import *
 from . utils import *
 from . import_funcs import *
+from . import_funcs_brres import *
+from . import_funcs_sar1 import *
 
 class MonadoForgeViewImportSkeletonOperator(Operator):
 	bl_idname = "object.monado_forge_skeleton_import_operator"
