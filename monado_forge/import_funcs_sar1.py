@@ -311,16 +311,26 @@ def import_wimdo(f, context, externalSkeleton=None):
 		materialExtraDataOffset = readAndParseInt(f,4)
 		materialExtraDataCount = readAndParseInt(f,4)
 		# a bunch of unknowns follow (looks likely to be offset+count pairs), skipping entirely for the moment
+		f.seek(materialsOffset+92) # a magic number unfortunately
+		samplerTableOffset = readAndParseInt(f,4)
+		# get the samplers now so we can put them in the materials
+		f.seek(materialsOffset+samplerTableOffset)
+		samplerCount = readAndParseInt(f,4)
+		samplerOffset = readAndParseInt(f,4)
+		f.seek(materialsOffset+samplerTableOffset+samplerOffset)
+		samplers = []
+		for s in range(samplerCount):
+			samplers.append([readAndParseInt(f,4),readAndParseFloat(f)]) # flags, LOD bias (don't need to parse/understand here)
 		f.seek(materialsOffset+materialHeadersOffset)
 		for m in range(materialCount):
 			matNameOffset = readAndParseInt(f,4)
 			matFlags1 = readAndParseInt(f,4)
 			matFlags2 = readAndParseInt(f,4)
 			matBaseColour = [readAndParseFloat(f),readAndParseFloat(f),readAndParseFloat(f),readAndParseFloat(f)]
-			matU1 = readAndParseFloat(f)
+			matU0 = readAndParseFloat(f)
 			matTextureTableOffset = readAndParseInt(f,4)
 			matTextureCount = readAndParseInt(f,4)
-			matTextureMirrorFlags = readAndParseInt(f,4)
+			matU1 = readAndParseInt(f,4) # some sort of flags, probably
 			matU2 = readAndParseInt(f,4)
 			matU3 = readAndParseInt(f,4)
 			matU4 = readAndParseInt(f,4)
@@ -347,12 +357,12 @@ def import_wimdo(f, context, externalSkeleton=None):
 			for t in range(matTextureCount):
 				matTextureTable.append([readAndParseInt(f,2),readAndParseInt(f,2),readAndParseInt(f,2),readAndParseInt(f,2)])
 			f.seek(ftemp)
-			#materials.append([matName,matBaseColour,matTextureTable,matTextureMirrorFlags,matExtraDataIndex])
+			#materials.append([matName,matBaseColour,matTextureTable,matExtraDataIndex])
 			mat = MonadoForgeWimdoMaterial(m)
 			mat.setName(matName)
 			mat.setBaseColour(matBaseColour)
 			mat.setTextureTable(matTextureTable)
-			mat.setTextureMirrorFlags(matTextureMirrorFlags)
+			mat.setSamplers(samplers) # yes this means each material has the samplers duplicated, but that's not really a big deal (it's two numbers)
 			mat.setExtraDataIndex(matExtraDataIndex)
 			materials.append(mat)
 		f.seek(materialsOffset+materialExtraDataOffset)
@@ -375,7 +385,7 @@ def import_wimdo(f, context, externalSkeleton=None):
 		if printProgress:
 			print("Found "+str(len(materials))+" materials.")
 			#for m in materials:
-			#	print(m.getName(),m.getBaseColour(),m.getTextureTable(),m.getTextureMirrorFlags(),m.getExtraDataIndex(),m.getExtraData())
+			#	print(m.getName(),m.getBaseColour(),m.getTextureTable(),m.getExtraDataIndex(),m.getExtraData())
 	if vertexBufferOffset > 0:
 		f.seek(vertexBufferOffset)
 	if shadersOffset > 0:
@@ -932,17 +942,32 @@ def import_wismt(f, wimdoResults, context):
 		newMat.setViewportColour(mat.getBaseColour())
 		newMat.setExtraData(mat.getExtraData())
 		newMat.setUVLayerCount(maxUVLayers)
-		matMirrorFlags = mat.getTextureMirrorFlags()
+		matSamplers = mat.getSamplers()
 		# this is done in a way that "duplicates" texture references, but that's fairly harmless at this stage
 		for ti,t in enumerate(mat.getTextureTable()):
 			newTex = MonadoForgeTexture()
 			texIndex = t[0] # ignore the unknowns for now
 			newTex.setName(textureAlignment[textureHeaders[texIndex][3]])
-			# presumably there's more nuance somewhere, but for now this is all we know
-			if matMirrorFlags == 2:
-				newTex.setMirroring([True,True])
-			else:
-				newTex.setMirroring([False,False])
+			texSampler = matSamplers[t[1]]
+			samplerFlags = texSampler[0]
+			# the known sampler flags:
+			# 0x01 = u-repeat
+			# 0x02 = v-repeat
+			# 0x04 = u-mirror
+			# 0x08 = v-mirror
+			# 0x10 = no filtering (use nearest instead of linear)
+			# 0x20 = set UVW to clamped (override)
+			# 0x40 = disable mipmaps
+			# 0x80 = set UVW to repeat (override)
+			# the current code skips the mipmaps and UVW overrides (since we don't support 3D textures yet anyways)
+			uRepeat = (samplerFlags & 0x01) != 0
+			vRepeat = (samplerFlags & 0x02) != 0
+			uMirror = (samplerFlags & 0x04) != 0
+			vMirror = (samplerFlags & 0x08) != 0
+			noFiltering = (samplerFlags & 0x10) != 0
+			newTex.setRepeating([uRepeat,vRepeat])
+			newTex.setMirroring([uMirror,vMirror])
+			newTex.setFiltered(not noFiltering) # yes we're flipping the meaning, "true means don't" is confusing
 			newMat.addTexture(newTex)
 		resultMaterials.append(newMat)
 	

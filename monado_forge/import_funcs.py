@@ -91,7 +91,15 @@ def realise_results(forgeResults, mainName, self, context):
 			newMat.node_tree.links.new(baseColourNode.outputs[0],shaderSubnode.inputs["Base Color"])
 		for ti,t in enumerate(mat.getTextures()):
 			texNode = n.new("ShaderNodeTexImage")
-			texNode.extension = "EXTEND" # it's easier to find cases of "I need this to be REPEAT because the UVs are out there" than "I need this to be EXTEND because REPEAT is causing cross-edge bleeding"
+			texNode.extension = "EXTEND"
+			repeat = t.getRepeating()
+			if repeat[0] or repeat[1]: # Blender only supports "all extend" or "all repeat", so will have to make a new node to support mixed cases (probably not common)
+				texNode.extension = "REPEAT"
+			if repeat[0] != repeat[1]:
+				print_warning("Texture "+t.getName()+" wants to be clamped in one direction but repeat in another, which is not yet supported (setting to repeat in both)")
+			texNode.interpolation = "Closest"
+			if t.isFiltered():
+				texNode.interpolation = "Linear"
 			texNode.image = bpy.data.images[t.getName()]
 			# use the name to make a guess for whether this is colour data or not
 			if any([

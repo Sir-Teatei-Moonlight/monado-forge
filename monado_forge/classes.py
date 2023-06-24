@@ -75,8 +75,8 @@ class MonadoForgeWimdoMaterial:
 		self._index = i
 		self._name = "Material"
 		self._baseColour = [1.0,1.0,1.0,1.0]
-		self._textureTable = [] # [[id,???,???,???]]
-		self._textureMirrorFlags = 0
+		self._textureTable = [] # [[texture id,sampler id,???,???]]
+		self._samplers = [] # [[flags,float]]
 		self._extraData = []
 		self._extraDataIndex = 0 # needed because of how extra data needs to be read separately
 	
@@ -111,12 +111,18 @@ class MonadoForgeWimdoMaterial:
 			raise TypeError("expected a list, not a(n) "+str(type(ts)))
 		for t in ts: self.addTextureTableItem(t)
 	
-	def getTextureMirrorFlags(self):
-		return self._textureMirrorFlags
-	def setTextureMirrorFlags(self,x):
-		if not isinstance(x,int):
-			raise TypeError("expected an int, not a(n) "+str(type(x)))
-		self._textureMirrorFlags = x
+	def getSamplers(self):
+		return self._samplers
+	def clearSamplers(self):
+		self._samplers = []
+	def addSampler(self,a):
+		if len(a) != 2:
+			raise ValueError("sequence must be length 2, not "+str(len(a)))
+		self._samplers.append(a)
+	def setSamplers(self,ss):
+		if not isinstance(ss,list):
+			raise TypeError("expected a list, not a(n) "+str(type(ss)))
+		for s in ss: self.addSampler(s)
 	
 	def getExtraData(self):
 		return self._extraData
@@ -137,10 +143,12 @@ class MonadoForgeWimdoMaterial:
 			raise TypeError("expected an int, not a(n) "+str(type(x)))
 		self._extraDataIndex = x
 
-class MonadoForgeTexture:
+class MonadoForgeTexture: # 2D only, no 3D texture support (for now?)
 	def __init__(self):
 		self._name = "Texture"
+		self._repeating = [False,False] # False = clamp, True = repeat (default False because "weird solid colour" is easier to see as a potential mistake than "minor cross-edge bleeding")
 		self._mirroring = [False,False]
+		self._isFiltered = True # False = nearest, True = linear
 	
 	def getName(self):
 		return self._name
@@ -149,12 +157,26 @@ class MonadoForgeTexture:
 			raise TypeError("expected a string, not a(n) "+str(type(x)))
 		self._name = x
 	
+	def getRepeating(self):
+		return self._repeating
+	def setRepeating(self,a):
+		if len(a) != 2:
+			raise ValueError("sequence must be length 2, not "+str(len(a)))
+		self._repeating = a[:]
+	
 	def getMirroring(self):
 		return self._mirroring
 	def setMirroring(self,a):
 		if len(a) != 2:
 			raise ValueError("sequence must be length 2, not "+str(len(a)))
 		self._mirroring = a[:]
+	
+	def isFiltered(self):
+		return self._isFiltered
+	def setFiltered(self,x):
+		if not isinstance(x,bool):
+			raise TypeError("expected a bool, not a(n) "+str(type(x)))
+		self._isFiltered = x
 
 class MonadoForgeMaterial:
 	def __init__(self,i):
