@@ -8,6 +8,333 @@ from . classes import *
 from . utils import *
 from . modify_funcs import *
 
+# yes there's a lot of copy-paste code in here but nodes are a mess no matter what
+def import_library_node(nodeId, self, context):
+	prereqs = {
+				"TexInset":["TBNMatrix"],
+				}
+	try:
+		for pr in prereqs[nodeId]:
+			if pr not in bpy.data.node_groups:
+				import_library_node(pr,self,context)
+	except KeyError: # no prereqs
+		pass
+	if nodeId == "BasicMetallic":
+		nodeGroup = bpy.data.node_groups.new("BasicMetallic","ShaderNodeTree")
+		nodeGroup.inputs.new("NodeSocketColor","Base Colour")
+		nodeGroup.inputs.new("NodeSocketColor","Emit Colour")
+		nodeGroup.inputs.new("NodeSocketColor","Normal Map")
+		nodeGroup.inputs.new("NodeSocketFloat","Alpha")
+		nodeGroup.inputs.new("NodeSocketFloat","AO")
+		nodeGroup.inputs.new("NodeSocketFloat","Metallic")
+		nodeGroup.inputs.new("NodeSocketFloat","Glossiness")
+		nodeGroup.inputs.new("NodeSocketFloat","Emit")
+		nodeGroup.outputs.new("NodeSocketShader","BSDF")
+		nodeGroup.inputs["Base Colour"].default_value = (0.5,0.5,0.5,1.0)
+		nodeGroup.inputs["Emit Colour"].default_value = (0.0,0.0,0.0,1.0)
+		nodeGroup.inputs["Normal Map"].default_value = (0.5,0.5,1.0,1.0)
+		nodeGroup.inputs["Alpha"].default_value = 1.0
+		nodeGroup.inputs["AO"].default_value = 1.0
+		nodeGroup.inputs["Metallic"].default_value = 0.0
+		nodeGroup.inputs["Glossiness"].default_value = 0.5
+		nodeGroup.inputs["Emit"].default_value = 0.0
+		metalN = nodeGroup.nodes
+		metalInput = metalN.new("NodeGroupInput")
+		metalInput.location = [-400,0]
+		metalOutput = metalN.new("NodeGroupOutput")
+		metalOutput.location = [400,0]
+		shaderNode = metalN.new("ShaderNodeBsdfPrincipled")
+		shaderNode.location = [0,250]
+		baseMixNode = metalN.new("ShaderNodeMixRGB")
+		baseMixNode.blend_type = "MIX"
+		baseMixNode.location = [-200,100]
+		baseMixNode.inputs["Color1"].default_value = [0.0,0.0,0.0,1.0]
+		normalMapNode = metalN.new("ShaderNodeNormalMap")
+		normalMapNode.location = [-200,-100]
+		normalMapNode.hide = True
+		roughToGlossNode = metalN.new("ShaderNodeMath")
+		roughToGlossNode.operation = "SUBTRACT"
+		roughToGlossNode.inputs[0].default_value = 1.0
+		roughToGlossNode.location = [-200,-150]
+		nodeGroup.links.new(metalInput.outputs["Base Colour"],baseMixNode.inputs["Color2"])
+		nodeGroup.links.new(metalInput.outputs["AO"],baseMixNode.inputs["Fac"])
+		nodeGroup.links.new(metalInput.outputs["Normal Map"],normalMapNode.inputs["Color"])
+		nodeGroup.links.new(metalInput.outputs["Glossiness"],roughToGlossNode.inputs[1])
+		nodeGroup.links.new(metalInput.outputs["Emit Colour"],shaderNode.inputs["Emission"])
+		nodeGroup.links.new(metalInput.outputs["Alpha"],shaderNode.inputs["Alpha"])
+		nodeGroup.links.new(metalInput.outputs["Metallic"],shaderNode.inputs["Metallic"])
+		nodeGroup.links.new(metalInput.outputs["Emit"],shaderNode.inputs["Emission Strength"])
+		nodeGroup.links.new(baseMixNode.outputs[0],shaderNode.inputs["Base Color"])
+		nodeGroup.links.new(normalMapNode.outputs[0],shaderNode.inputs["Normal"])
+		nodeGroup.links.new(roughToGlossNode.outputs[0],shaderNode.inputs["Roughness"])
+		nodeGroup.links.new(shaderNode.outputs["BSDF"],metalOutput.inputs["BSDF"])
+	elif nodeId == "BasicSpecular":
+		if context.scene.render.engine != "BLENDER_EEVEE":
+			self.report({"ERROR"}, "Only Eevee supports the specular workflow (as of this plugin version).\nThe node will be added anyway, but it might not work right.")
+		nodeGroup = bpy.data.node_groups.new("BasicSpecular","ShaderNodeTree")
+		nodeGroup.inputs.new("NodeSocketColor","Base Colour")
+		nodeGroup.inputs.new("NodeSocketColor","Specular Colour")
+		nodeGroup.inputs.new("NodeSocketColor","Emit Colour")
+		nodeGroup.inputs.new("NodeSocketColor","Normal Map")
+		nodeGroup.inputs.new("NodeSocketFloat","Alpha")
+		nodeGroup.inputs.new("NodeSocketFloat","AO")
+		nodeGroup.inputs.new("NodeSocketFloat","Glossiness")
+		nodeGroup.inputs.new("NodeSocketFloat","Emit")
+		nodeGroup.outputs.new("NodeSocketShader","BSDF")
+		nodeGroup.inputs["Base Colour"].default_value = (0.5,0.5,0.5,1.0)
+		nodeGroup.inputs["Specular Colour"].default_value = (1.0,1.0,1.0,1.0)
+		nodeGroup.inputs["Emit Colour"].default_value = (0.0,0.0,0.0,1.0)
+		nodeGroup.inputs["Normal Map"].default_value = (0.5,0.5,1.0,1.0)
+		nodeGroup.inputs["Alpha"].default_value = 1.0
+		nodeGroup.inputs["AO"].default_value = 1.0
+		nodeGroup.inputs["Glossiness"].default_value = 0.5
+		nodeGroup.inputs["Emit"].default_value = 0.0
+		specN = nodeGroup.nodes
+		specInput = specN.new("NodeGroupInput")
+		specInput.location = [-400,0]
+		specOutput = specN.new("NodeGroupOutput")
+		specOutput.location = [400,0]
+		shaderNode = specN.new("ShaderNodeEeveeSpecular")
+		shaderNode.location = [200,50]
+		baseMixNode = specN.new("ShaderNodeMixRGB")
+		baseMixNode.blend_type = "MIX"
+		baseMixNode.location = [-200,100]
+		baseMixNode.inputs["Color1"].default_value = [0.0,0.0,0.0,1.0]
+		normalMapNode = specN.new("ShaderNodeNormalMap")
+		normalMapNode.location = [-200,-100]
+		normalMapNode.hide = True
+		roughToGlossNode = specN.new("ShaderNodeMath")
+		roughToGlossNode.operation = "SUBTRACT"
+		roughToGlossNode.inputs[0].default_value = 1.0
+		roughToGlossNode.location = [-200,-150]
+		alphaInvertNode = specN.new("ShaderNodeMath")
+		alphaInvertNode.operation = "SUBTRACT"
+		alphaInvertNode.inputs[0].default_value = 1.0
+		alphaInvertNode.location = [0,50]
+		emitMixNode = specN.new("ShaderNodeMixRGB")
+		emitMixNode.blend_type = "MIX"
+		emitMixNode.location = [0,-150]
+		emitMixNode.inputs["Color1"].default_value = [0.0,0.0,0.0,1.0]
+		nodeGroup.links.new(specInput.outputs["Base Colour"],baseMixNode.inputs["Color2"])
+		nodeGroup.links.new(specInput.outputs["AO"],baseMixNode.inputs["Fac"])
+		nodeGroup.links.new(specInput.outputs["Normal Map"],normalMapNode.inputs["Color"])
+		nodeGroup.links.new(specInput.outputs["Glossiness"],roughToGlossNode.inputs[1])
+		nodeGroup.links.new(specInput.outputs["Alpha"],alphaInvertNode.inputs[1])
+		nodeGroup.links.new(specInput.outputs["Specular Colour"],shaderNode.inputs["Specular"])
+		nodeGroup.links.new(specInput.outputs["Emit Colour"],emitMixNode.inputs["Color2"])
+		nodeGroup.links.new(specInput.outputs["Emit"],emitMixNode.inputs["Fac"])
+		nodeGroup.links.new(baseMixNode.outputs[0],shaderNode.inputs["Base Color"])
+		nodeGroup.links.new(normalMapNode.outputs[0],shaderNode.inputs["Normal"])
+		nodeGroup.links.new(alphaInvertNode.outputs[0],shaderNode.inputs["Transparency"])
+		nodeGroup.links.new(roughToGlossNode.outputs[0],shaderNode.inputs["Roughness"])
+		nodeGroup.links.new(emitMixNode.outputs[0],shaderNode.inputs["Emissive Color"])
+		nodeGroup.links.new(shaderNode.outputs["BSDF"],specOutput.inputs["BSDF"])
+	elif nodeId == "TBNMatrix":
+		nodeGroup = bpy.data.node_groups.new("TBNMatrix","ShaderNodeTree")
+		nodeGroup.inputs.new("NodeSocketColor","Normal Map")
+		nodeGroup.inputs.new("NodeSocketVector","Tangent")
+		nodeGroup.outputs.new("NodeSocketVector","Tangent")
+		nodeGroup.outputs.new("NodeSocketVector","Bitangent")
+		nodeGroup.outputs.new("NodeSocketVector","Normal")
+		nodeGroup.inputs["Normal Map"].default_value = (0.5,0.5,1.0,1.0)
+		tbnN = nodeGroup.nodes
+		tbnInput = tbnN.new("NodeGroupInput")
+		tbnInput.location = [-500,0]
+		tbnOutput = tbnN.new("NodeGroupOutput")
+		tbnOutput.location = [500,0]
+		normalMapNode = tbnN.new("ShaderNodeNormalMap")
+		normalMapNode.location = [-300,0]
+		crossNode1 = tbnN.new("ShaderNodeVectorMath")
+		crossNode1.operation = "CROSS_PRODUCT"
+		crossNode1.location = [-100,0]
+		crossNode2 = tbnN.new("ShaderNodeVectorMath")
+		crossNode2.operation = "CROSS_PRODUCT"
+		crossNode2.location = [100,0]
+		normalizeNode1 = tbnN.new("ShaderNodeVectorMath")
+		normalizeNode1.operation = "NORMALIZE"
+		normalizeNode1.location = [300,0]
+		normalizeNode1.hide = True
+		normalizeNode2 = tbnN.new("ShaderNodeVectorMath")
+		normalizeNode2.operation = "NORMALIZE"
+		normalizeNode2.location = [300,-50]
+		normalizeNode2.hide = True
+		normalizeNode3 = tbnN.new("ShaderNodeVectorMath")
+		normalizeNode3.operation = "NORMALIZE"
+		normalizeNode3.location = [300,-100]
+		normalizeNode3.hide = True
+		nodeGroup.links.new(tbnInput.outputs["Normal Map"],normalMapNode.inputs["Color"])
+		nodeGroup.links.new(tbnInput.outputs["Tangent"],crossNode1.inputs[1])
+		nodeGroup.links.new(normalMapNode.outputs[0],crossNode1.inputs[0])
+		nodeGroup.links.new(normalMapNode.outputs[0],crossNode2.inputs[1])
+		nodeGroup.links.new(normalMapNode.outputs[0],normalizeNode3.inputs[0])
+		nodeGroup.links.new(crossNode1.outputs[0],crossNode2.inputs[0])
+		nodeGroup.links.new(crossNode1.outputs[0],normalizeNode2.inputs[0])
+		nodeGroup.links.new(crossNode2.outputs[0],normalizeNode1.inputs[0])
+		nodeGroup.links.new(normalizeNode1.outputs[0],tbnOutput.inputs["Tangent"])
+		nodeGroup.links.new(normalizeNode2.outputs[0],tbnOutput.inputs["Bitangent"])
+		nodeGroup.links.new(normalizeNode3.outputs[0],tbnOutput.inputs["Normal"])
+	elif nodeId == "TexInset":
+		nodeGroup = bpy.data.node_groups.new("TexInset","ShaderNodeTree")
+		nodeGroup.inputs.new("NodeSocketVector","UV")
+		nodeGroup.inputs.new("NodeSocketVector","Tangent")
+		nodeGroup.inputs.new("NodeSocketColor","Normal Map")
+		nodeGroup.inputs.new("NodeSocketFloat","Depth")
+		nodeGroup.outputs.new("NodeSocketVector","UV")
+		nodeGroup.inputs["Normal Map"].default_value = (0.5,0.5,1.0,1.0)
+		insetN = nodeGroup.nodes
+		insetInput = insetN.new("NodeGroupInput")
+		insetInput.location = [-500,100]
+		insetOutput = insetN.new("NodeGroupOutput")
+		insetOutput.location = [500,0]
+		geometryInput = insetN.new("ShaderNodeNewGeometry") # New! Geometry Advance 64 & Knuckles
+		geometryInput.location = [-500,-100]
+		normalizeNode = insetN.new("ShaderNodeVectorMath")
+		normalizeNode.operation = "NORMALIZE"
+		normalizeNode.location = [-300,-200]
+		normalizeNode.hide = True
+		depthTripleNode = insetN.new("ShaderNodeCombineXYZ")
+		depthTripleNode.location = [-300,50]
+		depthTripleNode.hide = True
+		tbnNode = insetN.new("ShaderNodeGroup")
+		tbnNode.node_tree = bpy.data.node_groups["TBNMatrix"]
+		tbnNode.location = [-300,0]
+		dotTangentNode = insetN.new("ShaderNodeVectorMath")
+		dotTangentNode.operation = "DOT_PRODUCT"
+		dotTangentNode.location = [-100,0]
+		dotTangentNode.hide = True
+		dotBitangentNode = insetN.new("ShaderNodeVectorMath")
+		dotBitangentNode.operation = "DOT_PRODUCT"
+		dotBitangentNode.location = [-100,-50]
+		dotBitangentNode.hide = True
+		dotNormalNode = insetN.new("ShaderNodeVectorMath")
+		dotNormalNode.operation = "DOT_PRODUCT"
+		dotNormalNode.location = [-100,-100]
+		dotNormalNode.hide = True
+		dotMergeNode = insetN.new("ShaderNodeCombineXYZ")
+		dotMergeNode.location = [100,100]
+		dotMergeNode.hide = True
+		dotTransformNode = insetN.new("ShaderNodeVectorTransform")
+		dotTransformNode.vector_type = "VECTOR"
+		dotTransformNode.convert_from = "WORLD"
+		dotTransformNode.convert_to = "OBJECT"
+		dotTransformNode.location = [100,50]
+		zSplitNode = insetN.new("ShaderNodeSeparateXYZ")
+		zSplitNode.location = [100,-150]
+		zSplitNode.hide = True
+		divideNode = insetN.new("ShaderNodeVectorMath")
+		divideNode.operation = "DIVIDE"
+		divideNode.location = [100,-200]
+		divideNode.hide = True
+		multiplyNode = insetN.new("ShaderNodeVectorMath")
+		multiplyNode.operation = "MULTIPLY"
+		multiplyNode.location = [100,-250]
+		multiplyNode.hide = True
+		mappingNode = insetN.new("ShaderNodeMapping")
+		mappingNode.vector_type = "TEXTURE"
+		mappingNode.location = [300,50]
+		nodeGroup.links.new(geometryInput.outputs["Incoming"],normalizeNode.inputs[0])
+		nodeGroup.links.new(insetInput.outputs["Depth"],depthTripleNode.inputs[0])
+		nodeGroup.links.new(insetInput.outputs["Depth"],depthTripleNode.inputs[1])
+		nodeGroup.links.new(insetInput.outputs["Depth"],depthTripleNode.inputs[2])
+		nodeGroup.links.new(insetInput.outputs["Tangent"],tbnNode.inputs["Tangent"])
+		nodeGroup.links.new(insetInput.outputs["Normal Map"],tbnNode.inputs["Normal Map"])
+		nodeGroup.links.new(tbnNode.outputs["Tangent"],dotTangentNode.inputs[0])
+		nodeGroup.links.new(tbnNode.outputs["Bitangent"],dotBitangentNode.inputs[0])
+		nodeGroup.links.new(tbnNode.outputs["Normal"],dotNormalNode.inputs[0])
+		nodeGroup.links.new(normalizeNode.outputs[0],dotTangentNode.inputs[1])
+		nodeGroup.links.new(normalizeNode.outputs[0],dotBitangentNode.inputs[1])
+		nodeGroup.links.new(normalizeNode.outputs[0],dotNormalNode.inputs[1])
+		nodeGroup.links.new(dotTangentNode.outputs["Value"],dotMergeNode.inputs[0])
+		nodeGroup.links.new(dotBitangentNode.outputs["Value"],dotMergeNode.inputs[1])
+		nodeGroup.links.new(dotNormalNode.outputs["Value"],dotMergeNode.inputs[2])
+		nodeGroup.links.new(dotMergeNode.outputs[0],dotTransformNode.inputs[0])
+		nodeGroup.links.new(dotTransformNode.outputs[0],zSplitNode.inputs[0])
+		nodeGroup.links.new(dotTransformNode.outputs[0],divideNode.inputs[0])
+		nodeGroup.links.new(zSplitNode.outputs["Z"],divideNode.inputs[1])
+		nodeGroup.links.new(divideNode.outputs[0],multiplyNode.inputs[1])
+		nodeGroup.links.new(depthTripleNode.outputs[0],multiplyNode.inputs[0])
+		nodeGroup.links.new(multiplyNode.outputs[0],mappingNode.inputs["Location"])
+		nodeGroup.links.new(insetInput.outputs["UV"],mappingNode.inputs["Vector"])
+		nodeGroup.links.new(mappingNode.outputs[0],insetOutput.inputs["UV"])
+	elif nodeId == "TexMirrorX":
+		nodeGroup = bpy.data.node_groups.new("TexMirrorX","ShaderNodeTree")
+		nodeGroup.inputs.new("NodeSocketVector","Vector")
+		nodeGroup.outputs.new("NodeSocketVector","Vector")
+		mirN = nodeGroup.nodes
+		mirInput = mirN.new("NodeGroupInput")
+		mirInput.location = [-400,0]
+		mirOutput = mirN.new("NodeGroupOutput")
+		mirOutput.location = [400,0]
+		sepNode = mirN.new("ShaderNodeSeparateXYZ")
+		sepNode.location = [-200,0]
+		merNode = mirN.new("ShaderNodeCombineXYZ")
+		merNode.location = [200,0]
+		mirXNode = mirN.new("ShaderNodeMath")
+		mirXNode.operation = "PINGPONG"
+		mirXNode.inputs[1].default_value = 1.0 # yay magic numbers (they're all called "Value")
+		mirXNode.location = [0,0]
+		nodeGroup.links.new(mirInput.outputs[0],sepNode.inputs[0])
+		nodeGroup.links.new(sepNode.outputs["X"],mirXNode.inputs["Value"])
+		nodeGroup.links.new(mirXNode.outputs[0],merNode.inputs["X"])
+		nodeGroup.links.new(sepNode.outputs["Y"],merNode.inputs["Y"])
+		nodeGroup.links.new(sepNode.outputs["Z"],merNode.inputs["Z"])
+		nodeGroup.links.new(merNode.outputs[0],mirOutput.inputs[0])
+	elif nodeId == "TexMirrorY":
+		nodeGroup = bpy.data.node_groups.new("TexMirrorY","ShaderNodeTree")
+		nodeGroup.inputs.new("NodeSocketVector","Vector")
+		nodeGroup.outputs.new("NodeSocketVector","Vector")
+		mirN = nodeGroup.nodes
+		mirInput = mirN.new("NodeGroupInput")
+		mirInput.location = [-400,0]
+		mirOutput = mirN.new("NodeGroupOutput")
+		mirOutput.location = [400,0]
+		sepNode = mirN.new("ShaderNodeSeparateXYZ")
+		sepNode.location = [-200,0]
+		merNode = mirN.new("ShaderNodeCombineXYZ")
+		merNode.location = [200,0]
+		mirYNode = mirN.new("ShaderNodeMath")
+		mirYNode.operation = "PINGPONG"
+		mirYNode.inputs[1].default_value = 1.0
+		mirYNode.location = [0,0]
+		nodeGroup.links.new(mirInput.outputs[0],sepNode.inputs[0])
+		nodeGroup.links.new(sepNode.outputs["Y"],mirYNode.inputs["Value"])
+		nodeGroup.links.new(sepNode.outputs["X"],merNode.inputs["X"])
+		nodeGroup.links.new(mirYNode.outputs[0],merNode.inputs["Y"])
+		nodeGroup.links.new(sepNode.outputs["Z"],merNode.inputs["Z"])
+		nodeGroup.links.new(merNode.outputs[0],mirOutput.inputs[0])
+	elif nodeId == "TexMirrorXY":
+		nodeGroup = bpy.data.node_groups.new("TexMirrorXY","ShaderNodeTree")
+		nodeGroup.inputs.new("NodeSocketVector","Vector")
+		nodeGroup.outputs.new("NodeSocketVector","Vector")
+		mirN = nodeGroup.nodes
+		mirInput = mirN.new("NodeGroupInput")
+		mirInput.location = [-400,0]
+		mirOutput = mirN.new("NodeGroupOutput")
+		mirOutput.location = [400,0]
+		sepNode = mirN.new("ShaderNodeSeparateXYZ")
+		sepNode.location = [-200,0]
+		merNode = mirN.new("ShaderNodeCombineXYZ")
+		merNode.location = [200,0]
+		mirXNode = mirN.new("ShaderNodeMath")
+		mirXNode.operation = "PINGPONG"
+		mirXNode.inputs[1].default_value = 1.0 # yay magic numbers (they're all called "Value")
+		mirXNode.location = [0,100]
+		mirYNode = mirN.new("ShaderNodeMath")
+		mirYNode.operation = "PINGPONG"
+		mirYNode.inputs[1].default_value = 1.0
+		mirYNode.location = [0,-100]
+		nodeGroup.links.new(mirInput.outputs[0],sepNode.inputs[0])
+		nodeGroup.links.new(sepNode.outputs["X"],mirXNode.inputs["Value"])
+		nodeGroup.links.new(sepNode.outputs["Y"],mirYNode.inputs["Value"])
+		nodeGroup.links.new(mirXNode.outputs[0],merNode.inputs["X"])
+		nodeGroup.links.new(mirYNode.outputs[0],merNode.inputs["Y"])
+		nodeGroup.links.new(sepNode.outputs["Z"],merNode.inputs["Z"])
+		nodeGroup.links.new(merNode.outputs[0],mirOutput.inputs[0])
+	else:
+		self.report({"ERROR"}, "Node with id "+nodeId+" is not in the Forge library.")
+		return {"CANCELLED"}
+	self.report({"INFO"}, "Node group created: "+nodeGroup.name)
+
 def realise_results(forgeResults, mainName, self, context):
 	printProgress = context.scene.monado_forge_main.printProgress
 	if not forgeResults:

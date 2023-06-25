@@ -43,6 +43,12 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 * Has the ability to automatically split "temp" files into channels, but currently does so in a terribly slow and inefficient way, so it's off by default. Don't exactly recommend using it yet, but it's there if you need it.
 * Creates a basic material with all the correct textures and values in it, in which the first texture is assumed to be the base colour, and nothing else is plugged in. Also reads samplers to determine the textures' clamp/repeat, mirroring, and filtering settings, plugging textures into a TexMirrorXY node accordingly (creating it if it doesn't exist already). Anything more will have to wait for deeper shader parsing.
 
+#### Node Library
+* Imports a couple preset node groups that are useful for many of these models, including:
+** Basic shader for metallic workflow
+** Basic shader for specular workflow
+** Shader for inset parallax effect (e.g. Core Crystals)
+
 ### Modify
 * One-click setting all bones to be the same size.
 * One-click flipping and mirroring bones so _L and _R sides match. Auto-mirror skips bones that seem like they might be intentionally uneven.

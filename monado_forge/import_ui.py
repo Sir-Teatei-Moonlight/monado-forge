@@ -5,6 +5,7 @@ import os
 import traceback
 from bpy.props import (
 						BoolProperty,
+						EnumProperty,
 						FloatProperty,
 						FloatVectorProperty,
 						IntProperty,
@@ -188,6 +189,21 @@ class MonadoForgeViewImportCleanupModelOperator(Operator):
 			self.report({"ERROR"}, "Unexpected error; see console")
 			return {"CANCELLED"}
 
+class MonadoForgeViewImportNodeLibraryOperator(Operator):
+	bl_idname = "object.monado_forge_import_node_library_operator"
+	bl_label = "Xenoblade Import Node From Library Operator"
+	bl_description = "Creates a predetermined node group (and all prerequisites)"
+	bl_options = {"REGISTER","UNDO"}
+	
+	def execute(self, context):
+		try:
+			import_library_node(context.scene.monado_forge_import.nodePicker, self, context)
+			return {"FINISHED"}
+		except Exception:
+			traceback.print_exc()
+			self.report({"ERROR"}, "Unexpected error; see console")
+			return {"CANCELLED"}
+
 class MonadoForgeViewImportProperties(PropertyGroup):
 	skeletonPath : StringProperty(
 		name="Skeleton Path",
@@ -342,6 +358,26 @@ class MonadoForgeViewImportProperties(PropertyGroup):
 		description="Include all textures, even if there's a larger resolution of the same",
 		default=False,
 	)
+	def nodeLibraryCallback(self, context):
+		return (
+			("BasicMetallic","Basic Metallic Shader","Metallic-style PBR shader with inputs tailored for the average Xenoblade model"),
+			("BasicSpecular","Basic Specular Shader","Specular-style shader with inputs tailored for the average Xenoblade model"),
+			("TBNMatrix","TBN Matrix","Outputs tangent-bitangent-normal triplet, given normal map and mesh tangent"),
+			("TexInset","Texture Inset","Distorts UVs for an inset (parallax) effect, given UVs, mesh tangent, normal map, and depth"),
+			("TexMirrorX","Texture Mirror X","Horizontally mirrors UVs outside bounds"),
+			("TexMirrorY","Texture Mirror Y","Vertically mirrors UVs outside bounds"),
+			("TexMirrorXY","Texture Mirror XY","Mirrors UVs outside bounds"),
+			# dunno if these ones are needed yet, so keep them out for now
+			# ("TexRepeatX","Texture Repeat X","Horizontally repeats UVs outside bounds"),
+			# ("TexRepeatY","Texture Repeat Y","Vertically repeats UVs outside bounds"),
+			# ("TexRepeatXY","Texture Repeat XY","Repeats UVs outside bounds"),
+		)
+	nodePicker : EnumProperty(
+		name="Node",
+		items=nodeLibraryCallback,
+		description="Node to add",
+		default=0,
+	)
 
 class OBJECT_PT_MonadoForgeViewImportPanel(Panel):
 	bl_idname = "OBJECT_PT_MonadoForgeViewImportPanel"
@@ -447,17 +483,33 @@ class OBJECT_PT_MonadoForgeViewImportCleanupPanel(Panel):
 		col.prop(scn.monado_forge_import, "cleanupEmptyGroups")
 		col.prop(scn.monado_forge_import, "cleanupEmptyShapes")
 
+class OBJECT_PT_MonadoForgeViewImportNodeLibraryPanel(Panel):
+	bl_idname = "OBJECT_PT_MonadoForgeViewImportNodeLibraryPanel"
+	bl_label = "Node Library"
+	bl_space_type = "VIEW_3D"
+	bl_region_type = "UI"
+	bl_parent_id = "OBJECT_PT_MonadoForgeViewImportPanel"
+	
+	def draw(self, context):
+		layout = self.layout
+		scn = context.scene
+		col = layout.column(align=True)
+		col.prop(scn.monado_forge_import, "nodePicker")
+		col.operator(MonadoForgeViewImportNodeLibraryOperator.bl_idname, text="Add", icon="PLUS")
+
 classes = (
 			MonadoForgeViewImportSkeletonOperator,
 			MonadoForgeViewImportModelOperator,
 			MonadoForgeViewImportModelWithSkeletonOperator,
 			MonadoForgeViewImportCleanupModelOperator,
+			MonadoForgeViewImportNodeLibraryOperator,
 			MonadoForgeViewImportProperties,
 			OBJECT_PT_MonadoForgeViewImportPanel,
 			OBJECT_PT_MonadoForgeViewImportSkeletonOptionsPanel,
 			OBJECT_PT_MonadoForgeViewImportModelOptionsPanel,
 			OBJECT_PT_MonadoForgeViewImportTextureOptionsPanel,
 			OBJECT_PT_MonadoForgeViewImportCleanupPanel,
+			OBJECT_PT_MonadoForgeViewImportNodeLibraryPanel,
 			)
 
 def register():
