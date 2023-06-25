@@ -475,33 +475,8 @@ def realise_results(forgeResults, mainName, self, context):
 				try:
 					mirrorNodeGroup = bpy.data.node_groups["TexMirrorXY"]
 				except KeyError:
-					mirrorNodeGroup = bpy.data.node_groups.new("TexMirrorXY","ShaderNodeTree")
-					mirrorNodeGroup.inputs.new("NodeSocketVector","Vector")
-					mirrorNodeGroup.outputs.new("NodeSocketVector","Vector")
-					mirN = mirrorNodeGroup.nodes
-					mirInput = mirN.new("NodeGroupInput")
-					mirInput.location = [-400,0]
-					mirOutput = mirN.new("NodeGroupOutput")
-					mirOutput.location = [400,0]
-					sepNode = mirN.new("ShaderNodeSeparateXYZ")
-					sepNode.location = [-200,0]
-					merNode = mirN.new("ShaderNodeCombineXYZ")
-					merNode.location = [200,0]
-					mirXNode = mirN.new("ShaderNodeMath")
-					mirXNode.operation = "PINGPONG"
-					mirXNode.inputs[1].default_value = 1.0 # yay magic numbers (they're all called "Value")
-					mirXNode.location = [0,-100]
-					mirYNode = mirN.new("ShaderNodeMath")
-					mirYNode.operation = "PINGPONG"
-					mirYNode.inputs[1].default_value = 1.0
-					mirYNode.location = [0,100]
-					mirrorNodeGroup.links.new(mirInput.outputs[0],sepNode.inputs[0])
-					mirrorNodeGroup.links.new(sepNode.outputs["X"],mirXNode.inputs["Value"])
-					mirrorNodeGroup.links.new(sepNode.outputs["Y"],mirYNode.inputs["Value"])
-					mirrorNodeGroup.links.new(mirXNode.outputs[0],merNode.inputs["X"])
-					mirrorNodeGroup.links.new(mirYNode.outputs[0],merNode.inputs["Y"])
-					mirrorNodeGroup.links.new(sepNode.outputs["Z"],merNode.inputs["Z"])
-					mirrorNodeGroup.links.new(merNode.outputs[0],mirOutput.inputs[0])
+					import_library_node("TexMirrorXY", self, context)
+					mirrorNodeGroup = bpy.data.node_groups["TexMirrorXY"]
 				mirrorNode = n.new("ShaderNodeGroup")
 				mirrorNode.node_tree = mirrorNodeGroup
 				mirrorNode.location = [-650,-175*uv-25]
