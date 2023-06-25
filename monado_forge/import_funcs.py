@@ -130,6 +130,7 @@ def import_library_node(nodeId, self, context):
 		nodeGroup.links.new(emitMixNode.outputs[0],shaderNode.inputs["Emissive Color"])
 		nodeGroup.links.new(shaderNode.outputs["BSDF"],specOutput.inputs["BSDF"])
 	elif nodeId == "TBNMatrix":
+		# https://blender.stackexchange.com/questions/291989/how-would-i-get-the-full-tbn-matrix-from-just-a-normal-map
 		nodeGroup = bpy.data.node_groups.new("TBNMatrix","ShaderNodeTree")
 		nodeGroup.inputs.new("NodeSocketColor","Normal Map")
 		nodeGroup.inputs.new("NodeSocketVector","Tangent")
@@ -174,6 +175,8 @@ def import_library_node(nodeId, self, context):
 		nodeGroup.links.new(normalizeNode2.outputs[0],tbnOutput.inputs["Bitangent"])
 		nodeGroup.links.new(normalizeNode3.outputs[0],tbnOutput.inputs["Normal"])
 	elif nodeId == "TexInset":
+		# https://80.lv/articles/a-simple-way-to-make-a-parallax-effect-in-blender/
+		# https://blender.stackexchange.com/questions/243048/fix-parallax-occlusion-mapping-from-the-side
 		nodeGroup = bpy.data.node_groups.new("TexInset","ShaderNodeTree")
 		nodeGroup.inputs.new("NodeSocketVector","UV")
 		nodeGroup.inputs.new("NodeSocketVector","Tangent")
