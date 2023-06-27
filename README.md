@@ -45,9 +45,9 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 
 #### Node Library
 * Imports a couple preset node groups that are useful for many of these models, including:
-** Basic shader for metallic workflow
-** Basic shader for specular workflow
-** Shader for inset parallax effect (e.g. Core Crystals)
+  * Basic shader for metallic workflow
+  * Basic shader for specular workflow
+  * Shader for inset parallax effect (e.g. Core Crystals)
 
 ### Modify
 * One-click setting all bones to be the same size.

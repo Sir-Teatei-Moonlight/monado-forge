@@ -417,7 +417,7 @@ def realise_results(forgeResults, mainName, self, context):
 		n.get("Material Output").location = [950,300]
 		texNodes = []
 		mirroring = {"":[],"x":[],"y":[],"xy":[]}
-		if not mat.getTextures(): # no textures, plug in the base colour directly
+		if createDummyShader and not mat.getTextures(): # no textures, plug in the base colour directly
 			newMat.node_tree.links.new(baseColourNode.outputs[0],shaderSubnode.inputs["Base Color"])
 		for ti,t in enumerate(mat.getTextures()):
 			texNode = n.new("ShaderNodeTexImage")
