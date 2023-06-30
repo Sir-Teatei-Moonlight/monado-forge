@@ -427,7 +427,7 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 			bpy.data.images.remove(existingImage)
 	except KeyError as e: # no existing image of the same name
 		pass # fine, move on
-	newImage = bpy.data.images.new(textureName,imgWidth,imgHeight)
+	newImage = bpy.data.images.new(textureName,imgWidth,imgHeight,alpha=True)
 	# don't really want to do any of this until the end, but apparently setting the filepath after setting the pixels clears the image for no good reason
 	newImage.file_format = "PNG"
 	if saveTo:
