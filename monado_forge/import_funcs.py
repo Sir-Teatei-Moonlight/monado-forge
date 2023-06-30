@@ -431,12 +431,13 @@ def realise_results(forgeResults, mainName, self, context):
 			if t.isFiltered():
 				texNode.interpolation = "Linear"
 			texNode.image = bpy.data.images[t.getName()]
-			# use the name to make a guess for whether this is colour data or not
+			# use the name to guess what should be non-colour data
 			if any([
 				"_NRM" in t.getName(),"_NML" in t.getName(), # normal
 				"_MTL" in t.getName(), # metal
 				"_SHY" in t.getName(), # gloss
 				"_ALP" in t.getName(), # alpha
+				"_AO" in t.getName(), # ambient occlusion
 				"_GLO" in t.getName(), # glow/emit
 				"_MSK" in t.getName(), # mask
 				"_VEL" in t.getName(), # velocity (fur/hair map)
