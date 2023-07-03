@@ -443,7 +443,7 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 	virtImgHeight = imgHeight if imgHeight % blockSize == 0 else imgHeight + (blockSize - (imgHeight % blockSize))
 	# gotta create the image in full emptiness to start with, so we can random-access-fill the blocks as they come
 	# Blender always needs alpha, so colours must be length 4
-	pixels = numpy.zeros([virtImgHeight*virtImgWidth,4],dtype=float)
+	pixels = numpy.zeros([virtImgHeight*virtImgWidth,4],dtype=numpy.float32)
 	
 	blockCountX = virtImgWidth // blockSize
 	blockCountY = virtImgHeight // blockSize
@@ -775,12 +775,7 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 	d.close()
 	
 	finalImages = [[newImage,pixels]]
-	channelMult = [
-					[[1,1,1,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]],
-					[[0,0,0,0],[1,1,1,0],[0,0,0,0],[0,0,0,0]],
-					[[0,0,0,0],[0,0,0,0],[1,1,1,0],[0,0,0,0]],
-					[[0,0,0,0],[0,0,0,0],[0,0,0,0],[1,1,1,0]],
-					]
+
 	if dechannelise:
 		for i,c in enumerate(["r","g","b","a"]):
 			splitName = textureName+"_"+c
@@ -795,36 +790,24 @@ def parse_texture(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blue
 			newSplitImage.file_format = "PNG"
 			if saveTo:
 				newSplitImage.filepath = os.path.join(saveTo,splitName+".png")
-			# detect channels that are entirely black or white and don't include them
-			# if a channel is entirely some sort of grey, that's still worth including
-			mono = True
-			first = pixels[0][i]
-			if first != 0 and first != 1:
-				mono = False
-			splitPixels = numpy.zeros([virtImgHeight*virtImgWidth,4],dtype=float)
-			# this check is quick enough even on big images it can be done separately to avoid wasting time on creating an image that is later discarded
-			for j,p in enumerate(pixels):
-				if p[i] != first:
-					mono = False
-					break
-			if mono:
-				if printProgress:
-					print("Excluding channel "+c.upper()+" (all pixels "+str(first)+")")
-				bpy.data.images.remove(newSplitImage)
-				continue
-			barCount = len(pixels)
-			for j,p in enumerate(pixels):
-				splitPixels[j] = p @ channelMult[i] + [0,0,0,1] # the addition is to force alpha to be 1.0 in all cases (not really possible as part of the matmult)
-				if printProgress and j % 1024 == 0:
-					print_progress_bar(j,barCount,splitName)
+
+			# Assign the selected single channel to the RGB channels.
+			splitPixels = numpy.zeros([virtImgHeight*virtImgWidth,4],dtype=numpy.float32)
+			splitPixels[:,0] = pixels[:,i]
+			splitPixels[:,1] = pixels[:,i]
+			splitPixels[:,2] = pixels[:,i]
+			splitPixels[:,3] = 1.0
+
 			finalImages.append([newSplitImage,splitPixels])
-			if printProgress:
-				print_progress_bar(barCount,barCount,splitName)
-	
-	# final pixel data must be flattened (and, if necessary, cropped)
+
+	# final pixel data must be 1D (and, if necessary, cropped)
 	for fi,px in finalImages:
-		fi.pixels = px.reshape([virtImgHeight,virtImgWidth,4])[0:imgHeight,0:imgWidth].flatten()
+		# Fast pixel updates using foreach_set: 
+		# https://projects.blender.org/blender/blender/commit/9075ec8269e7cb029f4fab6c1289eb2f1ae2858a
+		pixel_buffer = px.reshape([virtImgHeight,virtImgWidth,4])[0:imgHeight,0:imgWidth].reshape(-1)
+		fi.pixels.foreach_set(pixel_buffer)
 		fi.update()
+
 		if saveTo:
 			fi.save()
 	return newImage.name # pass back whatever the final name of the image ended up being
