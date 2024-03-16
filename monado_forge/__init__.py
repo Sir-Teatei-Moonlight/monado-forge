@@ -5,8 +5,8 @@ from bpy.types import AddonPreferences
 bl_info = {
 	"name": "Monado Forge",
 	"description": "Xenoblade tools",
-	"author": "Sir Teatei Moonlight (https://github.com/Sir-Teatei-Moonlight)",
-	"version": (4, 8, 5),
+	"author": "Sir Teatei Moonlight (https://github.com/Sir-Teatei-Moonlight) & others (https://github.com/Sir-Teatei-Moonlight/monado-forge/graphs/contributors)",
+	"version": (4, 9, 0),
 	"blender": (3, 3, 1),
 	"category": "General",
 }

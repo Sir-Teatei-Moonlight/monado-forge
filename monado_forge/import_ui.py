@@ -350,7 +350,7 @@ class MonadoForgeViewImportProperties(PropertyGroup):
 	)
 	splitTemps : BoolProperty(
 		name="Dechannelise \"temp\" Files",
-		description="(warning: slow, thinking of a better way to implement the feature)\nIf the image is named \"temp0000\" or similar, splits it out into an independent file per channel",
+		description="If the image is named \"temp0000\" or similar, splits it out into an independent file per channel",
 		default=False,
 	)
 	keepAllResolutions : BoolProperty(
