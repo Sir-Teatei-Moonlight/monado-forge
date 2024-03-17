@@ -462,11 +462,13 @@ def realise_results(forgeResults, mainName, self, context):
 				sepNode.hide = True
 				newMat.node_tree.links.new(texNode.outputs["Color"],sepNode.inputs[0])
 		uvCount = mat.getUVLayerCount() # this will probably result in overestimation, but that's okay
+		pushdownValue = 0 # to keep track of how low the node under the UV nodes must be
 		for uv in range(uvCount):
 			uvInputNode = n.new("ShaderNodeUVMap")
 			uvInputNode.label = "UV Map "+str(uv+1)
-			if mirroring[""]:
+			if mirroring[""] or not mat.getTextures(): # no textures means no mirroring defined: assume none
 				uvInputNode.location = [-650,-125*uv+100]
+				pushdownValue = -125*(uv+1)+100
 				if uv == 0:
 					for mt in mirroring[""]:
 						newMat.node_tree.links.new(uvInputNode.outputs["UV"],mt.inputs["Vector"])
@@ -476,6 +478,7 @@ def realise_results(forgeResults, mainName, self, context):
 				print_warning("Y-only texture mirror not yet supported (how'd you even get here)")
 			if mirroring["xy"]:
 				uvInputNode.location = [-650,-175*uv+100]
+				pushdownValue = -175*(uv+1)+100
 				try:
 					mirrorNodeGroup = bpy.data.node_groups["TexMirrorXY"]
 				except KeyError:
@@ -489,6 +492,12 @@ def realise_results(forgeResults, mainName, self, context):
 					newMat.node_tree.links.new(uvInputNode.outputs["UV"],mirrorNode.inputs[0])
 					if uv == 0:
 						newMat.node_tree.links.new(mirrorNode.outputs[0],mt.inputs["Vector"])
+		# here, we create a node for vertex colours - we don't know if we'll need it, but we might
+		colourInputNode = n.new("ShaderNodeAttribute")
+		colourInputNode.label = "Vertex Colours"
+		colourInputNode.location = [-650,pushdownValue]
+		colourInputNode.attribute_type = "GEOMETRY"
+		colourInputNode.attribute_name = "VertexColours"
 		for xi,x in enumerate(mat.getExtraData()):
 			extraDataNode = n.new("ShaderNodeValue")
 			extraDataNode.outputs["Value"].default_value = x
@@ -521,9 +530,9 @@ def realise_results(forgeResults, mainName, self, context):
 			meshData.normals_split_custom_set_from_vertices(normalsList)
 		if mesh.hasColours():
 			coloursList = mesh.getVertexColoursList()
-			vertCols = meshData.color_attributes.new("VertexColours","BYTE_COLOR","POINT")
+			vertCols = meshData.color_attributes.new("VertexColours","FLOAT_COLOR","POINT") # BYTE_COLOR *should* be correct, but in practice it isn't
 			for i in range(len(coloursList)):
-				vertCols.data[i].color = coloursList[i]
+				vertCols.data[i].color = [c/255.0 for c in coloursList[i]]
 		if mesh.hasWeightIndexes() and baseArmature: # try the indexes method first (faster) (and also needs a baseArmature or it makes no sense)
 			weightIndexes = set(mesh.getVertexWeightIndexesList())
 			vertexesInEachGroup = {}
