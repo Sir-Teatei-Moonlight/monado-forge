@@ -273,7 +273,7 @@ def create_armature_from_bones(boneList,name,pos,rot,boneSize,positionEpsilon,an
 	bpy.ops.object.mode_set(mode="OBJECT")
 	return skelObj # return the new object
 
-def cleanup_mesh(context,meshObj,looseVerts,emptyGroups,emptyShapes):
+def cleanup_mesh(context,meshObj,looseVerts,emptyGroups,emptyColours,emptyShapes):
 	tempActive = context.view_layer.objects.active
 	context.view_layer.objects.active = meshObj
 	meshData = meshObj.data
@@ -292,6 +292,25 @@ def cleanup_mesh(context,meshObj,looseVerts,emptyGroups,emptyShapes):
 				except ValueError: pass
 		for g in unusedVertexGroups:
 			meshObj.vertex_groups.remove(meshObj.vertex_groups[g])
+	# remove vertex colours if they're pure white or black with pure 1.0 or 0.0 alpha
+	# a colour layer like this conveys no information, so make it clear it's useless by removing it
+	if emptyColours:
+		coloursArray = [[1.0,1.0,1.0,1.0],[1.0,1.0,1.0,0.0],[0.0,0.0,0.0,1.0],[0.0,0.0,0.0,0.0]]
+		coloursToRemove = []
+		for layer in meshData.color_attributes:
+			empty = True
+			first = list(layer.data[0].color)
+			if first not in coloursArray:
+				empty = False
+			else:
+				for c in layer.data:
+					if list(c.color) != first: # if any single one does not match the first, this is not a useless layer
+						empty = False
+						break
+			if empty:
+				coloursToRemove.append(layer)
+		for layer in coloursToRemove:
+			meshData.color_attributes.remove(layer)
 	# determine which shapes don't do anything and remove them
 	# seems to be somewhat conservative (some shapes with no visible effect are kept), but that's the safer error to make
 	if emptyShapes:

@@ -182,7 +182,10 @@ class MonadoForgeViewImportCleanupModelOperator(Operator):
 				if s.type == "MESH":
 					objList.append(s)
 			for obj in objList:
-				cleanup_mesh(context,obj,context.scene.monado_forge_import.cleanupLooseVertices,context.scene.monado_forge_import.cleanupEmptyGroups,context.scene.monado_forge_import.cleanupEmptyShapes)
+				cleanup_mesh(context,obj,context.scene.monado_forge_import.cleanupLooseVertices,
+								context.scene.monado_forge_import.cleanupEmptyGroups,
+								context.scene.monado_forge_import.cleanupEmptyColours,
+								context.scene.monado_forge_import.cleanupEmptyShapes)
 			return {"FINISHED"}
 		except Exception:
 			traceback.print_exc()
@@ -325,6 +328,11 @@ class MonadoForgeViewImportProperties(PropertyGroup):
 	cleanupEmptyGroups : BoolProperty(
 		name="Empty Groups",
 		description="Erase vertex groups with nothing using them",
+		default=True,
+	)
+	cleanupEmptyColours : BoolProperty(
+		name="Empty Colours",
+		description="Erase vertex colours that have no value (pure white or black with pure 1.0 or 0.0 alpha)",
 		default=True,
 	)
 	cleanupEmptyShapes : BoolProperty(
@@ -474,6 +482,7 @@ class OBJECT_PT_MonadoForgeViewImportCleanupPanel(Panel):
 		col = layout.column(align=True)
 		col.prop(scn.monado_forge_import, "cleanupLooseVertices")
 		col.prop(scn.monado_forge_import, "cleanupEmptyGroups")
+		col.prop(scn.monado_forge_import, "cleanupEmptyColours")
 		col.prop(scn.monado_forge_import, "cleanupEmptyShapes")
 
 class OBJECT_PT_MonadoForgeViewImportNodeLibraryPanel(Panel):

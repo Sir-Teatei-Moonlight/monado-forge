@@ -571,7 +571,11 @@ def realise_results(forgeResults, mainName, self, context):
 		#meshData.validate(verbose=True)
 		meshData.validate()
 		meshData.transform(mathutils.Euler((math.radians(90),0,0)).to_matrix().to_4x4(),shape_keys=True) # transform from lying down (+Y up +Z forward) to standing up (+Z up -Y forward)
-		cleanup_mesh(context,newMeshObject,context.scene.monado_forge_import.cleanupLooseVertices,context.scene.monado_forge_import.cleanupEmptyGroups,context.scene.monado_forge_import.cleanupEmptyShapes)
+		cleanup_mesh(context,newMeshObject,
+						context.scene.monado_forge_import.cleanupLooseVertices,
+						context.scene.monado_forge_import.cleanupEmptyGroups,
+						context.scene.monado_forge_import.cleanupEmptyColours,
+						context.scene.monado_forge_import.cleanupEmptyShapes)
 		# attach mesh to base armature
 		armatureMod = newMeshObject.modifiers.new("Armature","ARMATURE")
 		armatureMod.object = baseArmature

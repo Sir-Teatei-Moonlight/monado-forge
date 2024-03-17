@@ -36,7 +36,7 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 * Supports normals, UVs, vertex colours, rigging (vertex groups), and shapes (morphs). Models are automatically parented to the skeleton found in the .wimdo; if there is no skeleton, they are parented to a blank one.
 * By using the import-with-skeleton button instead, both the .wimdo's skeleton and the .arc/.chr skeleton will be imported, and then merged into one (giving the .arc/.chr one priority).
 * Optionally also import lower-LOD models. Doesn't currently distinguish them in any way.
-* Optional mesh cleanup, erasing unused vertices, vertex groups, and shapes.
+* Optional mesh cleanup, erasing unused vertices, vertex groups, vertex colours, and shapes.
 * Imports textures and saves them to a specified folder. By default, keeps only the biggest of each, but provides the option to keep all resolutions (using subfolders). Supports all known-to-be-used formats (R8G8B8A8, BC1, BC3, BC4, BC5, BC7).
 * Optionally differentiates newly-imported textures with same-named existing ones by appending the imported .wismt's filename.
 * Optionally assumes that BC5 textures are normal maps, and auto-calculates the blue channel for them.
