@@ -227,7 +227,8 @@ def import_wimdo(f, context, externalSkeleton=None):
 				f.seek(modelsOffset+meshTableOffset)
 				for j in range(meshTableCount):
 					meshID = readAndParseInt(f,4)
-					meshFlags = readAndParseInt(f,4)
+					meshFlags1 = readAndParseInt(f,2)
+					meshFlags2 = readAndParseInt(f,2)
 					meshVertTableIndex = readAndParseInt(f,2)
 					meshFaceTableIndex = readAndParseInt(f,2)
 					f.seek(f.tell()+2) # skip unknown
@@ -235,7 +236,7 @@ def import_wimdo(f, context, externalSkeleton=None):
 					f.seek(f.tell()+14) # skip unknown
 					meshLODValue = readAndParseInt(f,2)
 					f.seek(f.tell()+16) # skip unknown
-					meshHeaders.append(MonadoForgeMeshHeader(meshID,meshFlags,meshVertTableIndex,meshFaceTableIndex,meshMaterialIndex,meshLODValue))
+					meshHeaders.append(MonadoForgeMeshHeader(meshID,meshFlags1,meshFlags2,meshVertTableIndex,meshFaceTableIndex,meshMaterialIndex,meshLODValue))
 			if printProgress:
 				print("Found "+str(len(meshHeaders))+" mesh headers.")
 		
@@ -339,7 +340,7 @@ def import_wimdo(f, context, externalSkeleton=None):
 			matExtraDataIndex = readAndParseInt(f,4)
 			matU7 = readAndParseInt(f,4)
 			matU8 = readAndParseInt(f,4)
-			matU9 = readAndParseInt(f,4) # this is an offset
+			matU9 = readAndParseInt(f,4) # this is an offset that we need later
 			matU10 = readAndParseInt(f,4)
 			matU11 = readAndParseInt(f,4)
 			matU12 = readAndParseInt(f,4)
@@ -356,6 +357,8 @@ def import_wimdo(f, context, externalSkeleton=None):
 			matTextureTable = []
 			for t in range(matTextureCount):
 				matTextureTable.append([readAndParseInt(f,2),readAndParseInt(f,2),readAndParseInt(f,2),readAndParseInt(f,2)])
+			f.seek(materialsOffset+matU9+4)
+			renderPassType = readAndParseInt(f,2)
 			f.seek(ftemp)
 			#materials.append([matName,matBaseColour,matTextureTable,matExtraDataIndex])
 			mat = MonadoForgeWimdoMaterial(m)
@@ -364,6 +367,7 @@ def import_wimdo(f, context, externalSkeleton=None):
 			mat.setTextureTable(matTextureTable)
 			mat.setSamplers(samplers) # yes this means each material has the samplers duplicated, but that's not really a big deal (it's two numbers)
 			mat.setExtraDataIndex(matExtraDataIndex)
+			mat.setRenderPassType(renderPassType)
 			materials.append(mat)
 		f.seek(materialsOffset+materialExtraDataOffset)
 		materialExtraData = []
@@ -534,6 +538,7 @@ def import_wismt(f, wimdoResults, context):
 					vertexTables = []
 					faceTables = []
 					weightTables = []
+					weightTableIndexConversion = []
 					shapeHeaders = []
 					shapeTargets = []
 					shapes = []
@@ -573,21 +578,25 @@ def import_wismt(f, wimdoResults, context):
 						weightTableCount = readAndParseInt(sf,4)
 						weightTableOffset = readAndParseInt(sf,4)
 						weightVertTableIndex = readAndParseInt(sf,2)
-						# then a couple unknowns
+						weightTableLodCount = readAndParseInt(sf,2)
+						weightTableLodOffset = readAndParseInt(sf,4)
 						sf.seek(weightTableOffset)
 						for i in range(weightTableCount):
 							# buncha unknowns in here, might not use it necessarily
-							sf.seek(sf.tell()+4)
+							wtStartIndex = readAndParseInt(sf,4)
 							wtDataOffset = readAndParseInt(sf,4)
 							wtDataCount = readAndParseInt(sf,4)
 							sf.seek(sf.tell()+17)
 							wtLOD = readAndParseInt(sf,1)
 							sf.seek(sf.tell()+10)
-							weightTables.append([wtDataOffset,wtDataCount,wtLOD])
+							weightTables.append([wtStartIndex,wtDataOffset,wtDataCount,wtLOD])
+						sf.seek(weightTableLodOffset)
+						for i in range(weightTableLodCount):
+							weightTableIndexConversion.append([])
+							for j in range(9): # apparently this is fixed (https://github.com/atnavon/xc2f/wiki/Geometry)
+								weightTableIndexConversion[-1].append(readAndParseInt(sf,2)-1) # doing a -1 here for easier debugging later
 						if printProgress:
 							print("Found "+str(len(weightTables))+" weight tables.")
-						if len(weightTables) > 1:
-							print_warning("You may need to use the Weight Table Override feature to get correct weights for some meshes.\nMake a new import for each table, and keep only the valid meshes.")
 					if shapeDataOffset > 0:
 						sf.seek(shapeDataOffset)
 						shapeHeaderCount = readAndParseInt(sf,4)
@@ -732,33 +741,38 @@ def import_wismt(f, wimdoResults, context):
 						unusedVertexTables.remove(weightVertTableIndex)
 						for v in range(len(vertexWeightData[weightVertTableIndex])):
 							vertexWeights.append([vertexWeightData[weightVertTableIndex][v][0],vertexWeightData[weightVertTableIndex][v][1]])
-					# we don't know how to pick the right weight table, so for now we let the user pick which one to use for all (needing multiple imports to do it right)
-					forcedWeightTable = context.scene.monado_forge_import.tempWeightTableOverride
-					if forcedWeightTable > 0:
-						if forcedWeightTable >= len(weightTables):
-							print_warning("weight table override too high, ignoring and treating as 0")
-						else:
-							totalOffset = weightTables[forcedWeightTable][0]
-							vertexWeights = vertexWeights[totalOffset:]
-					# we can "bake" the vertices with their weights now (but they keep the index in case it's more useful later)
-					badWeightTable = False
-					for i,vertices in vertexData.items():
-						for v in vertices:
-							weightIndex = v.getWeightSetIndex()
-							if weightIndex == -1: continue
-							try:
-								for j in range(len(vertexWeights[weightIndex][0])):
-									if vertexWeights[weightIndex][1][j] > 0:
-										v.setWeight(vertexWeights[weightIndex][0][j],vertexWeights[weightIndex][1][j])
-							except IndexError:
-								badWeightTable = True
-					if badWeightTable:
-						print_warning("some vertices will not have weights due to the chosen weight table being too small")
+					# split up the weight list by weight table
+					splitVertexWeights = {}
+					for splitTableIndex in range(len(weightTables)):
+						startIndex = weightTables[splitTableIndex][1]-weightTables[splitTableIndex][0]
+						endIndex = weightTables[splitTableIndex][1]+weightTables[splitTableIndex][2]
+						splitVertexWeights[splitTableIndex] = vertexWeights[startIndex:endIndex]
 					# now for the meshes themselves
 					for md in wimdoResults.getMeshHeaders():
 						vtIndex = md.getMeshVertTableIndex()
 						ftIndex = md.getMeshFaceTableIndex()
 						mtIndex = md.getMeshMaterialIndex()
+						
+						# here is where we can determine the necessary weight table for this mesh
+						# this is entirely based on what xc3_lib does (no further trying to understand it has been done)
+						flags1 = md.getMeshFlags1()
+						meshLod = md.getMeshLODValue()
+						tableID = 0
+						if flags1 == 64:
+							tableID = 4
+						else:
+							passLookup = {0:0,1:1,7:3}
+							passType = wimdoResults.getMaterials()[mtIndex].getRenderPassType()
+							try:
+								tableID = passLookup[passType]
+							except KeyError:
+								print_warning("unknown passType:",passType)
+								tableID = 0
+						finalTableID = weightTableIndexConversion[meshLod-1][tableID]
+						if finalTableID == -1:
+							print_warning("bad finalTableID")
+							finalTableID = 0
+						
 						if vtIndex in unusedVertexTables:
 							unusedVertexTables.remove(vtIndex)
 						if ftIndex in unusedFaceTables:
@@ -767,10 +781,11 @@ def import_wismt(f, wimdoResults, context):
 						if not context.scene.monado_forge_import.alsoImportLODs:
 							if md.getMeshLODValue() > bestLOD:
 								continue
+						
 						newMesh = MonadoForgeMesh()
 						newMesh.setVertices(vertexData[vtIndex])
 						newMesh.setFaces(faceData[ftIndex])
-						newMesh.setWeightSets(vertexWeights)
+						newMesh.setWeightSets(splitVertexWeights[finalTableID])
 						newMesh.setMaterialIndex(mtIndex)
 						if vtIndex in shapesByVertexTableIndex.keys():
 							newMesh.setShapes(shapesByVertexTableIndex[vtIndex])

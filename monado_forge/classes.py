@@ -79,6 +79,7 @@ class MonadoForgeWimdoMaterial:
 		self._samplers = [] # [[flags,float]]
 		self._extraData = []
 		self._extraDataIndex = 0 # needed because of how extra data needs to be read separately
+		self._renderPassType = 0
 	
 	# no setter (index should be immutable)
 	def getIndex(self):
@@ -142,6 +143,13 @@ class MonadoForgeWimdoMaterial:
 		if not isinstance(x,int):
 			raise TypeError("expected an int, not a(n) "+str(type(x)))
 		self._extraDataIndex = x
+	
+	def getRenderPassType(self):
+		return self._renderPassType
+	def setRenderPassType(self,x):
+		if not isinstance(x,int):
+			raise TypeError("expected an int, not a(n) "+str(type(x)))
+		self._renderPassType = x
 
 class MonadoForgeTexture: # 2D only, no 3D texture support (for now?)
 	def __init__(self):
@@ -252,7 +260,7 @@ class MonadoForgeVertex:
 		self._normal = None
 		self._colour = None
 		self._weightSetIndex = -1 # pre-bake
-		self._weights = {} # post-bake (must also be by index rather than name sicne we don't necessarily know names)
+		self._weights = {} # post-bake (must also be by index rather than name since we don't necessarily know names)
 	
 	def getID(self):
 		return self._id
@@ -491,17 +499,20 @@ class MonadoForgeMesh:
 
 class MonadoForgeMeshHeader:
 	# intended to be immutable, so all the setting is in the constructor
-	def __init__(self,id,md,vt,ft,mm,lod):
+	def __init__(self,id,mf1,mf2,vt,ft,mm,lod):
 		self._meshID = id
-		self._meshFlags = md
+		self._meshFlags1 = mf1
+		self._meshFlags2 = mf2
 		self._meshVertTableIndex = vt
 		self._meshFaceTableIndex = ft
 		self._meshMaterialIndex = mm
 		self._meshLODValue = lod
 	def getMeshID(self):
 		return self._meshID
-	def getMeshFlags(self):
-		return self._meshFlags
+	def getMeshFlags1(self):
+		return self._meshFlags1
+	def getMeshFlags2(self):
+		return self._meshFlags2
 	def getMeshVertTableIndex(self):
 		return self._meshVertTableIndex
 	def getMeshFaceTableIndex(self):

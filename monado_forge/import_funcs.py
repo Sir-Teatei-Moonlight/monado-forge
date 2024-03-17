@@ -535,10 +535,7 @@ def realise_results(forgeResults, mainName, self, context):
 				vertexesInEachSet[i] = mesh.getVertexesWithWeightIndex(i)
 			weightSets = mesh.getWeightSets()
 			for weightIndex in weightIndexes:
-				try:
-					weightSetData = weightSets[weightIndex]
-				except IndexError: # can happen if the weight table override is high - the warning has already been given above
-					continue
+				weightSetData = weightSets[weightIndex]
 				for j in range(len(weightSetData[0])):
 					groupIndex = weightSetData[0][j]
 					groupValue = weightSetData[1][j]

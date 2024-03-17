@@ -38,8 +38,8 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 * Optionally also import lower-LOD models. Doesn't currently distinguish them in any way.
 * Optional mesh cleanup, erasing unused vertices, vertex groups, and shapes.
 * Imports textures and saves them to a specified folder. By default, keeps only the biggest of each, but provides the option to keep all resolutions (using subfolders). Supports all known-to-be-used formats (R8G8B8A8, BC1, BC3, BC4, BC5, BC7).
+* Optionally differentiates newly-imported textures with same-named existing ones by appending the imported .wismt's filename.
 * Optionally assumes that BC5 textures are normal maps, and auto-calculates the blue channel for them.
-* Differentiates newly-imported textures with same-named existing ones by appending the imported .wismt's filename. Can be turned off.
 * Optionally automatically splits "temp" files into channels.
 * Creates a basic material with all the correct textures and values in it, in which the first texture is assumed to be the base colour, and nothing else is plugged in. Also reads samplers to determine the textures' clamp/repeat, mirroring, and filtering settings, plugging textures into a TexMirrorXY node accordingly (creating it if it doesn't exist already). Anything more will have to wait for deeper shader parsing.
 
@@ -59,7 +59,6 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 ## Known issues
 Roughly in order of badness.
 ### Things with workarounds
-* Some models have multiple weight tables, but the information about which one to use per each mesh cannot yet be found. Use the "Weight Table Override" feature to select which one to use for all meshes, and re-import for each one so you can pick-and-choose which ones are correct.
 * By default, images import as whatever the default colour setting is. It guesses whether they are non-colour data based on the name, so it can always get it wrong, and you'll have to manually notice and correct them. This will make them _look_ wrong, for whatever dumb reason, but they will _behave_ correctly.
 ### Things with no workarounds
 * Blender does not support per-shape normals, so that information is lost. In theory it won't matter much.

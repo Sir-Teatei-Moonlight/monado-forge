@@ -266,12 +266,6 @@ class MonadoForgeViewImportProperties(PropertyGroup):
 		description="Place the import at the 3D cursor (false: place it at [0,0,0])",
 		default=False,
 	)
-	tempWeightTableOverride : IntProperty(
-		name="Weight Table Override",
-		description="Force all meshes to use this weight table (see readme for explanation)",
-		default=0,
-		min=0,
-	)
 	alsoImportLODs : BoolProperty(
 		name="Also Import LODs",
 		description="Include lower-detail meshes in the import",
@@ -351,7 +345,7 @@ class MonadoForgeViewImportProperties(PropertyGroup):
 	splitTemps : BoolProperty(
 		name="Dechannelise \"temp\" Files",
 		description="If the image is named \"temp0000\" or similar, splits it out into an independent file per channel",
-		default=False,
+		default=True,
 	)
 	keepAllResolutions : BoolProperty(
 		name="Keep All Resolutions",
@@ -446,7 +440,6 @@ class OBJECT_PT_MonadoForgeViewImportModelOptionsPanel(Panel):
 		layout = self.layout
 		scn = context.scene
 		col = layout.column(align=True)
-		col.prop(scn.monado_forge_import, "tempWeightTableOverride")
 		col.prop(scn.monado_forge_import, "importToCursor")
 		col.prop(scn.monado_forge_import, "alsoImportLODs")
 		col.prop(scn.monado_forge_import, "doCleanupOnImport")
