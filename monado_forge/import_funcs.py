@@ -22,6 +22,7 @@ def import_library_node(nodeId, self, context):
 	if nodeId == "BasicMetallic":
 		nodeGroup = bpy.data.node_groups.new("BasicMetallic","ShaderNodeTree")
 		nodeGroup.inputs.new("NodeSocketColor","Base Colour")
+		nodeGroup.inputs.new("NodeSocketColor","Ambient Colour")
 		nodeGroup.inputs.new("NodeSocketColor","Emit Colour")
 		nodeGroup.inputs.new("NodeSocketColor","Normal Map")
 		nodeGroup.inputs.new("NodeSocketFloat","Alpha")
@@ -31,6 +32,7 @@ def import_library_node(nodeId, self, context):
 		nodeGroup.inputs.new("NodeSocketFloat","Emit")
 		nodeGroup.outputs.new("NodeSocketShader","BSDF")
 		nodeGroup.inputs["Base Colour"].default_value = (0.5,0.5,0.5,1.0)
+		nodeGroup.inputs["Ambient Colour"].default_value = (0.0,0.0,0.0,1.0)
 		nodeGroup.inputs["Emit Colour"].default_value = (0.0,0.0,0.0,1.0)
 		nodeGroup.inputs["Normal Map"].default_value = (0.5,0.5,1.0,1.0)
 		nodeGroup.inputs["Alpha"].default_value = 1.0
@@ -42,22 +44,27 @@ def import_library_node(nodeId, self, context):
 		metalInput = metalN.new("NodeGroupInput")
 		metalInput.location = [-400,0]
 		metalOutput = metalN.new("NodeGroupOutput")
-		metalOutput.location = [400,0]
+		metalOutput.location = [500,0]
 		shaderNode = metalN.new("ShaderNodeBsdfPrincipled")
 		shaderNode.location = [0,250]
 		baseMixNode = metalN.new("ShaderNodeMixRGB")
 		baseMixNode.blend_type = "MIX"
-		baseMixNode.location = [-200,100]
+		baseMixNode.location = [-200,200]
 		baseMixNode.inputs["Color1"].default_value = [0.0,0.0,0.0,1.0]
+		ambientNode = metalN.new("ShaderNodeEmission")
+		ambientNode.location = [-200,0]
 		normalMapNode = metalN.new("ShaderNodeNormalMap")
-		normalMapNode.location = [-200,-100]
+		normalMapNode.location = [-200,-125]
 		normalMapNode.hide = True
 		roughToGlossNode = metalN.new("ShaderNodeMath")
 		roughToGlossNode.operation = "SUBTRACT"
 		roughToGlossNode.inputs[0].default_value = 1.0
-		roughToGlossNode.location = [-200,-150]
+		roughToGlossNode.location = [-200,-175]
+		shaderAddNode = metalN.new("ShaderNodeAddShader")
+		shaderAddNode.location = [300,0]
 		nodeGroup.links.new(metalInput.outputs["Base Colour"],baseMixNode.inputs["Color2"])
 		nodeGroup.links.new(metalInput.outputs["AO"],baseMixNode.inputs["Fac"])
+		nodeGroup.links.new(metalInput.outputs["Ambient Colour"],ambientNode.inputs["Color"])
 		nodeGroup.links.new(metalInput.outputs["Normal Map"],normalMapNode.inputs["Color"])
 		nodeGroup.links.new(metalInput.outputs["Glossiness"],roughToGlossNode.inputs[1])
 		nodeGroup.links.new(metalInput.outputs["Emit Colour"],shaderNode.inputs["Emission"])
@@ -65,15 +72,18 @@ def import_library_node(nodeId, self, context):
 		nodeGroup.links.new(metalInput.outputs["Metallic"],shaderNode.inputs["Metallic"])
 		nodeGroup.links.new(metalInput.outputs["Emit"],shaderNode.inputs["Emission Strength"])
 		nodeGroup.links.new(baseMixNode.outputs[0],shaderNode.inputs["Base Color"])
+		nodeGroup.links.new(ambientNode.outputs[0],shaderAddNode.inputs[1])
 		nodeGroup.links.new(normalMapNode.outputs[0],shaderNode.inputs["Normal"])
 		nodeGroup.links.new(roughToGlossNode.outputs[0],shaderNode.inputs["Roughness"])
-		nodeGroup.links.new(shaderNode.outputs["BSDF"],metalOutput.inputs["BSDF"])
+		nodeGroup.links.new(shaderNode.outputs["BSDF"],shaderAddNode.inputs[0])
+		nodeGroup.links.new(shaderAddNode.outputs[0],metalOutput.inputs["BSDF"])
 	elif nodeId == "BasicSpecular":
 		if context.scene.render.engine != "BLENDER_EEVEE":
 			self.report({"ERROR"}, "Only Eevee supports the specular workflow (as of this plugin version).\nThe node will be added anyway, but it might not work right.")
 		nodeGroup = bpy.data.node_groups.new("BasicSpecular","ShaderNodeTree")
 		nodeGroup.inputs.new("NodeSocketColor","Base Colour")
 		nodeGroup.inputs.new("NodeSocketColor","Specular Colour")
+		nodeGroup.inputs.new("NodeSocketColor","Ambient Colour")
 		nodeGroup.inputs.new("NodeSocketColor","Emit Colour")
 		nodeGroup.inputs.new("NodeSocketColor","Normal Map")
 		nodeGroup.inputs.new("NodeSocketFloat","Alpha")
@@ -91,32 +101,37 @@ def import_library_node(nodeId, self, context):
 		nodeGroup.inputs["Emit"].default_value = 0.0
 		specN = nodeGroup.nodes
 		specInput = specN.new("NodeGroupInput")
-		specInput.location = [-400,0]
+		specInput.location = [-500,0]
 		specOutput = specN.new("NodeGroupOutput")
-		specOutput.location = [400,0]
+		specOutput.location = [500,0]
 		shaderNode = specN.new("ShaderNodeEeveeSpecular")
-		shaderNode.location = [200,50]
+		shaderNode.location = [100,50]
 		baseMixNode = specN.new("ShaderNodeMixRGB")
 		baseMixNode.blend_type = "MIX"
-		baseMixNode.location = [-200,100]
+		baseMixNode.location = [-300,200]
 		baseMixNode.inputs["Color1"].default_value = [0.0,0.0,0.0,1.0]
+		ambientNode = specN.new("ShaderNodeEmission")
+		ambientNode.location = [-300,0]
 		normalMapNode = specN.new("ShaderNodeNormalMap")
-		normalMapNode.location = [-200,-100]
+		normalMapNode.location = [-300,-125]
 		normalMapNode.hide = True
 		roughToGlossNode = specN.new("ShaderNodeMath")
 		roughToGlossNode.operation = "SUBTRACT"
 		roughToGlossNode.inputs[0].default_value = 1.0
-		roughToGlossNode.location = [-200,-150]
+		roughToGlossNode.location = [-300,-175]
 		alphaInvertNode = specN.new("ShaderNodeMath")
 		alphaInvertNode.operation = "SUBTRACT"
 		alphaInvertNode.inputs[0].default_value = 1.0
-		alphaInvertNode.location = [0,50]
+		alphaInvertNode.location = [-100,50]
 		emitMixNode = specN.new("ShaderNodeMixRGB")
 		emitMixNode.blend_type = "MIX"
-		emitMixNode.location = [0,-150]
+		emitMixNode.location = [-100,-150]
 		emitMixNode.inputs["Color1"].default_value = [0.0,0.0,0.0,1.0]
+		shaderAddNode = specN.new("ShaderNodeAddShader")
+		shaderAddNode.location = [300,0]
 		nodeGroup.links.new(specInput.outputs["Base Colour"],baseMixNode.inputs["Color2"])
 		nodeGroup.links.new(specInput.outputs["AO"],baseMixNode.inputs["Fac"])
+		nodeGroup.links.new(specInput.outputs["Ambient Colour"],ambientNode.inputs["Color"])
 		nodeGroup.links.new(specInput.outputs["Normal Map"],normalMapNode.inputs["Color"])
 		nodeGroup.links.new(specInput.outputs["Glossiness"],roughToGlossNode.inputs[1])
 		nodeGroup.links.new(specInput.outputs["Alpha"],alphaInvertNode.inputs[1])
@@ -124,11 +139,13 @@ def import_library_node(nodeId, self, context):
 		nodeGroup.links.new(specInput.outputs["Emit Colour"],emitMixNode.inputs["Color2"])
 		nodeGroup.links.new(specInput.outputs["Emit"],emitMixNode.inputs["Fac"])
 		nodeGroup.links.new(baseMixNode.outputs[0],shaderNode.inputs["Base Color"])
+		nodeGroup.links.new(ambientNode.outputs[0],shaderAddNode.inputs[1])
 		nodeGroup.links.new(normalMapNode.outputs[0],shaderNode.inputs["Normal"])
 		nodeGroup.links.new(alphaInvertNode.outputs[0],shaderNode.inputs["Transparency"])
 		nodeGroup.links.new(roughToGlossNode.outputs[0],shaderNode.inputs["Roughness"])
 		nodeGroup.links.new(emitMixNode.outputs[0],shaderNode.inputs["Emissive Color"])
-		nodeGroup.links.new(shaderNode.outputs["BSDF"],specOutput.inputs["BSDF"])
+		nodeGroup.links.new(shaderNode.outputs["BSDF"],shaderAddNode.inputs[0])
+		nodeGroup.links.new(shaderAddNode.outputs[0],specOutput.inputs["BSDF"])
 	elif nodeId == "TBNMatrix":
 		# https://blender.stackexchange.com/questions/291989/how-would-i-get-the-full-tbn-matrix-from-just-a-normal-map
 		nodeGroup = bpy.data.node_groups.new("TBNMatrix","ShaderNodeTree")
