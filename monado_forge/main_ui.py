@@ -15,7 +15,7 @@ from bpy.types import (
 class MonadoForgeProperties(PropertyGroup):
 	def gameListCallback(self, context):
 		return (
-			#("XC1","XC1","Xenoblade 1 (Wii)"),
+			("XC1","XC1","Xenoblade 1 (Wii)"),
 			#("XCX","XCX","Xenoblade X"),
 			("XC2","XC2","Xenoblade 2"),
 			("XC1DE","XC1DE","Xenoblade 1 DE"),
@@ -29,7 +29,7 @@ class MonadoForgeProperties(PropertyGroup):
 		name="Game",
 		items=gameListCallback,
 		description="Game to deal with",
-		default=1, #"XC1DE"
+		default=2, #"XC1DE"
 		update=gameListSelectionCallback,
 	)
 	printProgress : BoolProperty(

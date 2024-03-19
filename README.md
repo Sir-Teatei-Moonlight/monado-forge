@@ -12,26 +12,29 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 
 | | <img alt="XC1" src="https://www.xenoserieswiki.org/w/images/8/8d/Article_icon_-_Xenoblade_Chronicles.svg" width="24px"/> | <img alt="XCX" src="https://www.xenoserieswiki.org/w/images/3/3f/Article_icon_-_Xenoblade_Chronicles_X.svg" width="24px"/> | <img alt="XC2" src="https://www.xenoserieswiki.org/w/images/a/a8/Article_icon_-_Xenoblade_Chronicles_2.svg" width="24px"/> | <img alt="XC1DE" src="https://www.xenoserieswiki.org/w/images/6/6f/Article_icon_-_Xenoblade_Chronicles_Definitive_Edition.svg" width="24px"/> | <img alt="XC3" src="https://www.xenoserieswiki.org/w/images/b/bc/Article_icon_-_Xenoblade_Chronicles_3.svg" width="24px"/>
 | --- | :---: | :---: | :---: | :---: | :---: |
-| Skeleton import | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | 65% |
-| Model import | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
+| Skeleton import | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | 65% |
+| Model import | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Vertex colours | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ UVs | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Vertex normals | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
-| └ Vertex groups | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
+| └ Vertex groups | 50% | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Shapes/Morphs | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Textures | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Materials | :x: | :x: | :beginner: | :beginner: | :o: |
 
 ## Current features
+Note that this list is of all features, not per-game features. Use the grid above, and known issues section below, to know what's currently supported per game.
+
 ### Import
 #### General
 * Controllable epsilon, for choosing whether 0.00001 should just be set to 0, and whether two things that differ by only that much should be treated as equal. Applies to position and rotation separately.
 
 #### Skeleton
-* Imports skeletons from .arc and .chr files.
+* Imports skeletons from .brres, .arc, and .chr files.
 * Choose whether to also import endpoints as bones, and puts them in a second bone layer.
 
 #### Model
+* Imports .brres model files, with whatever model and skeleton is in there.
 * Imports .wimdo/.wismt model files. The .wimdo can be imported alone, which grabs only whatever bones are inside, while the .wismt import requires a .wimdo to go with it.
 * Supports normals, UVs, vertex colours, rigging (vertex groups), and shapes (morphs). Models are automatically parented to the skeleton found in the .wimdo; if there is no skeleton, they are parented to a blank one.
 * By using the import-with-skeleton button instead, both the .wimdo's skeleton and the .arc/.chr skeleton will be imported, and then merged into one (giving the .arc/.chr one priority).
@@ -61,7 +64,12 @@ Roughly in order of badness.
 ### Things with workarounds
 * By default, images import as whatever the default colour setting is. It guesses whether they are non-colour data based on the name, so it can always get it wrong, and you'll have to manually notice and correct them. This will make them _look_ wrong, for whatever dumb reason, but they will _behave_ correctly.
 ### Things with no workarounds
+#### All
 * Blender does not support per-shape normals, so that information is lost. In theory it won't matter much.
+#### .brres
+* Currently only supports meshes for which all vertices only have a single bone influence. Vertices that require multiple influences will be incorrect.
+* Not all drawcodes are in yet.
+#### .wimdo/wismt
 * Many XC3 models for party members (and possibly others) appear to use an unknown parenting mechanism for several bones (believed to be constraint-related), so they end up not being parented at all. You'll have to guess how things need to be attached.
 * Images that aren't power-of-two dimensions are not descrambled/deswizzled correctly. Very rare, but there.
 * Models entirely embedded in the .wimdo are not checked for yet. (Normally, the model itself is in the .wismt and the .wimdo is just definitions, but putting a model in the .wimdo is also legal.) Very rare, so ought not to be a big deal.

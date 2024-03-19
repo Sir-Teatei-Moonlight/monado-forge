@@ -37,21 +37,22 @@ class MonadoForgeViewImportSkeletonOperator(Operator):
 	def execute(self, context):
 		try:
 			game = context.scene.monado_forge_main.game
+			if game == "XC1":
+				self.report({"ERROR"}, ".brres format shouldn't be able to call this function")
+				return {"CANCELLED"}
 			printProgress = context.scene.monado_forge_main.printProgress
 			absolutePath = bpy.path.abspath(context.scene.monado_forge_import.skeletonPath)
 			if printProgress:
 				print("Importing skeleton from: "+absolutePath)
 			
 			filename, fileExtension = os.path.splitext(absolutePath)
-			expectedExtension = {"XC1":".brres","XCX":".xcx","XC2":".arc","XC1DE":".chr","XC3":".chr",}[game]
+			expectedExtension = {"XCX":".xcx","XC2":".arc","XC1DE":".chr","XC3":".chr",}[game]
 			if fileExtension != expectedExtension:
 				self.report({"ERROR"}, "Unexpected file type (for "+game+", expected "+expectedExtension+")")
 				return {"CANCELLED"}
 			
 			# first, read in the data and store it in a game-agnostic way
-			if game == "XC1": # big endian
-				modelFormat = "BRES"
-			elif game == "XCX": # big endian
+			if game == "XCX": # big endian
 				modelFormat = "[xcx]"
 			elif game == "XC2":
 				modelFormat = "SAR1"
@@ -91,6 +92,9 @@ class MonadoForgeViewImportModelOperator(Operator):
 	
 	def execute(self, context):
 		game = context.scene.monado_forge_main.game
+		if game == "XC1":
+			self.report({"ERROR"}, ".brres format shouldn't be able to call this function")
+			return {"CANCELLED"}
 		# this isn't part of the poll because it's not a trivial check and the fix needs to be more descriptive
 		if context.scene.monado_forge_import.autoSaveTextures:
 			if not os.path.isdir(bpy.path.abspath(context.scene.monado_forge_import.texturePath)):
@@ -101,7 +105,7 @@ class MonadoForgeViewImportModelOperator(Operator):
 			self.report({"ERROR"}, "Import uncached textures selected, but no texture repositories provided (both are required)")
 			return {"CANCELLED"}
 		try:
-			if game == "XC1" or game == "XCX":
+			if game == "XCX":
 				self.report({"ERROR"}, "game not yet supported")
 				return {"CANCELLED"}
 			if context.scene.monado_forge_import.defsPath and context.scene.monado_forge_import.dataPath:
@@ -138,17 +142,21 @@ class MonadoForgeViewImportModelWithSkeletonOperator(Operator):
 			self.report({"ERROR"}, "Import uncached textures selected, but no texture repositories provided (both are required)")
 			return {"CANCELLED"}
 		
-		filename, fileExtension = os.path.splitext(bpy.path.abspath(context.scene.monado_forge_import.skeletonPath))
-		expectedExtension = {"XC1":".brres","XCX":".xcx","XC2":".arc","XC1DE":".chr","XC3":".chr",}[game]
-		if fileExtension != expectedExtension:
-			self.report({"ERROR"}, "Unexpected file type (for "+game+", expected "+expectedExtension+")")
-			return {"CANCELLED"}
+		if game != "XC1":
+			filename, fileExtension = os.path.splitext(bpy.path.abspath(context.scene.monado_forge_import.skeletonPath))
+			expectedExtension = {"XCX":".xcx","XC2":".arc","XC1DE":".chr","XC3":".chr",}[game]
+			if fileExtension != expectedExtension:
+				self.report({"ERROR"}, "Unexpected file type (for "+game+", expected "+expectedExtension+")")
+				return {"CANCELLED"}
 		
 		try:
-			if game == "XC1" or game == "XCX":
+			if game == "XC1":
+				return import_brres(self, context)
+			elif game == "XCX":
 				self.report({"ERROR"}, "game not yet supported")
 				return {"CANCELLED"}
-			return import_sar1_skel_and_wimdo_and_wismt(self, context)
+			else:
+				return import_sar1_skel_and_wimdo_and_wismt(self, context)
 			self.report({"ERROR"}, "Unexpected error; code shouldn't be able to reach here")
 			return {"CANCELLED"}
 		except Exception:
@@ -394,10 +402,10 @@ class OBJECT_PT_MonadoForgeViewImportPanel(Panel):
 		col = layout.column(align=True)
 		activeObject = bpy.context.view_layer.objects.active
 		expectedSkeletonExtension = {"XC1":".brres","XCX":".xcx","XC2":".arc","XC1DE":".chr","XC3":".chr",}[scn.monado_forge_main.game]
-		col.prop(scn.monado_forge_import, "skeletonPath", text=expectedSkeletonExtension)
 		if scn.monado_forge_main.game == "XC1":
 			col.prop(scn.monado_forge_import, "singlePath", text=".brres")
 		else:
+			col.prop(scn.monado_forge_import, "skeletonPath", text=expectedSkeletonExtension)
 			col.prop(scn.monado_forge_import, "defsPath", text=".wimdo")
 			col.prop(scn.monado_forge_import, "dataPath", text=".wismt")
 		col.prop(scn.monado_forge_import, "importUncachedTextures")
@@ -416,9 +424,12 @@ class OBJECT_PT_MonadoForgeViewImportPanel(Panel):
 		if scn.monado_forge_import.fixedViewportColour:
 			col.prop(scn.monado_forge_import, "viewportColour", text="")
 		col.separator()
-		col.operator(MonadoForgeViewImportSkeletonOperator.bl_idname, text="Import Skeleton Only", icon="IMPORT")
-		col.operator(MonadoForgeViewImportModelOperator.bl_idname, text="Import Model Only", icon="IMPORT")
-		col.operator(MonadoForgeViewImportModelWithSkeletonOperator.bl_idname, text="Import Model With Skeleton", icon="IMPORT")
+		if scn.monado_forge_main.game == "XC1":
+			col.operator(MonadoForgeViewImportModelWithSkeletonOperator.bl_idname, text="Import BRRES", icon="IMPORT")
+		else:
+			col.operator(MonadoForgeViewImportSkeletonOperator.bl_idname, text="Import Skeleton Only", icon="IMPORT")
+			col.operator(MonadoForgeViewImportModelOperator.bl_idname, text="Import Model Only", icon="IMPORT")
+			col.operator(MonadoForgeViewImportModelWithSkeletonOperator.bl_idname, text="Import Model With Skeleton", icon="IMPORT")
 
 class OBJECT_PT_MonadoForgeViewImportSkeletonOptionsPanel(Panel):
 	bl_idname = "OBJECT_PT_MonadoForgeViewImportSkeletonOptionsPanel"
@@ -432,10 +443,8 @@ class OBJECT_PT_MonadoForgeViewImportSkeletonOptionsPanel(Panel):
 		scn = context.scene
 		col = layout.column(align=True)
 		col.prop(scn.monado_forge_import, "boneSize")
-		epSubcol = col.column()
-		epSubcol.prop(scn.monado_forge_import, "importEndpoints")
-		if scn.monado_forge_main.game == "XC1": # endpoints are just normal bones, conceptually always selected
-			epSubcol.enabled = False
+		if scn.monado_forge_main.game != "XC1": # BRRES endpoints are just normal bones, conceptually always selected/indistinguishable
+			col.prop(scn.monado_forge_import, "importEndpoints")
 
 class OBJECT_PT_MonadoForgeViewImportModelOptionsPanel(Panel):
 	bl_idname = "OBJECT_PT_MonadoForgeViewImportModelOptionsPanel"
@@ -449,7 +458,8 @@ class OBJECT_PT_MonadoForgeViewImportModelOptionsPanel(Panel):
 		scn = context.scene
 		col = layout.column(align=True)
 		col.prop(scn.monado_forge_import, "importToCursor")
-		col.prop(scn.monado_forge_import, "alsoImportLODs")
+		if scn.monado_forge_main.game != "XC1":
+			col.prop(scn.monado_forge_import, "alsoImportLODs")
 		col.prop(scn.monado_forge_import, "doCleanupOnImport")
 		col.operator(MonadoForgeViewImportCleanupModelOperator.bl_idname, text="Clean Up Selected Meshes", icon="BRUSH_DATA")
 
@@ -465,9 +475,10 @@ class OBJECT_PT_MonadoForgeViewImportTextureOptionsPanel(Panel):
 		scn = context.scene
 		col = layout.column(align=True)
 		col.prop(scn.monado_forge_import, "differentiateTextures")
-		col.prop(scn.monado_forge_import, "blueBC5")
-		col.prop(scn.monado_forge_import, "splitTemps")
-		col.prop(scn.monado_forge_import, "keepAllResolutions")
+		if scn.monado_forge_main.game != "XC1":
+			col.prop(scn.monado_forge_import, "blueBC5")
+			col.prop(scn.monado_forge_import, "splitTemps")
+			col.prop(scn.monado_forge_import, "keepAllResolutions")
 
 class OBJECT_PT_MonadoForgeViewImportCleanupPanel(Panel):
 	bl_idname = "OBJECT_PT_MonadoForgeViewImportCleanupPanel"

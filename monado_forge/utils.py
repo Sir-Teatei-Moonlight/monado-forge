@@ -166,6 +166,24 @@ class BitReader():
 			return reverse_int(v,n)
 		return v
 
+# class helper functions
+
+def calculateGlobalBoneMatrixes(boneList):
+	localMats = {}
+	globalMats = {}
+	for b in boneList:
+		if b.getIndex() in localMats.keys():
+			raise ValueError("Multiple bones with index "+str(b.getIndex())+" in list")
+		localMats[b.getIndex()] = [b.getParent(),mathutils.Matrix.LocRotScale(b.getPosition()[0:3],mathutils.Quaternion(b.getRotation()),b.getScale()[0:3])]
+	# assumption: bones will only be parented to a previous bone (never a yet-to-be-seen one)
+	for b,[p,mtx] in localMats.items():
+		if p == -1: # no parent, no transformation
+			globalMats[b] = mtx
+		else:
+			parentMtx = globalMats[p]
+			globalMats[b] = parentMtx @ mtx
+	return globalMats
+
 # Blender helper functions
 
 def flipRoll(roll):

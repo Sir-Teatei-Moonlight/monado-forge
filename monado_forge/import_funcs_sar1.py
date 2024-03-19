@@ -120,7 +120,7 @@ def import_sar1_skel_subfile(f, context):
 			sz = readAndParseFloat(f)
 			sw = readAndParseFloat(f)
 			# reminder that the pos and scale are x,y,z,w but the rotation is w,x,y,z
-			fb = MonadoForgeBone()
+			fb = MonadoForgeBone(len(forgeBones))
 			fb.setParent(parent)
 			fb.setName(name)
 			fb.setPosition([px,py,pz,pw])
@@ -155,7 +155,7 @@ def import_sar1_skel_subfile(f, context):
 				# for some reason, endpoints tend to have pw = 0, which positions it relative to root instead of parent (and we don't want that)
 				if pw == 0.0: pw = 1.0
 				# reminder that the pos and scale are x,y,z,w but the rotation is w,x,y,z
-				fb = MonadoForgeBone()
+				fb = MonadoForgeBone(len(forgeBones))
 				fb.setParent(parent)
 				fb.setName(name)
 				fb.setPosition([px,py,pz,pw])
@@ -267,7 +267,7 @@ def import_wimdo(f, context, externalSkeleton=None):
 				posMatrix = mathutils.Matrix.Translation(bonePosition)
 				rotMatrix = mathutils.Matrix([boneXAxis,boneYAxis,boneZAxis,bonePosition])
 				bonePosition = (rotMatrix @ posMatrix).to_translation().to_4d()
-				fb = MonadoForgeBone()
+				fb = MonadoForgeBone(len(forgeBones))
 				fb.setName(boneName)
 				fb.setPosition(bonePosition[:]) # the [:] is because we're turning a Vector into a list
 				fb.setRotation(rotMatrix.to_quaternion())

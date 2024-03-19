@@ -1,13 +1,18 @@
 # because just packing/unpacking arrays gets old and error-prone
 
 class MonadoForgeBone:
-	def __init__(self):
+	def __init__(self,i):
 		self._name = "Bone"
+		self._index = i
 		self._parent = -1
 		self._position = [0,0,0,1] # x, y, z, w
 		self._rotation = [1,0,0,0] # w, x, y, z
 		self._scale = [1,1,1,1] # x, y, z, w
 		self._endpoint = False
+	
+	# no setter (index should be immutable)
+	def getIndex(self):
+		return self._index
 	
 	def getName(self):
 		return self._name
@@ -382,12 +387,19 @@ class MonadoForgeMeshShape:
 
 class MonadoForgeMesh:
 	def __init__(self):
-		self._name = "Mesh"
+		self._name = ""
 		self._vertices = []
 		self._faces = []
 		self._weightSets = [] # because it can be convenient to hold these here and have vertexes just refer with index
 		self._shapes = [] # list of MonadoForgeMeshShapes
-		self._materialIndex = 0
+		self._materialIndex = -1
+	
+	def getName(self):
+		return self._name
+	def setName(self,x):
+		if not isinstance(x,str):
+			raise TypeError("expected a string, not a(n) "+str(type(x)))
+		self._name = x
 	
 	def getVertices(self):
 		return self._vertices

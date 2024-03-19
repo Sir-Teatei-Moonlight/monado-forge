@@ -376,17 +376,15 @@ def realise_results(forgeResults, mainName, self, context):
 		rot = (0,0,0)
 	externalSkeleton = forgeResults.getExternalSkeleton()
 	if externalSkeleton:
-		boneList = externalSkeleton.getBones()
 		armatureName = mainName
-		externalArmature = create_armature_from_bones(boneList,armatureName,pos,rot,boneSize,positionEpsilon,angleEpsilon)
+		externalArmature = create_armature_from_bones(externalSkeleton,armatureName,pos,rot,boneSize,positionEpsilon,angleEpsilon)
 		armaturesCreated += 1
 	else:
 		externalArmature = None
 	baseSkeleton = forgeResults.getSkeleton()
 	if baseSkeleton:
-		boneList = baseSkeleton.getBones()
 		armatureName = mainName
-		baseArmature = create_armature_from_bones(boneList,armatureName,pos,rot,boneSize,positionEpsilon,angleEpsilon)
+		baseArmature = create_armature_from_bones(baseSkeleton,armatureName,pos,rot,boneSize,positionEpsilon,angleEpsilon)
 		armaturesCreated += 1
 	else:
 		baseArmature = None
@@ -528,7 +526,10 @@ def realise_results(forgeResults, mainName, self, context):
 			print_progress_bar(m,len(meshes),"Mesh creation")
 		bpy.ops.object.add(type="MESH", enter_editmode=False, align="WORLD", location=(0,0,0), rotation=(0,0,0), scale=(1,1,1))
 		newMeshObject = bpy.context.view_layer.objects.active
-		newMeshObject.name = f"{mainName}_mesh{m:03d}"
+		if mesh.getName():
+			newMeshObject.name = f"{mainName}_{mesh.getName()}"
+		else:
+			newMeshObject.name = f"{mainName}_mesh{m:03d}"
 		meshData = newMeshObject.data
 		meshData.name = "Mesh"
 		vertCount = len(mesh.getVertices())
@@ -581,7 +582,7 @@ def realise_results(forgeResults, mainName, self, context):
 				newShape = newMeshObject.shape_key_add(name=s.getName(),from_mix=False)
 				for vertexIndex,vertex in s.getVertices().items():
 					newShape.data[vertexIndex].co += mathutils.Vector(vertex.getPosition())
-		if not context.scene.monado_forge_import.skipMaterialImport:
+		if materials and not context.scene.monado_forge_import.skipMaterialImport and mesh.getMaterialIndex() != -1:
 			meshData.materials.append(newMatsByIndex[mesh.getMaterialIndex()])
 		
 		# import complete, cleanup time
