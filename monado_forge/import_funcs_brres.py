@@ -102,7 +102,6 @@ def parse_mdl0(f, context, subfileOffset):
 		weightLinkCount = readAndParseIntBig(f,4)
 		for bl in range(weightLinkCount):
 			weightLinkTable.append(readAndParseIntBig(f,4,signed=True))
-	print("wLT",weightLinkTable)
 	
 	# the following will be two lists in one: single-bone weights, and multi-bone weights
 	# it will be flattened into a single weight index list later
@@ -129,6 +128,7 @@ def parse_mdl0(f, context, subfileOffset):
 	if userDataOffset > 0:
 		print_warning(name+" has userdata, which aren't supported yet (skipping)")
 	
+	defsMultiWeightGroups = {}
 	if definitionsOffset > 0:
 		f.seek(definitionsOffset+subfileOffset)
 		defsDict = parse_brres_dict(f)
@@ -153,8 +153,12 @@ def parse_mdl0(f, context, subfileOffset):
 					for w in range(weightCount):
 						weightTableID = readAndParseIntBig(f,2)
 						weightValue = readAndParseFloatBig(f)
-						weights.append([weightTableID,weightValue])
+						weights.append([weightLinkTable[weightTableID],weightValue])
+					# currently the data is in [[i,v],[i,v]] format
+					# this needs to be transposed into [[i,i],[v,v]] format
+					weights = [list(x) for x in zip(*weights)]
 					data.append([3,[weightID,weightCount,weights]])
+					defsMultiWeightGroups[weightID] = weights
 				elif cmd == 0x04: # mesh
 					materialIndex = readAndParseIntBig(f,2)
 					meshIndex = readAndParseIntBig(f,2)
@@ -169,7 +173,15 @@ def parse_mdl0(f, context, subfileOffset):
 					toMatrix = readAndParseIntBig(f,2)
 					fromMatrix = readAndParseIntBig(f,2)
 					data.append([6,[toMatrix,fromMatrix]])
-			print("defData",data)
+			#print("defData",data)
+	# we can build the second part of the weights list now
+	# we have to put in a lot of blank space so the list indexes align with the dict ones
+	if defsMultiWeightGroups:
+		for k in range(max(defsMultiWeightGroups.keys())+1):
+			try:
+				weightsList[1].append(defsMultiWeightGroups[k])
+			except KeyError:
+				weightsList[1].append([])
 	
 	boneList = []
 	boneLinkTable = {} # for turning bone indexes into link IDs
@@ -220,8 +232,6 @@ def parse_mdl0(f, context, subfileOffset):
 			boneList.append(newBone)
 		# fill in the weight list with a bunch of 1.0 influence on every bone (to be used for single-bone verts)
 		weightsList[0] = [[[x],[1.0]] for x in range(len(boneList))]
-	print("bLT",boneLinkTable)
-	print("wL",weightsList)
 	
 	# now that we have all the bones, we can calculate their global matrixes (they start with just local)
 	globalBoneMatrixes = calculateGlobalBoneMatrixes(boneList)
@@ -229,7 +239,6 @@ def parse_mdl0(f, context, subfileOffset):
 	# now that we have the bone info, we can create the whole rest of the weights list
 	multiWeightShiftIndex = len(weightsList[0])
 	fullWeightIndexesList = weightsList[0]+weightsList[1] # no need to call flattened_list, it's simple enough
-	print("fwIL",fullWeightIndexesList)
 	
 	# could call these "vertex tables" or just "vertices", doesn't matter too much
 	positions = {}
@@ -317,7 +326,6 @@ def parse_mdl0(f, context, subfileOffset):
 			weightIndexTableData = []
 			for weightItem in range(weightIndexTableCount):
 				weightIndexTableData.append(readAndParseIntBig(f,2))
-			print("wITD",weightIndexTableData)
 			# this is now raw Wii graphics code (ugliness guaranteed)
 			# the deal is: some commands define the format, and then other commands read the data in said format
 			# the basic pattern is defining the bit-size of indexes with 0850 and 0860 cmds
@@ -442,23 +450,22 @@ def parse_mdl0(f, context, subfileOffset):
 						newVertex = MonadoForgeVertex()
 						newVertex._id = curVIndex
 						if vert[9] != -1: # should never happen (a vertex without position), but
+							pos = positions[meshVerticesIndex][vert[9]]
 							singleBone = None
 							boneListIndex = -1
-							if singleBoneWeightIndex != -1:
-								boneListIndex = weightLinkTable[singleBoneWeightIndex]
-							else: # vertex has to use multiple weights to get into position
-								boneListIndex = weightLinkTable[indexedMatrixesPos[vert[0]//3]]
-							# this will need to be rejigged for non-single bones
-							if boneListIndex == -1:
-								print_warning("boneListIndex == -1")
-							singleBone = boneList[boneListIndex]
+							if singleBoneWeightIndex != -1: # entire mesh uses the same bone
+								boneListIndexTarget = singleBoneWeightIndex
+							else: # per-vertex weights
+								boneListIndexTarget = indexedMatrixesPos[vert[0]//3]
+							boneListIndex = weightLinkTable[boneListIndexTarget]
 							newVertex.setWeightSetIndex(boneListIndex)
-							pos = positions[meshVerticesIndex][vert[9]]
-							try: # remove later
+							if boneListIndex == -1: # not a single bone vertex
+								newVertex.setWeightSetIndex(boneListIndexTarget+multiWeightShiftIndex)
+							else: # is a single bone vertex
+								# these vertices are origin-clustered and modified into position based on their bone
+								singleBone = boneList[boneListIndex]
 								boneMatrix = globalBoneMatrixes[boneListIndex]
-							except:
-								boneMatrix = globalBoneMatrixes[0]
-							pos = boneMatrix @ mathutils.Vector(pos)
+								pos = boneMatrix @ mathutils.Vector(pos)
 							newVertex.setPosition(pos)
 						forgeVerts.append(newVertex)
 						faceVerts.append(curVIndex)
@@ -468,8 +475,6 @@ def parse_mdl0(f, context, subfileOffset):
 					forgeFaces.append(newFace)
 			if unknownCmds:
 				print_warning("found unknown graphic commands: "+", ".join(hex(x) for x in unknownCmds))
-			#print("iMP",indexedMatrixesPos)
-			#print("iMN",indexedMatrixesNrm)
 			newMesh = MonadoForgeMesh()
 			newMesh.setName(name+"_"+meshName)
 			newMesh.setVertices(forgeVerts)

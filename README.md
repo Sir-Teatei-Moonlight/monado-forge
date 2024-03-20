@@ -17,7 +17,7 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 | └ Vertex colours | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ UVs | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Vertex normals | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
-| └ Vertex groups | 50% | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
+| └ Vertex groups | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Shapes/Morphs | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Textures | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Materials | :x: | :x: | :beginner: | :beginner: | :o: |
@@ -67,8 +67,7 @@ Roughly in order of badness.
 #### All
 * Blender does not support per-shape normals, so that information is lost. In theory it won't matter much.
 #### .brres
-* Currently only supports meshes for which all vertices only have a single bone influence. Vertices that require multiple influences will be incorrect.
-* Not all drawcodes are in yet.
+* Not all drawcodes are in yet. (That said, nothing I've tried so far has needed them, so I wouldn't be able to test them anyways.)
 #### .wimdo/wismt
 * Many XC3 models for party members (and possibly others) appear to use an unknown parenting mechanism for several bones (believed to be constraint-related), so they end up not being parented at all. You'll have to guess how things need to be attached.
 * Images that aren't power-of-two dimensions are not descrambled/deswizzled correctly. Very rare, but there.
