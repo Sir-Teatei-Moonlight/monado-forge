@@ -16,7 +16,7 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 | Model import | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Vertex colours | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ UVs | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
-| └ Vertex normals | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
+| └ Vertex normals | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Vertex groups | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Shapes/Morphs | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Textures | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
@@ -67,7 +67,10 @@ Roughly in order of badness.
 #### All
 * Blender does not support per-shape normals, so that information is lost. In theory it won't matter much.
 #### .brres
-* Not all drawcodes are in yet. (That said, nothing I've tried so far has needed them, so I wouldn't be able to test them anyways.)
+* Some .brres features are not present because I've yet to encounter a XC1 model that uses them (and therefore cannot code or test them). This includes:
+  * Face drawcodes for "quad", "tri fan", "lines", "line strip", and "points"
+  * Face drawcodes with embedded data (as opposed to indexed data)
+  * All but the most basic normals type (i.e. not anything based on tangent or bitangent)
 #### .wimdo/wismt
 * Many XC3 models for party members (and possibly others) appear to use an unknown parenting mechanism for several bones (believed to be constraint-related), so they end up not being parented at all. You'll have to guess how things need to be attached.
 * Images that aren't power-of-two dimensions are not descrambled/deswizzled correctly. Very rare, but there.

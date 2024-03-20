@@ -107,8 +107,6 @@ def parse_mdl0(f, context, subfileOffset):
 	# it will be flattened into a single weight index list later
 	weightsList = [[],[]]
 	
-	if normalsOffset > 0:
-		print_warning(name+" has normals, which aren't supported yet (skipping)")
 	if coloursOffset > 0:
 		print_warning(name+" has colours, which aren't supported yet (skipping)")
 	if uvsOffset > 0:
@@ -253,9 +251,9 @@ def parse_mdl0(f, context, subfileOffset):
 			positionNameOffset = readAndParseIntBig(f,4) # probably not needed, already have a name
 			positionIndex = readAndParseIntBig(f,4)
 			positionDimensionality = readAndParseIntBig(f,4) # 0 = 2D, 1 = 3D
-			positionDataFormat = readAndParseIntBig(f,4) # 0 = u8, 1 = i8, 2 = u16, 3 = s16, 4 = float
+			positionDataFormat = readAndParseIntBig(f,4) # 0 = u8, 1 = i8, 2 = u16, 3 = i16, 4 = float
 			positionNonFloatDivisor = readAndParseIntBig(f,1) # if not float, divide all positions by (1 << this)
-			positionPosStrideSize = readAndParseIntBig(f,1) # shouldn't need this
+			positionStrideSize = readAndParseIntBig(f,1) # only needed to keep place given unknowns
 			positionVertexCount = readAndParseIntBig(f,2)
 			positionBoundingBoxMin = [readAndParseFloatBig(f),readAndParseFloatBig(f),readAndParseFloatBig(f)]
 			positionBoundingBoxMax = [readAndParseFloatBig(f),readAndParseFloatBig(f),readAndParseFloatBig(f)]
@@ -264,19 +262,57 @@ def parse_mdl0(f, context, subfileOffset):
 			for i in range(positionVertexCount):
 				is3D = positionDimensionality == 1 # will be assigning Z = 0 for 2D positions
 				divisor = 1 << positionNonFloatDivisor
-				if positionDataFormat == 0:
-					positions[positionIndex].append([readAndParseIntBig(f,1,signed=False)/divisor,readAndParseIntBig(f,1,signed=False)/divisor,readAndParseIntBig(f,1,signed=False)/divisor if is3D else 0.0])
-				elif positionDataFormat == 1:
-					positions[positionIndex].append([readAndParseIntBig(f,1,signed=True)/divisor,readAndParseIntBig(f,1,signed=True)/divisor,readAndParseIntBig(f,1,signed=True)/divisor if is3D else 0.0])
-				elif positionDataFormat == 2:
-					positions[positionIndex].append([readAndParseIntBig(f,2,signed=False)/divisor,readAndParseIntBig(f,2,signed=False)/divisor,readAndParseIntBig(f,2,signed=False)/divisor if is3D else 0.0])
-				elif positionDataFormat == 3:
-					positions[positionIndex].append([readAndParseIntBig(f,2,signed=True)/divisor,readAndParseIntBig(f,2,signed=True)/divisor,readAndParseIntBig(f,2,signed=True)/divisor if is3D else 0.0])
-				elif positionDataFormat == 4:
+				if positionDataFormat == 4:
 					positions[positionIndex].append([readAndParseFloatBig(f),readAndParseFloatBig(f),readAndParseFloatBig(f) if is3D else 0.0])
+				elif positionDataFormat >= 0 and positionDataFormat <= 3:
+					formatSize = [1,1,2,2][positionDataFormat]
+					formatSigned = [False,True,False,True][positionDataFormat]
+					positions[positionIndex].append([
+														readAndParseIntBig(f,formatSize,signed=formatSigned)/divisor,
+														readAndParseIntBig(f,formatSize,signed=formatSigned)/divisor,
+														readAndParseIntBig(f,formatSize,signed=formatSigned)/divisor if is3D else 0.0,
+													])
 				else:
 					print_warning("unknown position data format: "+str(positionDataFormat))
 					positions[positionIndex].append([0,0,0]) # need something so indices still line up
+					f.seek(f.tell()+positionStrideSize)
+	
+	normals = {}
+	if normalsOffset > 0:
+		f.seek(normalsOffset+subfileOffset)
+		normalsDict = parse_brres_dict(f)
+		for p,(normalName,normalDataOffset) in enumerate(normalsDict.items()):
+			f.seek(normalDataOffset)
+			normalSize = readAndParseIntBig(f,4)
+			parentSubfileOffset = readAndParseIntBig(f,4,signed=True)
+			dataOffset = readAndParseIntBig(f,4)
+			normalNameOffset = readAndParseIntBig(f,4) # probably not needed, already have a name
+			normalIndex = readAndParseIntBig(f,4)
+			normalType = readAndParseIntBig(f,4) # 0 = normal, 1 = normal+binormal+tangent, 2 = normal or binormal or tangent
+			if normalType != 0:
+				print_warning("normalType is "+str(normalType)+"; this is not currently understood so results may be weird")
+			normalDataFormat = readAndParseIntBig(f,4) # 0 = u8, 1 = i8, 2 = u16, 3 = i16, 4 = float
+			normalNonFloatDivisor = readAndParseIntBig(f,1) # if not float, divide all normals by (1 << this)
+			normalStrideSize = readAndParseIntBig(f,1) # only needed to keep place given unknowns
+			normalCount = readAndParseIntBig(f,2)
+			f.seek(dataOffset+normalDataOffset)
+			normals[normalIndex] = []
+			for i in range(normalCount):
+				divisor = 1 << normalNonFloatDivisor
+				if normalDataFormat == 4:
+					normals[normalIndex].append([readAndParseFloatBig(f),readAndParseFloatBig(f),readAndParseFloatBig(f)])
+				elif normalDataFormat >= 0 and normalDataFormat <= 3:
+					formatSize = [1,1,2,2][normalDataFormat]
+					formatSigned = [False,True,False,True][normalDataFormat]
+					normals[normalIndex].append([
+													readAndParseIntBig(f,formatSize,signed=formatSigned)/divisor,
+													readAndParseIntBig(f,formatSize,signed=formatSigned)/divisor,
+													readAndParseIntBig(f,formatSize,signed=formatSigned)/divisor,
+												])
+				else:
+					print_warning("unknown normal data format: "+str(normalDataFormat))
+					normals[normalIndex].append([0,0,1]) # need something so indices still line up
+					f.seek(f.tell()+normalStrideSize)
 	
 	# these are called "objects" in BrawlBox and similar programs, but "meshes" makes more sense honestly
 	meshes = {}
@@ -438,10 +474,16 @@ def parse_mdl0(f, context, subfileOffset):
 						vertData.append(vert)
 					if cmd == 0x90: # triangles
 						for v in range(0,len(vertData),3):
-							faces.append([vertData[v],vertData[v+1],vertData[v+2]])
+							# the vert order is backwards (2,1,0) for normals purposes
+							faces.append([vertData[v+2],vertData[v+1],vertData[v]])
 					if cmd == 0x98: # triangle strip
 						for v in range(len(vertData)-2):
-							faces.append([vertData[v],vertData[v+1],vertData[v+2]])
+							# if we just add the verts in order, the strip will keep alternating between clockwise and CCW
+							# so we have to invert the direction of every other face
+							if v % 2 == 0:
+								faces.append([vertData[v+2],vertData[v+1],vertData[v]])
+							else:
+								faces.append([vertData[v],vertData[v+1],vertData[v+2]])
 				else: # all options exhausted, not a known/supported code
 					if cmd not in unknownCmds: unknownCmds.append(cmd)
 				for face in faces:
@@ -451,6 +493,8 @@ def parse_mdl0(f, context, subfileOffset):
 						newVertex._id = curVIndex
 						if vert[9] != -1: # should never happen (a vertex without position), but
 							pos = positions[meshVerticesIndex][vert[9]]
+							if vert[10] != -1: # normal
+								nrm = normals[meshNormalsIndex][vert[10]]
 							singleBone = None
 							boneListIndex = -1
 							if singleBoneWeightIndex != -1: # entire mesh uses the same bone
@@ -466,7 +510,13 @@ def parse_mdl0(f, context, subfileOffset):
 								singleBone = boneList[boneListIndex]
 								boneMatrix = globalBoneMatrixes[boneListIndex]
 								pos = boneMatrix @ mathutils.Vector(pos)
+								if vert[10] != -1:
+									# rotation part only
+									nrmMatrix = boneMatrix.to_quaternion().to_matrix()
+									nrm = nrmMatrix @ mathutils.Vector(nrm)
 							newVertex.setPosition(pos)
+							if vert[10] != -1: # normal
+								newVertex.setNormal(nrm)
 						forgeVerts.append(newVertex)
 						faceVerts.append(curVIndex)
 						curVIndex += 1
