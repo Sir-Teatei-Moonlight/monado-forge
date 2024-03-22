@@ -14,7 +14,7 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 | --- | :---: | :---: | :---: | :---: | :---: |
 | Skeleton import | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | 65% |
 | Model import | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
-| └ Vertex colours | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
+| └ Vertex colours | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ UVs | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Vertex normals | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Vertex groups | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |

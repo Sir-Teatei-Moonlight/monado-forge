@@ -263,7 +263,7 @@ class MonadoForgeVertex:
 		self._position = [0,0,0] # having position ever be None seems to cause Problems
 		self._uvs = {}
 		self._normal = None
-		self._colour = None
+		self._colours = {} # in 255 format
 		self._weightSetIndex = -1 # pre-bake
 		self._weights = {} # post-bake (must also be by index rather than name since we don't necessarily know names)
 	
@@ -303,16 +303,18 @@ class MonadoForgeVertex:
 			raise ValueError("sequence must be length 3, not "+str(len(a)))
 		self._normal = a[:]
 	
-	def hasColour(self):
-		return self._colour != None
-	def getColour(self):
-		return self._colour
-	def clearColour(self):
-		self._colour = None
-	def setColour(self,a):
-		if len(a) != 4: # allow alpha colours
-			raise ValueError("sequence must be length 4, not "+str(len(a)))
-		self._colour = a[:]
+	def hasColours(self):
+		return self._colours != {}
+	def getColours(self):
+		return self._colours
+	def getColour(self,layer):
+		return self._colours[layer]
+	def clearColours(self):
+		self._colours = []
+	def setColour(self,layer,value):
+		if len(value) != 4: # Blender really pushes alpha for everything
+			raise ValueError("sequence must be length 4, not "+str(len(value)))
+		self._colours[layer] = value[:]
 	
 	def hasWeightIndex(self):
 		return self._weightSetIndex != -1
@@ -345,7 +347,7 @@ class MonadoForgeVertex:
 			self._position == other._position and
 			self._uvs == other._uvs and
 			self._normal == other._normal and
-			self._colour == other._colour and
+			self._colours == other._colours and
 			self._weightSetIndex == other._weightSetIndex and
 			self._weights == other._weights
 		)
@@ -478,7 +480,7 @@ class MonadoForgeMesh:
 		return False
 	def hasColours(self):
 		for v in self._vertices:
-			if v.hasColour(): return True
+			if v.hasColours(): return True
 		return False
 	def hasWeightIndexes(self):
 		for v in self._vertices:
@@ -506,8 +508,13 @@ class MonadoForgeMesh:
 		return [v.getUVs()[layer] for v in self._vertices]
 	def getVertexNormalsList(self):
 		return [v.getNormal() for v in self._vertices]
-	def getVertexColoursList(self):
-		return [v.getColour() for v in self._vertices]
+	def getColourLayerList(self):
+		layers = []
+		for v in self._vertices:
+			layers += [k for k in v.getColours().keys()]
+		return list(set(layers))
+	def getVertexColoursLayer(self,layer):
+		return [v.getColours()[layer] for v in self._vertices]
 	def getVertexWeightIndexesList(self):
 		return [v.getWeightSetIndex() for v in self._vertices]
 	def getVertexWeightsList(self):

@@ -508,11 +508,12 @@ def realise_results(forgeResults, mainName, self, context):
 					if uv == 0:
 						newMat.node_tree.links.new(mirrorNode.outputs[0],mt.inputs["Vector"])
 		# here, we create a node for vertex colours - we don't know if we'll need it, but we might
+		# having multiple colour layers is rare enough that it's probably safe to let the user figure out
 		colourInputNode = n.new("ShaderNodeAttribute")
 		colourInputNode.label = "Vertex Colours"
 		colourInputNode.location = [-650,pushdownValue]
 		colourInputNode.attribute_type = "GEOMETRY"
-		colourInputNode.attribute_name = "VertexColours"
+		colourInputNode.attribute_name = "VertexColours1"
 		for xi,x in enumerate(mat.getExtraData()):
 			extraDataNode = n.new("ShaderNodeValue")
 			extraDataNode.outputs["Value"].default_value = x
@@ -548,10 +549,11 @@ def realise_results(forgeResults, mainName, self, context):
 			meshData.normals_split_custom_set_from_vertices(normalsList)
 			meshData.calc_normals_split()
 		if mesh.hasColours():
-			coloursList = mesh.getVertexColoursList()
-			vertCols = meshData.color_attributes.new("VertexColours","FLOAT_COLOR","POINT") # BYTE_COLOR *should* be correct, but in practice it isn't
-			for i in range(len(coloursList)):
-				vertCols.data[i].color = [c/255.0 for c in coloursList[i]]
+			for layer in mesh.getColourLayerList():
+				meshColours = mesh.getVertexColoursLayer(layer)
+				newColoursLayer = meshData.color_attributes.new("VertexColours"+str(layer+1),"FLOAT_COLOR","POINT") # BYTE_COLOR *should* be correct, but in practice it isn't
+				for i in range(len(meshColours)):
+					newColoursLayer.data[i].color = [c/255.0 for c in meshColours[i]]
 		if mesh.hasWeightIndexes() and baseArmature: # try the indexes method first (faster) (and also needs a baseArmature or it makes no sense)
 			weightIndexes = set(mesh.getVertexWeightIndexesList())
 			vertexesInEachGroup = {}

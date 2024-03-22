@@ -107,8 +107,6 @@ def parse_mdl0(f, context, subfileOffset):
 	# it will be flattened into a single weight index list later
 	weightsList = [[],[]]
 	
-	if coloursOffset > 0:
-		print_warning(name+" has colours, which aren't supported yet (skipping)")
 	if uvsOffset > 0:
 		print_warning(name+" has UVs, which aren't supported yet (skipping)")
 	if furVectorsOffset > 0:
@@ -314,6 +312,61 @@ def parse_mdl0(f, context, subfileOffset):
 					normals[normalIndex].append([0,0,1]) # need something so indices still line up
 					f.seek(f.tell()+normalStrideSize)
 	
+	# all colours will be represented with alpha just to make things easier (Blender also prefers it)
+	colours = {}
+	if coloursOffset > 0:
+		f.seek(coloursOffset+subfileOffset)
+		coloursDict = parse_brres_dict(f)
+		for c,(colourName,colourDataOffset) in enumerate(coloursDict.items()):
+			f.seek(colourDataOffset)
+			colourSize = readAndParseIntBig(f,4)
+			parentSubfileOffset = readAndParseIntBig(f,4,signed=True)
+			dataOffset = readAndParseIntBig(f,4)
+			colourNameOffset = readAndParseIntBig(f,4) # probably not needed, already have a name
+			colourIndex = readAndParseIntBig(f,4)
+			colourHasAlpha = readAndParseIntBig(f,4) # 0 = RGB, 1 = RGBA
+			colourDataFormat = readAndParseIntBig(f,4) # 0 = RGB565, 1 = RGB8, 2 = RGBX8, 3 = RGBA4, 4 = RGBA6, 5 = RGBA8
+			colourStrideSize = readAndParseIntBig(f,1) # only needed to keep place given unknowns
+			colourPadding = readAndParseIntBig(f,1)
+			colourCount = readAndParseIntBig(f,2)
+			colours[colourIndex] = []
+			for i in range(colourCount):
+				if colourDataFormat == 0: # RGB565
+					data = readAndParseIntBig(f,2)
+					colours[colourIndex].append([
+						((data & 0b1111100000000000) >> 11)/31*255,
+						((data & 0b0000011111100000) >> 5)/63*255,
+						(data & 0b0000000000011111)/31*255,
+						255])
+				elif colourDataFormat == 1: # RGB8
+					colours[colourIndex].append([readAndParseIntBig(f,1),readAndParseIntBig(f,1),readAndParseIntBig(f,1),255])
+				elif colourDataFormat == 2: # RGBX8
+					colours[colourIndex].append([readAndParseIntBig(f,1),readAndParseIntBig(f,1),readAndParseIntBig(f,1),255])
+					unused = readAndParseIntBig(f,1) # sheesh what a dumb format that's 25% of your space completely wasted
+				elif colourDataFormat == 3: # RGBA4
+					data = readAndParseIntBig(f,2)
+					colours[colourIndex].append([
+						((data & 0xf000) >> 12)/15*255,
+						((data & 0x0f00) >> 8)/15*255,
+						((data & 0x00f0) >> 4)/15*255,
+						( data & 0x000f)/15*255,
+						])
+				elif colourDataFormat == 4: # RGBA6
+					params = f.read(3)
+					bits = BitReader(params)
+					colours[colourIndex].append([
+						(bits.readbits(6))/63*255,
+						(bits.readbits(6))/63*255,
+						(bits.readbits(6))/63*255,
+						(bits.readbits(6))/63*255,
+						])
+				elif colourDataFormat == 5: # RGBA8
+					colours[colourIndex].append([readAndParseIntBig(f,1),readAndParseIntBig(f,1),readAndParseIntBig(f,1),readAndParseIntBig(f,1)])
+				else:
+					print_warning("unknown colour data format: "+str(colourDataFormat))
+					colours[colourIndex].append([1.0,1.0,1.0,1.0]) # need something so indices still line up
+					f.seek(f.tell()+colourStrideSize)
+	
 	# these are called "objects" in BrawlBox and similar programs, but "meshes" makes more sense honestly
 	meshes = {}
 	if meshesOffset > 0: # a safe bet, but
@@ -518,6 +571,10 @@ def parse_mdl0(f, context, subfileOffset):
 							newVertex.setPosition(pos)
 							if vert[10] != -1: # normal
 								newVertex.setNormal(nrm)
+						if vert[11] != -1: # colour 1
+							newVertex.setColour(0,colours[meshColourIndexes[0]][vert[11]])
+						if vert[12] != -1: # colour 2
+							newVertex.setColour(1,colours[meshColourIndexes[1]][vert[12]])
 						# before adding this vertex, we must check for if it's a duplicate, and if so use the existing other instead
 						# this would be very expensive without hashing the position
 						foundDouble = False
