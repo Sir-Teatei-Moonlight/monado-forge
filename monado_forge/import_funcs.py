@@ -546,6 +546,7 @@ def realise_results(forgeResults, mainName, self, context):
 		if mesh.hasNormals():
 			normalsList = mesh.getVertexNormalsList()
 			meshData.normals_split_custom_set_from_vertices(normalsList)
+			meshData.calc_normals_split()
 		if mesh.hasColours():
 			coloursList = mesh.getVertexColoursList()
 			vertCols = meshData.color_attributes.new("VertexColours","FLOAT_COLOR","POINT") # BYTE_COLOR *should* be correct, but in practice it isn't
@@ -586,14 +587,14 @@ def realise_results(forgeResults, mainName, self, context):
 			meshData.materials.append(newMatsByIndex[mesh.getMaterialIndex()])
 		
 		# import complete, cleanup time
-		#meshData.validate(verbose=True)
-		meshData.validate()
-		meshData.transform(mathutils.Euler((math.radians(90),0,0)).to_matrix().to_4x4(),shape_keys=True) # transform from lying down (+Y up +Z forward) to standing up (+Z up -Y forward)
 		cleanup_mesh(context,newMeshObject,
 						context.scene.monado_forge_import.cleanupLooseVertices,
 						context.scene.monado_forge_import.cleanupEmptyGroups,
 						context.scene.monado_forge_import.cleanupEmptyColours,
 						context.scene.monado_forge_import.cleanupEmptyShapes)
+		#meshData.validate(verbose=True)
+		meshData.validate()
+		meshData.transform(mathutils.Euler((math.radians(90),0,0)).to_matrix().to_4x4(),shape_keys=True) # transform from lying down (+Y up +Z forward) to standing up (+Z up -Y forward)
 		# attach mesh to base armature
 		armatureMod = newMeshObject.modifiers.new("Armature","ARMATURE")
 		armatureMod.object = baseArmature

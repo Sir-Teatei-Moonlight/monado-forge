@@ -339,6 +339,16 @@ class MonadoForgeVertex:
 		if not isinstance(value,float):
 			raise TypeError("expected a float, not a(n) "+str(type(value)))
 		self._weights[groupIndex] = value
+	
+	def isDouble(self,other):
+		return self == other or (
+			self._position == other._position and
+			self._uvs == other._uvs and
+			self._normal == other._normal and
+			self._colour == other._colour and
+			self._weightSetIndex == other._weightSetIndex and
+			self._weights == other._weights
+		)
 
 class MonadoForgeFace:
 	def __init__(self):

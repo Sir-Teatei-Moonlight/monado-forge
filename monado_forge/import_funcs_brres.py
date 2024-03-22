@@ -387,6 +387,7 @@ def parse_mdl0(f, context, subfileOffset):
 			# we also have to index them manually (i.e. no calling .indexVertices() later)
 			forgeVerts = []
 			forgeFaces = []
+			hashedVertsByPosition = {} # this is for faster duplicate culling later
 			curVIndex = 0
 			# the following are volatile arrays: they will be overwritten with new stuff constantly
 			# this is why we can't just bulk all the vertices at once, they need the most recently-loaded index set
@@ -517,9 +518,20 @@ def parse_mdl0(f, context, subfileOffset):
 							newVertex.setPosition(pos)
 							if vert[10] != -1: # normal
 								newVertex.setNormal(nrm)
-						forgeVerts.append(newVertex)
-						faceVerts.append(curVIndex)
-						curVIndex += 1
+						# before adding this vertex, we must check for if it's a duplicate, and if so use the existing other instead
+						# this would be very expensive without hashing the position
+						foundDouble = False
+						thisPosHashed = tuple(newVertex.getPosition())
+						if thisPosHashed in hashedVertsByPosition.keys():
+							other = hashedVertsByPosition[thisPosHashed]
+							if newVertex.isDouble(other):
+								faceVerts.append(other.getID())
+								foundDouble = True
+						if not foundDouble:
+							forgeVerts.append(newVertex)
+							faceVerts.append(curVIndex)
+							hashedVertsByPosition[tuple(newVertex.getPosition())] = newVertex
+							curVIndex += 1
 					newFace = MonadoForgeFace()
 					newFace.setVertexIndexes(faceVerts)
 					forgeFaces.append(newFace)
