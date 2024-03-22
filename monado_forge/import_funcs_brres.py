@@ -580,14 +580,17 @@ def parse_mdl0(f, context, subfileOffset):
 						foundDouble = False
 						thisPosHashed = tuple(newVertex.getPosition())
 						if thisPosHashed in hashedVertsByPosition.keys():
-							other = hashedVertsByPosition[thisPosHashed]
-							if newVertex.isDouble(other):
-								faceVerts.append(other.getID())
-								foundDouble = True
+							others = hashedVertsByPosition[thisPosHashed]
+							for other in others:
+								if newVertex.isDouble(other):
+									faceVerts.append(other.getID())
+									foundDouble = True
+									hashedVertsByPosition[thisPosHashed].append(newVertex)
+									break
 						if not foundDouble:
 							forgeVerts.append(newVertex)
 							faceVerts.append(curVIndex)
-							hashedVertsByPosition[tuple(newVertex.getPosition())] = newVertex
+							hashedVertsByPosition[tuple(newVertex.getPosition())] = [newVertex]
 							curVIndex += 1
 					newFace = MonadoForgeFace()
 					newFace.setVertexIndexes(faceVerts)

@@ -63,6 +63,7 @@ Note that this list is of all features, not per-game features. Use the grid abov
 Roughly in order of badness.
 ### Things with workarounds
 * By default, images import as whatever the default colour setting is. It guesses whether they are non-colour data based on the name, so it can always get it wrong, and you'll have to manually notice and correct them. This will make them _look_ wrong, for whatever dumb reason, but they will _behave_ correctly.
+* .brres import is a bit too conservative with merging duplicate vertices, so some things will remain separate when it's reasonably clear they need merging.
 ### Things with no workarounds
 #### All
 * Blender does not support per-shape normals, so that information is lost. In theory it won't matter much.
