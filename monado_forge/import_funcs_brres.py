@@ -107,8 +107,6 @@ def parse_mdl0(f, context, subfileOffset):
 	# it will be flattened into a single weight index list later
 	weightsList = [[],[]]
 	
-	if uvsOffset > 0:
-		print_warning(name+" has UVs, which aren't supported yet (skipping)")
 	if furVectorsOffset > 0:
 		print_warning(name+" has fur vectors, which aren't supported yet (skipping)")
 	if furLayersOffset > 0:
@@ -367,6 +365,43 @@ def parse_mdl0(f, context, subfileOffset):
 					colours[colourIndex].append([1.0,1.0,1.0,1.0]) # need something so indices still line up
 					f.seek(f.tell()+colourStrideSize)
 	
+	uvs = {}
+	if uvsOffset > 0:
+		f.seek(uvsOffset+subfileOffset)
+		uvsDict = parse_brres_dict(f)
+		for uv,(uvName,uvDataOffset) in enumerate(uvsDict.items()):
+			f.seek(uvDataOffset)
+			uvSize = readAndParseIntBig(f,4)
+			parentSubfileOffset = readAndParseIntBig(f,4,signed=True)
+			dataOffset = readAndParseIntBig(f,4)
+			uvNameOffset = readAndParseIntBig(f,4) # probably not needed, already have a name
+			uvIndex = readAndParseIntBig(f,4)
+			uvDimensionality = readAndParseIntBig(f,4) # 0 = 1D, 1 = 2D
+			uvDataFormat = readAndParseIntBig(f,4) # 0 = u8, 1 = i8, 2 = u16, 3 = i16, 4 = float
+			uvNonFloatDivisor = readAndParseIntBig(f,1) # if not float, divide all positions by (1 << this)
+			uvStrideSize = readAndParseIntBig(f,1) # only needed to keep place given unknowns
+			uvCount = readAndParseIntBig(f,2)
+			uvBoundingBoxMin = [readAndParseFloatBig(f),readAndParseFloatBig(f),readAndParseFloatBig(f)]
+			uvBoundingBoxMax = [readAndParseFloatBig(f),readAndParseFloatBig(f),readAndParseFloatBig(f)]
+			f.seek(dataOffset+uvDataOffset)
+			uvs[uvIndex] = []
+			for i in range(uvCount):
+				is2D = uvDimensionality == 1 # will be assigning V = 0 for 1D positions
+				divisor = 1 << uvNonFloatDivisor
+				if uvDataFormat == 4:
+					uvs[uvIndex].append([readAndParseFloatBig(f),readAndParseFloatBig(f) if is2D else 0.0])
+				elif uvDataFormat >= 0 and uvDataFormat <= 3:
+					formatSize = [1,1,2,2][uvDataFormat]
+					formatSigned = [False,True,False,True][uvDataFormat]
+					uvs[uvIndex].append([
+											readAndParseIntBig(f,formatSize,signed=formatSigned)/divisor,
+											readAndParseIntBig(f,formatSize,signed=formatSigned)/divisor if is2D else 0.0,
+										])
+				else:
+					print_warning("unknown uv data format: "+str(uvDataFormat))
+					uvs[uvIndex].append([0,0]) # need something so indices still line up
+					f.seek(f.tell()+uvStrideSize)
+	
 	# these are called "objects" in BrawlBox and similar programs, but "meshes" makes more sense honestly
 	meshes = {}
 	if meshesOffset > 0: # a safe bet, but
@@ -575,6 +610,12 @@ def parse_mdl0(f, context, subfileOffset):
 							newVertex.setColour(0,colours[meshColourIndexes[0]][vert[11]])
 						if vert[12] != -1: # colour 2
 							newVertex.setColour(1,colours[meshColourIndexes[1]][vert[12]])
+						for uvLayer,uvIndex in enumerate(vert[13:21]):
+							uvMatrixIndex = vert[uvLayer+1] # vert[1] - vert[8]
+							if uvMatrixIndex != -1: # don't know what to do here yet, have not yet found an example
+								print_warning("uvMatrixIndex == ",uvMatrixIndex)
+							if uvIndex != -1:
+								newVertex.setUV(uvLayer,uvs[meshUVIndexes[uvLayer]][uvIndex])
 						# before adding this vertex, we must check for if it's a duplicate, and if so use the existing other instead
 						# this would be very expensive without hashing the position
 						foundDouble = False

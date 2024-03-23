@@ -15,7 +15,7 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 | Skeleton import | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | 65% |
 | Model import | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Vertex colours | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
-| └ UVs | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
+| └ UVs | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Vertex normals | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Vertex groups | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Shapes/Morphs | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
@@ -63,7 +63,7 @@ Note that this list is of all features, not per-game features. Use the grid abov
 Roughly in order of badness.
 ### Things with workarounds
 * By default, images import as whatever the default colour setting is. It guesses whether they are non-colour data based on the name, so it can always get it wrong, and you'll have to manually notice and correct them. This will make them _look_ wrong, for whatever dumb reason, but they will _behave_ correctly.
-* .brres import is a bit too conservative with merging duplicate vertices, so some things will remain separate when it's reasonably clear they need merging.
+* .brres import does not merge duplicate vertices if their UVs are different, even though this is often a valid/correct thing to do. Fixing this requires a significant refactoring with how data for all formats is parsed (there is currently no concept of "loops", which is required for this to work).
 ### Things with no workarounds
 #### All
 * Blender does not support per-shape normals, so that information is lost. In theory it won't matter much.
