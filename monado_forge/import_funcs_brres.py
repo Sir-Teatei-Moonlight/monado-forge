@@ -686,7 +686,7 @@ def import_brres_root(f, context):
 		f.seek(folderOffset)
 		folderDict = parse_brres_dict(f,folderName+"/")
 		globalDict.update(folderDict)
-	results = []
+	results = {}
 	for subfile in globalDict.items():
 		subfileName,subfileOffset = subfile
 		f.seek(subfileOffset)
@@ -694,11 +694,14 @@ def import_brres_root(f, context):
 		# there's a common format to the subfile headers, but it's more convenient to pretend otherwise
 		# was going to set this up with some cleverness about a function map, but decided it was overcomplicating things
 		if submagic == b"MDL0":
-			results.append(parse_mdl0(f,context,subfileOffset))
+			if "MDL0" not in results.keys(): results["MDL0"] = []
+			results["MDL0"].append(parse_mdl0(f,context,subfileOffset))
 		else:
 			print_warning(str(submagic)+" files not yet supported, skipping")
 	
-	return results[0]
+	if len(results["MDL0"]) > 1:
+		print_warning("found multiple MDL0s in this file, only processing the first for now")
+	return results["MDL0"][0]
 
 def import_brres(self, context):
 	absoluteFilePath = bpy.path.abspath(context.scene.monado_forge_import.singlePath)

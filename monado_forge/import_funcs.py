@@ -476,14 +476,16 @@ def realise_results(forgeResults, mainName, self, context):
 				sepNode.location = texNode.location + mathutils.Vector([125,-25])
 				sepNode.hide = True
 				newMat.node_tree.links.new(texNode.outputs["Color"],sepNode.inputs[0])
-		uvCount = mat.getUVLayerCount() # this will probably result in overestimation, but that's okay
-		pushdownValue = 0 # to keep track of how low the node under the UV nodes must be
+		colourCount = mat.getColourLayerCount() # this will probably result in overestimation, but that's okay
+		uvCount = mat.getUVLayerCount() # same
+		pushdownValue = 100 # to keep track of node posititon across multiple for loops
+		# we do UVs first because the node is shorter and they're more common than colours
 		for uv in range(uvCount):
 			uvInputNode = n.new("ShaderNodeUVMap")
 			uvInputNode.label = "UV Map "+str(uv+1)
 			if mirroring[""] or not mat.getTextures(): # no textures means no mirroring defined: assume none
-				uvInputNode.location = [-650,-125*uv+100]
-				pushdownValue = -125*(uv+1)+100
+				uvInputNode.location = [-650,pushdownValue]
+				pushdownValue -= 125
 				if uv == 0:
 					for mt in mirroring[""]:
 						newMat.node_tree.links.new(uvInputNode.outputs["UV"],mt.inputs["Vector"])
@@ -492,8 +494,8 @@ def realise_results(forgeResults, mainName, self, context):
 			if mirroring["y"]:
 				print_warning("Y-only texture mirror not yet supported (how'd you even get here)")
 			if mirroring["xy"]:
-				uvInputNode.location = [-650,-175*uv+100]
-				pushdownValue = -175*(uv+1)+100
+				uvInputNode.location = [-650,pushdownValue]
+				pushdownValue -= 175
 				try:
 					mirrorNodeGroup = bpy.data.node_groups["TexMirrorXY"]
 				except KeyError:
@@ -501,23 +503,23 @@ def realise_results(forgeResults, mainName, self, context):
 					mirrorNodeGroup = bpy.data.node_groups["TexMirrorXY"]
 				mirrorNode = n.new("ShaderNodeGroup")
 				mirrorNode.node_tree = mirrorNodeGroup
-				mirrorNode.location = [-650,-175*uv-25]
+				mirrorNode.location = [-650,pushdownValue-25]
 				mirrorNode.hide = True
 				for mt in mirroring["xy"]:
 					newMat.node_tree.links.new(uvInputNode.outputs["UV"],mirrorNode.inputs[0])
 					if uv == 0:
 						newMat.node_tree.links.new(mirrorNode.outputs[0],mt.inputs["Vector"])
-		# here, we create a node for vertex colours - we don't know if we'll need it, but we might
-		# having multiple colour layers is rare enough that it's probably safe to let the user figure out
-		colourInputNode = n.new("ShaderNodeAttribute")
-		colourInputNode.label = "Vertex Colours"
-		colourInputNode.location = [-650,pushdownValue]
-		colourInputNode.attribute_type = "GEOMETRY"
-		colourInputNode.attribute_name = "VertexColours1"
+		for colour in range(colourCount):
+			colourInputNode = n.new("ShaderNodeAttribute")
+			colourInputNode.label = "Vertex Colours "+str(colour+1)
+			colourInputNode.location = [-650,pushdownValue]
+			colourInputNode.attribute_type = "GEOMETRY"
+			colourInputNode.attribute_name = "VertexColours"+str(colour+1)
+			pushdownValue -= 175
 		for xi,x in enumerate(mat.getExtraData()):
 			extraDataNode = n.new("ShaderNodeValue")
 			extraDataNode.outputs["Value"].default_value = x
-			extraDataNode.label = "Extra Data Value"
+			extraDataNode.label = "Extra Data Value "+str(xi+1)
 			extraDataNode.location = [-475,xi*-100+300]
 		newMatsByIndex[mat.getIndex()] = newMat
 	

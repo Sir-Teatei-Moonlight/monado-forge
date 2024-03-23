@@ -509,7 +509,8 @@ def import_wismt(f, wimdoResults, context):
 	
 	meshes = []
 	vertexWeights = []
-	maxUVLayers = 0 # materials will need to know this without knowing what meshes they're on
+	maxColourLayers = 0 # materials will need to know this without knowing what meshes they're on
+	maxUVLayers = 0 # same
 	nextSubfileIndex = 0
 	hasRootSubfile = hasContentType[0] or hasContentType[1] or hasContentType[2]
 	hasUncachedTexSubfile = hasContentType[3]
@@ -636,6 +637,7 @@ def import_wismt(f, wimdoResults, context):
 						for j in range(vtDataCount):
 							newVertex = MonadoForgeVertex()
 							weightVertex = [[],[]]
+							hasColourLayers = [False] # only one colour layer is known at this time
 							hasUVLayers = [False,False,False]
 							for vd in vertexDescriptors:
 								vdType,vdSize = vd
@@ -652,9 +654,10 @@ def import_wismt(f, wimdoResults, context):
 								elif vdType == 7: # UV 3
 									newVertex.setUV(2,[readAndParseFloat(sf),1.0-readAndParseFloat(sf)])
 									hasUVLayers[2] = True
-								elif vdType == 17: # colour (is this the only colour layer?)
+								elif vdType == 17: # colour 1
 									a,r,g,b = readAndParseInt(sf,1),readAndParseInt(sf,1),readAndParseInt(sf,1),readAndParseInt(sf,1)
 									newVertex.setColour(0,[r,g,b,a])
+									hasColourLayers[0] = True
 								elif vdType == 28: # normals
 									newNormal = [readAndParseInt(sf,1,signed=True)/128.0,readAndParseInt(sf,1,signed=True)/128.0,readAndParseInt(sf,1,signed=True)/128.0]
 									readAndParseInt(sf,1,signed=True) # dummy
@@ -670,6 +673,7 @@ def import_wismt(f, wimdoResults, context):
 							newMesh.addVertex(newVertex)
 							vertexData[i].append(newVertex)
 							vertexWeightData[i].append(weightVertex)
+							maxColourLayers = max(maxColourLayers,sum(hasColourLayers))
 							maxUVLayers = max(maxUVLayers,sum(hasUVLayers))
 					if printProgress and vertexData != {}:
 						print("Finished reading vertex data.")
@@ -956,6 +960,7 @@ def import_wismt(f, wimdoResults, context):
 		newMat.setBaseColour(mat.getBaseColour())
 		newMat.setViewportColour(mat.getBaseColour())
 		newMat.setExtraData(mat.getExtraData())
+		newMat.setColourLayerCount(maxColourLayers)
 		newMat.setUVLayerCount(maxUVLayers)
 		matSamplers = mat.getSamplers()
 		# this is done in a way that "duplicates" texture references, but that's fairly harmless at this stage
