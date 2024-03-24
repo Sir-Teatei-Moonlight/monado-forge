@@ -19,8 +19,8 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 | └ Vertex normals | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Vertex groups | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Shapes/Morphs | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
-| └ Textures | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
-| └ Materials | :x: | :x: | :beginner: | :beginner: | :o: |
+| └ Textures | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
+| └ Materials | 50% | :x: | :beginner: | :beginner: | :o: |
 
 ## Current features
 Note that this list is of all features, not per-game features. Use the grid above, and known issues section below, to know what's currently supported per game.
@@ -40,7 +40,7 @@ Note that this list is of all features, not per-game features. Use the grid abov
 * By using the import-with-skeleton button instead, both the .wimdo's skeleton and the .arc/.chr skeleton will be imported, and then merged into one (giving the .arc/.chr one priority).
 * Optionally also import lower-LOD models. Doesn't currently distinguish them in any way.
 * Optional mesh cleanup, erasing unused vertices, vertex groups, vertex colours, and shapes.
-* Imports textures and saves them to a specified folder. By default, keeps only the biggest of each, but provides the option to keep all resolutions (using subfolders). Supports all known-to-be-used formats (R8G8B8A8, BC1, BC3, BC4, BC5, BC7).
+* Imports textures and saves them to a specified folder. By default, keeps only the biggest of each, but provides the option to keep all resolutions (using subfolders).
 * Optionally differentiates newly-imported textures with same-named existing ones by appending the imported .wismt's filename.
 * Optionally assumes that BC5 textures are normal maps, and auto-calculates the blue channel for them.
 * Optionally automatically splits "temp" files into channels.
@@ -62,8 +62,9 @@ Note that this list is of all features, not per-game features. Use the grid abov
 ## Known issues
 Roughly in order of badness.
 ### Things with workarounds
+* Imported models will not have vertices merged if their UVs are different, even though this is almost always a valid/correct thing to do. Fixing this is on the table but may take some time since it might take much refactoring.
 * By default, images import as whatever the default colour setting is. It guesses whether they are non-colour data based on the name, so it can always get it wrong, and you'll have to manually notice and correct them. This will make them _look_ wrong, for whatever dumb reason, but they will _behave_ correctly.
-* .brres import does not merge duplicate vertices if their UVs are different, even though this is often a valid/correct thing to do. Fixing this requires a significant refactoring with how data for all formats is parsed (there is currently no concept of "loops", which is required for this to work).
+  * .brres image names are not quite standardised enough to be worth doing this for them.
 ### Things with no workarounds
 #### All
 * Blender does not support per-shape normals, so that information is lost. In theory it won't matter much.
@@ -72,6 +73,7 @@ Roughly in order of badness.
   * Face drawcodes for "quad", "tri fan", "lines", "line strip", and "points"
   * Face drawcodes with embedded data (as opposed to indexed data)
   * All but the most basic normals type (i.e. not anything based on tangent or bitangent)
+  * The RGBA32 (RGBA8) image format
 #### .wimdo/wismt
 * Many XC3 models for party members (and possibly others) appear to use an unknown parenting mechanism for several bones (believed to be constraint-related), so they end up not being parented at all. You'll have to guess how things need to be attached.
 * Images that aren't power-of-two dimensions are not descrambled/deswizzled correctly. Very rare, but there.
@@ -80,6 +82,7 @@ Roughly in order of badness.
 * Outline data is not yet processed. Not quite sure how to be honest, perhaps will leverage a vertex colour layer for it.
 * There's an extra bit of data that we don't know what it does. It shows up as a "29,4" warning in the console. You can ignore it.
 * Some materials only have a base colour (no textures). These import as the Actual Raw Colour Values, and so might look incorrect when Blender's colour spaces get involved. Don't ask me how to fix this.
+* Everything assumes Eevee for rendering. I have no idea what will happen if you try to use Cycles.
 
 ## Planned features
 Roughly in order of priority.

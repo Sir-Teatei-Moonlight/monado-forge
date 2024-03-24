@@ -6,6 +6,7 @@ import os
 
 from . classes import *
 from . utils import *
+from . utils_img import *
 from . import_funcs import *
 from . modify_funcs import *
 
@@ -14,10 +15,15 @@ from . modify_funcs import *
 # https://avsys.xyz/wiki/BRRES_(File_Format)
 # the raw C++-masquerading-as-C# code of BrawlBox v0.66 (why else would it all be pointers >:( )
 
-def read_brres_str(f,pointer,offset):
+def read_brres_str(f,pointer,offset,debug=False):
 	crumb = f.tell()
 	f.seek(offset+pointer - 4) # have to "back up" 4 to get the length (could just do a till-null read, but this is safer)
+	if debug: print(f.tell())
 	length = readAndParseIntBig(f,4)
+	if length > 0xffff: # sanity check
+		print_error("tried to read a string from a bad place: file position "+str(offset+pointer))
+		f.seek(crumb)
+		return "(bad string "+str(offset+pointer)+")"
 	s = readFixedLenStr(f,length)
 	f.seek(crumb)
 	return s
@@ -111,18 +117,13 @@ def parse_mdl0(f, context, subfileOffset):
 		print_warning(name+" has fur vectors, which aren't supported yet (skipping)")
 	if furLayersOffset > 0:
 		print_warning(name+" has fur layers, which aren't supported yet (skipping)")
-	if materialsOffset > 0:
-		print_warning(name+" has materials, which aren't supported yet (skipping)")
 	if tevsOffset > 0:
 		print_warning(name+" has TEVs, which aren't supported yet (skipping)")
-	if textureLinksOffset > 0:
-		print_warning(name+" has texture links, which aren't supported yet (skipping)")
-	if paletteLinksOffset > 0:
-		print_warning(name+" has palette links, which aren't supported yet (skipping)")
 	if userDataOffset > 0:
 		print_warning(name+" has userdata, which aren't supported yet (skipping)")
 	
 	defsMultiWeightGroups = {}
+	defsMeshDraw = {}
 	if definitionsOffset > 0:
 		f.seek(definitionsOffset+subfileOffset)
 		defsDict = parse_brres_dict(f)
@@ -158,7 +159,7 @@ def parse_mdl0(f, context, subfileOffset):
 					meshIndex = readAndParseIntBig(f,2)
 					boneIndex = readAndParseIntBig(f,2)
 					priority = readAndParseIntBig(f,1)
-					data.append([4,[meshIndex,materialIndex,boneIndex,priority]])
+					defsMeshDraw[meshIndex] = [materialIndex,boneIndex,priority]
 				elif cmd == 0x05: # "indexing"
 					matrixID = readAndParseIntBig(f,2)
 					weightIndex = readAndParseIntBig(f,2)
@@ -176,6 +177,28 @@ def parse_mdl0(f, context, subfileOffset):
 				weightsList[1].append(defsMultiWeightGroups[k])
 			except KeyError:
 				weightsList[1].append([])
+	
+	# we do these link sections first because they might be useful later
+	# dunno how to actually use them yet, though
+	textureLinks = {}
+	if textureLinksOffset > 0:
+		f.seek(textureLinksOffset+subfileOffset)
+		texLinkDict = parse_brres_dict(f)
+		for b,(texLinkName,texLinkDataOffset) in enumerate(texLinkDict.items()):
+			f.seek(texLinkDataOffset)
+			texLinkCount = readAndParseIntBig(f,4)
+			for tl in range(texLinkCount):
+				textureLinks[texLinkName] = [readAndParseIntBig(f,4),readAndParseIntBig(f,4)]
+	
+	paletteLinks = {}
+	if paletteLinksOffset > 0:
+		f.seek(paletteLinksOffset+subfileOffset)
+		palLinkDict = parse_brres_dict(f)
+		for b,(palLinkName,palLinkDataOffset) in enumerate(palLinkDict.items()):
+			f.seek(palLinkDataOffset)
+			palLinkCount = readAndParseIntBig(f,4)
+			for pl in range(palLinkCount):
+				paletteLinks[palLinkName] = [readAndParseIntBig(f,4),readAndParseIntBig(f,4)]
 	
 	boneList = []
 	boneLinkTable = {} # for turning bone indexes into link IDs
@@ -385,25 +408,30 @@ def parse_mdl0(f, context, subfileOffset):
 			uvBoundingBoxMax = [readAndParseFloatBig(f),readAndParseFloatBig(f),readAndParseFloatBig(f)]
 			f.seek(dataOffset+uvDataOffset)
 			uvs[uvIndex] = []
-			for i in range(uvCount):
+			for i in range(uvCount): # reminder: the vertical must be inverted for all of these
 				is2D = uvDimensionality == 1 # will be assigning V = 0 for 1D positions
 				divisor = 1 << uvNonFloatDivisor
 				if uvDataFormat == 4:
-					uvs[uvIndex].append([readAndParseFloatBig(f),readAndParseFloatBig(f) if is2D else 0.0])
+					uvs[uvIndex].append([readAndParseFloatBig(f),1.0-(readAndParseFloatBig(f) if is2D else 0.0)])
 				elif uvDataFormat >= 0 and uvDataFormat <= 3:
 					formatSize = [1,1,2,2][uvDataFormat]
 					formatSigned = [False,True,False,True][uvDataFormat]
 					uvs[uvIndex].append([
 											readAndParseIntBig(f,formatSize,signed=formatSigned)/divisor,
-											readAndParseIntBig(f,formatSize,signed=formatSigned)/divisor if is2D else 0.0,
+											1.0-(readAndParseIntBig(f,formatSize,signed=formatSigned)/divisor if is2D else 0.0),
 										])
 				else:
 					print_warning("unknown uv data format: "+str(uvDataFormat))
 					uvs[uvIndex].append([0,0]) # need something so indices still line up
 					f.seek(f.tell()+uvStrideSize)
 	
+	# materials come next in the order, but we do them later so we can pass the colour/uv layer count
+	# we can get away with this because the defs contain the mesh/material linking purely by index
+	
 	# these are called "objects" in BrawlBox and similar programs, but "meshes" makes more sense honestly
 	meshes = {}
+	maxColourLayers = 0
+	maxUVLayers = 0
 	if meshesOffset > 0: # a safe bet, but
 		f.seek(meshesOffset+subfileOffset)
 		meshDict = parse_brres_dict(f)
@@ -436,11 +464,19 @@ def parse_mdl0(f, context, subfileOffset):
 			meshVerticesIndex = readAndParseIntBig(f,2,signed=True)
 			meshNormalsIndex = readAndParseIntBig(f,2,signed=True)
 			meshColourIndexes = [-1,-1]
+			currentColourLayers = 0
 			for i in range(2):
 				meshColourIndexes[i] = readAndParseIntBig(f,2,signed=True)
+				if meshColourIndexes[i] != -1:
+					currentColourLayers += 1
+			maxColourLayers = max(currentColourLayers,maxColourLayers)
 			meshUVIndexes = [-1,-1,-1,-1,-1,-1,-1,-1]
+			currentUVLayers = 0
 			for i in range(8):
 				meshUVIndexes[i] = readAndParseIntBig(f,2,signed=True)
+				if meshUVIndexes[i] != -1:
+					currentUVLayers += 1
+			maxUVLayers = max(currentUVLayers,maxUVLayers)
 			if subfileVersion >= 10:
 				meshFurVectorsIndex = readAndParseIntBig(f,2,signed=True)
 				meshFurLayersIndex = readAndParseIntBig(f,2,signed=True)
@@ -642,18 +678,208 @@ def parse_mdl0(f, context, subfileOffset):
 			newMesh.setName(name+"_"+meshName)
 			newMesh.setVertices(forgeVerts)
 			newMesh.setFaces(forgeFaces)
+			newMesh.setMaterialIndex(defsMeshDraw[meshIndex][0])
 			newMesh.setWeightSets(fullWeightIndexesList)
 			meshes[m] = newMesh
+	
+	materials = {}
+	if materialsOffset > 0:
+		f.seek(materialsOffset+subfileOffset)
+		materialsDict = parse_brres_dict(f)
+		for material,(materialName,materialDataOffset) in enumerate(materialsDict.items()):
+			f.seek(materialDataOffset)
+			materialSize = readAndParseIntBig(f,4)
+			parentSubfileOffset = readAndParseIntBig(f,4,signed=True)
+			#dataOffset = readAndParseIntBig(f,4)
+			materialNameOffset = readAndParseIntBig(f,4) # probably not needed, already have a name
+			materialIndex = readAndParseIntBig(f,4)
+			# probably don't need most of these, but might as well set them up just in case
+			materialFlags = readAndParseIntBig(f,4)
+			flagIsXLU = (materialFlags & 0x80000000) != 0 # specifically, has alpha aside from 1.0 or 0.0
+			flagNoTexMatrix = (materialFlags & 0x00000080) != 0
+			flagNoTexCoords = (materialFlags & 0x00000040) != 0
+			flagNoGenMode = (materialFlags & 0x00000020) != 0
+			flagNoLighting = (materialFlags & 0x00000010) != 0
+			flagNoIndirectMatrix = (materialFlags & 0x00000008) != 0
+			flagNoTexCoordScale = (materialFlags & 0x00000004) != 0
+			flagNoTEVColour = (materialFlags & 0x00000002) != 0
+			flagNoPixelDisplay = (materialFlags & 0x00000001) != 0
+			materialTexgenCount = readAndParseIntBig(f,1)
+			materialLightChannelCount = readAndParseIntBig(f,1)
+			materialShaderStageCount = readAndParseIntBig(f,1)
+			materialIndirectTexCount = readAndParseIntBig(f,1)
+			materialCulling = readAndParseIntBig(f,4) # bitflags: 1 = cull front, 2 = cull back
+			materialDepthTesting = readAndParseIntBig(f,1)
+			materialLightsetIndex = readAndParseIntBig(f,1)
+			materialFogIndex = readAndParseIntBig(f,1)
+			materialPadding = readAndParseIntBig(f,1)
+			materialIndirectMethod = readAndParseIntBig(f,4)
+			materialLightNrmMapRef = readAndParseIntBig(f,4)
+			materialShaderOffset = readAndParseIntBig(f,4,signed=True)
+			materialTexCount = readAndParseIntBig(f,4)
+			materialLayerOffset = readAndParseIntBig(f,4,signed=True)
+			materialOtherOffset1 = readAndParseIntBig(f,4,signed=True) # these change based on version and don't seem needed for XC1, so not trying too hard
+			materialOtherOffset2 = readAndParseIntBig(f,4,signed=True)
+			materialOtherOffset3 = readAndParseIntBig(f,4,signed=True)
+			materialTexMapUsage = readAndParseIntBig(f,4) # flags for which texture maps are used
+			f.seek(f.tell()+0x100) # "Precompiled code space containing texture information."
+			materialPaletteUsage = readAndParseIntBig(f,4) # flags for which palettes are used
+			f.seek(f.tell()+0x60) # "Precompiled code space containing palette information."
+			materialFixFlags = readAndParseIntBig(f,4) # bitflags: 1 = enable layer, 2 = fixed scale, 4 = fixed rotation, 8 = fixed translation
+			materialTexMatrixMode = readAndParseIntBig(f,4) # 0 = "Maya", 1 = "XSI", 2 = "3DS Max" (what do any of these actually mean)
+			materialCoordinates = []
+			for i in range(8):
+				scaleCoords = [readAndParseFloatBig(f),readAndParseFloatBig(f)]
+				rotCoords = readAndParseFloatBig(f)
+				transCoords = [readAndParseFloatBig(f),readAndParseFloatBig(f)]
+				materialCoordinates.append([scaleCoords,rotCoords,transCoords])
+			materialTexMatrixes = []
+			for i in range(8):
+				camRef = readAndParseIntBig(f,1,signed=True)
+				lightRef = readAndParseIntBig(f,1,signed=True)
+				mapMode = readAndParseIntBig(f,1) # 0 = UVs, 1 = camera, 2 = projection, 3 = list, 4 = specular
+				identityEffect = readAndParseIntBig(f,1)
+				texMatrix = [
+								[readAndParseFloatBig(f),readAndParseFloatBig(f),readAndParseFloatBig(f),readAndParseFloatBig(f)],
+								[readAndParseFloatBig(f),readAndParseFloatBig(f),readAndParseFloatBig(f),readAndParseFloatBig(f)],
+								[readAndParseFloatBig(f),readAndParseFloatBig(f),readAndParseFloatBig(f),readAndParseFloatBig(f)],
+							]
+				materialTexMatrixes = [camRef,lightRef,mapMode,identityEffect,texMatrix]
+			materialLightChannels = []
+			for i in range(8):
+				lightFlags = readAndParseIntBig(f,4) # bitflags: 1 = material colour, 2 = material alpha, 4 = ambient colour, 8 = ambient alpha, 16 = raster colour, 32 = raster alpha
+				baseMaterialColour = [readAndParseIntBig(f,1),readAndParseIntBig(f,1),readAndParseIntBig(f,1),readAndParseIntBig(f,1)] # RGBA
+				baseAmbientColour = [readAndParseIntBig(f,1),readAndParseIntBig(f,1),readAndParseIntBig(f,1),readAndParseIntBig(f,1)] # RGBA
+				colourChannelControl = readAndParseIntBig(f,4) # probably some other sort of flags
+				alphaChannelControl = readAndParseIntBig(f,4) # same
+				materialLightChannels.append([lightFlags,baseMaterialColour,baseAmbientColour,colourChannelControl,alphaChannelControl])
+			f.seek(materialDataOffset+materialLayerOffset)
+			textureData = []
+			for t in range(materialTexCount):
+				texNameOffset = readAndParseIntBig(f,4,signed=True)
+				paletteNameOffset = readAndParseIntBig(f,4,signed=True)
+				texDataOffset = readAndParseIntBig(f,4,signed=True) # unused/dummy?
+				paletteDataOffset = readAndParseIntBig(f,4,signed=True) # unused/dummy?
+				texDataID = readAndParseIntBig(f,4)
+				paletteDataID = readAndParseIntBig(f,4)
+				texWrapU = readAndParseIntBig(f,4) # 0 = clamp, 1 = repeat, 2 = mirror
+				texWrapV = readAndParseIntBig(f,4)
+				texFilterModeSmaller = readAndParseIntBig(f,4) # 0 = nearest, 1 = linear, 2 = nearest mipmap nearest, 3 = linear mipmap nearest, 4 = nearest mipmap linear, 5 = linear mipmap linear
+				texFilterModeLarger = readAndParseIntBig(f,4) # 0 = nearest, 1 = linear
+				texLODBias = readAndParseFloatBig(f)
+				texMaxAnisotropy = readAndParseIntBig(f,4) # 0 = 1, 1 = 2, 2 = 4
+				texClampBias = readAndParseIntBig(f,1)
+				texTexelInterpolate = readAndParseIntBig(f,1)
+				texPadding = readAndParseIntBig(f,2)
+				textureName = read_brres_str(f,texNameOffset,materialDataOffset+materialLayerOffset+52*t) # the extra 52 is because of the reads in this for-loop
+				textureData.append([textureName,texWrapU,texWrapV,texFilterModeLarger])
+			# all the stuff is in now, process it
+			newMat = MonadoForgeMaterial(materialIndex)
+			newMat.setName(materialName)
+			newMat.setCullingFront((materialCulling & 1) == 1)
+			newMat.setCullingBack(((materialCulling & 2)>>1) == 1)
+			newMat.setTransparency(2 if flagIsXLU else 0) # alpha clip not yet detected
+			newMat.setColourLayerCount(maxColourLayers)
+			newMat.setUVLayerCount(maxUVLayers)
+			for tex in textureData:
+				newTex = MonadoForgeTexture()
+				newTex.setName(tex[0])
+				uRepeat = tex[1] != 0 # not "== 1" because mirror also requires repeat
+				vRepeat = tex[2] != 0
+				uMirror = tex[1] == 2
+				vMirror = tex[2] == 2
+				newTex.setRepeating([uRepeat,vRepeat])
+				newTex.setMirroring([uMirror,vMirror])
+				newTex.setFiltered(tex[3] == 1)
+				newMat.addTexture(newTex)
+			materials[materialIndex] = newMat
 	
 	results = MonadoForgeImportedPackage()
 	skel = MonadoForgeSkeleton()
 	skel.setBones(boneList)
 	results.setSkeleton(skel)
 	results.setMeshes(list(meshes.values()))
-	#results.setMaterials(resultMaterials)
+	results.setMaterials(list(materials.values()))
 	if printProgress:
-		print("Finished parsing .brres file.")
+		print("Finished parsing MDL0 from .brres file.")
 	return results
+
+def parse_plt0(f, context, subfileOffset):
+	printProgress = context.scene.monado_forge_main.printProgress
+	startBreadcrumb = f.tell()
+	subfileLength = readAndParseIntBig(f,4)
+	subfileVersion = readAndParseIntBig(f,4)
+	subfileParentOffset = readAndParseIntBig(f,4,signed=True)
+	
+	pltHeaderCrumb = f.tell()
+	pltHeaderSize = readAndParseIntBig(f,4)
+	if pltHeaderSize != 0x40:
+		print_warning("palette at "+str(subfileOffset)+" doesn't have a pltHeaderSize of 0x40 (undefined behaviour)")
+	nameOffset = readAndParseIntBig(f,4)
+	name = read_brres_str(f,nameOffset,subfileOffset)
+	paletteFormat = readAndParseIntBig(f,4)
+	colourCount = readAndParseIntBig(f,2)
+	
+	f.seek(pltHeaderSize+subfileOffset)
+	colours = []
+	# all these results are in 255 format
+	if paletteFormat == 1: # RGB565
+		for c in range(colourCount):
+			data = readAndParseIntBig(f,2)
+			r = ((data & 0b1111100000000000) >> 11)/31*255
+			g = ((data & 0b0000011111100000) >> 5)/63*255
+			b = (data & 0b0000000000011111)/31*255
+			colours.append([r,g,b,255])
+	elif paletteFormat == 2: # RGB5A3
+		for c in range(colourCount):
+			data = readAndParseIntBig(f,2)
+			mode = (data & 0b1000000000000000) >> 15
+			if mode:
+				r = ((data & 0b0111110000000000) >> 10)/31*255
+				g = ((data & 0b0000001111100000) >> 5)/31*255
+				b = (data & 0b0000000000011111)/31*255
+				colours.append([r,g,b,255])
+			else:
+				a = ((data & 0b0111000000000000) >> 12)/7*255
+				r = ((data & 0b0000111100000000) >> 8)/15*255
+				g = ((data & 0b0000000011110000) >> 4)/15*255
+				b = (data & 0b0000000000001111)/15*255
+				colours.append([r,g,b,a])
+	else:
+		print_error("PLT0 block "+name+"is of unknown/unsupported format "+str(paletteFormat))
+	return name,colours
+
+def parse_tex0(f, context, subfileOffset, palettesDict):
+	printProgress = context.scene.monado_forge_main.printProgress
+	texPath = None
+	if context.scene.monado_forge_import.autoSaveTextures:
+		texPath = bpy.path.abspath(context.scene.monado_forge_import.texturePath)
+	startBreadcrumb = f.tell()
+	subfileLength = readAndParseIntBig(f,4)
+	subfileVersion = readAndParseIntBig(f,4)
+	subfileParentOffset = readAndParseIntBig(f,4,signed=True)
+	
+	texHeaderCrumb = f.tell()
+	texHeaderSize = readAndParseIntBig(f,4)
+	if texHeaderSize != 0x40:
+		print_warning("texture at "+str(subfileOffset)+" doesn't have a texHeaderSize of 0x40 (undefined behaviour)")
+	nameOffset = readAndParseIntBig(f,4)
+	name = read_brres_str(f,nameOffset,subfileOffset)
+	ciFlag = readAndParseIntBig(f,4)
+	imgWidth = readAndParseIntBig(f,2)
+	imgHeight = readAndParseIntBig(f,2)
+	imgFormat = readAndParseIntBig(f,4)
+	mipmapCount = readAndParseIntBig(f,4)
+	minMipmap = readAndParseFloatBig(f)
+	maxMipmap = readAndParseFloatBig(f)
+	unused = readAndParseIntBig(f,4)
+	
+	# assumption: texture name always matches palette name
+	palette = palettesDict.get(name,[])
+	
+	f.seek(texHeaderSize+subfileOffset)
+	# here is the raw image data
+	imgName = parse_texture_brres(name,imgFormat,imgWidth,imgHeight,f.read(subfileLength-texHeaderSize),palette,printProgress,saveTo=texPath)
 
 def import_brres_root(f, context):
 	printProgress = context.scene.monado_forge_main.printProgress
@@ -696,6 +922,15 @@ def import_brres_root(f, context):
 		if submagic == b"MDL0":
 			if "MDL0" not in results.keys(): results["MDL0"] = []
 			results["MDL0"].append(parse_mdl0(f,context,subfileOffset))
+		elif submagic == b"PLT0":
+			# assumption: palette names are never shared in a single .brres file
+			if "PLT0" not in results.keys(): results["PLT0"] = {}
+			pltName,pltColours = parse_plt0(f,context,subfileOffset)
+			results["PLT0"][pltName] = pltColours
+		elif submagic == b"TEX0":
+			# textures are just imported straight to Blender, no passing of results needed
+			# assumption: any necessary PLT0 file will always be imported first
+			parse_tex0(f,context,subfileOffset,results.get("PLT0",{}))
 		else:
 			print_warning(str(submagic)+" files not yet supported, skipping")
 	

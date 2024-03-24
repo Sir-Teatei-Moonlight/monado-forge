@@ -197,6 +197,8 @@ class MonadoForgeMaterial:
 		self._name = "Material"
 		self._baseColour = [1.0,1.0,1.0,1.0]
 		self._viewportColour = [0.5,0.5,0.5,1.0]
+		self._culling = [False,True] # front, back
+		self._transparency = 0 # 0 = opaque, 1 = alpha clip, 2 = alpha blend
 		self._textures = []
 		self._extraData = []
 		self._colourLayerCount = 0 # not actually part of the material, but the material needs to know
@@ -227,6 +229,40 @@ class MonadoForgeMaterial:
 			raise ValueError("sequence must be length 4, not "+str(len(a)))
 		self._viewportColour = a[:]
 	
+	def getCulling(self):
+		return self._culling
+	def getCullingFront(self):
+		return self._culling[0]
+	def getCullingBack(self):
+		return self._culling[1]
+	def setCulling(self,a):
+		if len(a) != 2:
+			raise ValueError("sequence must be length 2, not "+str(len(a)))
+		self._culling = a[:]
+	def setCullingFront(self,x):
+		if not isinstance(x,bool):
+			raise TypeError("expected a bool, not a(n) "+str(type(x)))
+		self._culling[0] = x
+	def setCullingBack(self,x):
+		if not isinstance(x,bool):
+			raise TypeError("expected a bool, not a(n) "+str(type(x)))
+		self._culling[1] = x
+	
+	def getTransparency(self):
+		return self._transparency
+	def setTransparency(self,x):
+		if not isinstance(x,int):
+			raise TypeError("expected an int, not a(n) "+str(type(x)))
+		self._transparency = x
+	def isOpaque(self):
+		return self._transparency == 0
+	def isTransparent(self):
+		return self._transparency > 0
+	def isAlphaClip(self):
+		return self._transparency == 1
+	def isAlphaBlend(self):
+		return self._transparency == 2
+
 	def getTextures(self):
 		return self._textures
 	def clearTextures(self):

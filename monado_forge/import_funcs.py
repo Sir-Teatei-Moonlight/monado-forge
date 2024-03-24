@@ -399,9 +399,12 @@ def realise_results(forgeResults, mainName, self, context):
 			newMat.diffuse_color = context.scene.monado_forge_import.viewportColour
 		else:
 			newMat.diffuse_color = mat.getViewportColour()
-		newMat.blend_method = "OPAQUE" # the most likely option
-		newMat.shadow_method = "OPAQUE"
-		newMat.use_backface_culling = True # more likely than not
+		transparencyEnum = ["OPAQUE","CLIP","BLEND"]
+		newMat.blend_method = transparencyEnum[mat.getTransparency()]
+		shadowTransparencyEnum = ["OPAQUE","CLIP","OPAQUE"] # only binary shadows allowed
+		newMat.shadow_method = shadowTransparencyEnum[mat.getTransparency()]
+		newMat.use_backface_culling = mat.getCullingBack() # dunno what to do about any that cull front, so leaving it out
+		newMat.show_transparent_back = True # not ideal but believed to be correct
 		newMat.use_nodes = True # the default creation is "Principled BSDF" into "Material Output"
 		n = newMat.node_tree.nodes
 		n.remove(n.get("Principled BSDF"))
@@ -483,39 +486,38 @@ def realise_results(forgeResults, mainName, self, context):
 		for uv in range(uvCount):
 			uvInputNode = n.new("ShaderNodeUVMap")
 			uvInputNode.label = "UV Map "+str(uv+1)
+			uvInputNode.hide = True
+			uvInputNode.location = [-650,pushdownValue]
+			uvInputNode.uv_map = "UV"+str(uv+1)
+			pushdownValue -= 40
 			if mirroring[""] or not mat.getTextures(): # no textures means no mirroring defined: assume none
-				uvInputNode.location = [-650,pushdownValue]
-				pushdownValue -= 125
 				if uv == 0:
 					for mt in mirroring[""]:
 						newMat.node_tree.links.new(uvInputNode.outputs["UV"],mt.inputs["Vector"])
-			if mirroring["x"]:
-				print_warning("X-only texture mirror not yet supported (how'd you even get here)")
-			if mirroring["y"]:
-				print_warning("Y-only texture mirror not yet supported (how'd you even get here)")
-			if mirroring["xy"]:
-				uvInputNode.location = [-650,pushdownValue]
-				pushdownValue -= 175
-				try:
-					mirrorNodeGroup = bpy.data.node_groups["TexMirrorXY"]
-				except KeyError:
-					import_library_node("TexMirrorXY", self, context)
-					mirrorNodeGroup = bpy.data.node_groups["TexMirrorXY"]
-				mirrorNode = n.new("ShaderNodeGroup")
-				mirrorNode.node_tree = mirrorNodeGroup
-				mirrorNode.location = [-650,pushdownValue-25]
-				mirrorNode.hide = True
-				for mt in mirroring["xy"]:
-					newMat.node_tree.links.new(uvInputNode.outputs["UV"],mirrorNode.inputs[0])
-					if uv == 0:
-						newMat.node_tree.links.new(mirrorNode.outputs[0],mt.inputs["Vector"])
+			for mType in ["x","y","xy"]:
+				if mirroring[mType]:
+					try:
+						mirrorNodeGroup = bpy.data.node_groups["TexMirror"+mType.upper()]
+					except KeyError:
+						import_library_node("TexMirror"+mType.upper(), self, context)
+						mirrorNodeGroup = bpy.data.node_groups["TexMirror"+mType.upper()]
+					mirrorNode = n.new("ShaderNodeGroup")
+					mirrorNode.node_tree = mirrorNodeGroup
+					mirrorNode.location = [-650,pushdownValue]
+					pushdownValue -= 40
+					mirrorNode.hide = True
+					for mt in mirroring[mType]:
+						newMat.node_tree.links.new(uvInputNode.outputs["UV"],mirrorNode.inputs[0])
+						if uv == 0:
+							newMat.node_tree.links.new(mirrorNode.outputs[0],mt.inputs["Vector"])
 		for colour in range(colourCount):
 			colourInputNode = n.new("ShaderNodeAttribute")
 			colourInputNode.label = "Vertex Colours "+str(colour+1)
 			colourInputNode.location = [-650,pushdownValue]
 			colourInputNode.attribute_type = "GEOMETRY"
 			colourInputNode.attribute_name = "VertexColours"+str(colour+1)
-			pushdownValue -= 175
+			colourInputNode.hide = True
+			pushdownValue -= 40
 		for xi,x in enumerate(mat.getExtraData()):
 			extraDataNode = n.new("ShaderNodeValue")
 			extraDataNode.outputs["Value"].default_value = x
