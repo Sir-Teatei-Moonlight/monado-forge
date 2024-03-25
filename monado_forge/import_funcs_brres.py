@@ -490,7 +490,7 @@ def parse_mdl0(f, context, subfileOffset):
 			# the deal is: some commands define the format, and then other commands read the data in said format
 			# the basic pattern is defining the bit-size of indexes with 0850 and 0860 cmds
 			# for one-bit flags, 0 = not present and 1 = present as an 8-bit index
-			# for two-bit flags: 00 = not present, 10 = 8-bit, 11 = 16-bit; 10 = data is directly in the params instead of being indexed
+			# for two-bit flags: 00 = not present, 10 = 8-bit, 11 = 16-bit; 01 = data is directly in the params instead of being indexed
 			# in the "direct" case, further commands (0870, 0880, 0890) define the format of the data
 			flagPatterns = {
 							"0850":[1,1,1,1,1,1,1,1,1,2,2,2,2,15], # posMat, texMat0-7, pos, nrm, col0, col1, unused*15
@@ -518,162 +518,190 @@ def parse_mdl0(f, context, subfileOffset):
 			# they're not actually arrays because we can just use the memory address target as a dict key (nice and simple)
 			indexedMatrixesPos = {}
 			indexedMatrixesNrm = {}
-			while f.tell() < meshSize+meshDataOffset:
-				faces = []
-				cmd = readAndParseIntBig(f,1)
-				if cmd == 0x00: # no-op
-					pass
-				elif cmd == 0x08: # load CP
-					subcmd = readAndParseIntBig(f,1)
-					params = f.read(4)
-					bits = BitReader(params)
-					readFields = []
-					# the flag patterns are reversed (and then unreversed via [::-1] after being read so the unused are skipped)
-					# because they're in little-first order but we kinda have to read in big-first order
-					if subcmd == 0x50:
-						for p in reversed(flagPatterns["0850"]):
-							readFields.append(bits.readbits(p))
-						combinedCPIndexedFlags[0:13] = readFields[13:0:-1]
-					elif subcmd == 0x60:
-						for p in reversed(flagPatterns["0860"]):
-							readFields.append(bits.readbits(p))
-						combinedCPIndexedFlags[13:21] = readFields[8:0:-1]
-					elif subcmd == 0x70:
-						for p in reversed(flagPatterns["0870"]):
-							readFields.append(bits.readbits(p))
-						combinedCPEmbeddedFlags[0:14] = readFields[14:0:-1]
-					elif subcmd == 0x80:
-						for p in reversed(flagPatterns["0880"]):
-							readFields.append(bits.readbits(p))
-						combinedCPEmbeddedFlags[14:25] = readFields[11:0:-1]
-					elif subcmd == 0x90:
-						for p in reversed(flagPatterns["0890"]):
-							readFields.append(bits.readbits(p))
-						combinedCPEmbeddedFlags[25:35] = readFields[10:0:-1]
-				elif cmd == 0x10: # load XF
-					# don't know how much we need this yet, so only kinda roughing it in
-					transferSize = readAndParseIntBig(f,2) + 1
-					address = readAndParseIntBig(f,2)
-					params = f.read(4)
-					bits = BitReader(params)
-					# reminder: have to read things in backwards
-					if address == 0x1008:
-						unused = bits.readbits(24)
-						texCoordCount = bits.readbits(4)
-						normalCount = bits.readbits(2)
-						colourCount = bits.readbits(2)
-					#elif address == 0x1040 # uhhh not yet sure how to deal with the 4th digit also being a value (hopefully don't need it)
-				# okay according to the BrawlBox code some of this stuff is:
-				# 16 bits of index
-				# 4 bits of "length-1" (says you have to add 1 to get the true value)
-				# 8 bits of memory address (needed to know what's being replaced from the current array)
-				elif cmd == 0x20: # indexed 4x3 position matrix (...what does that mean exactly?)
-					mtxIndex = readAndParseIntBig(f,2)
-					otherStuff = readAndParseIntBig(f,2)
-					chunkLength = (otherStuff >> 12)+1
-					memAddr = otherStuff & 0xff
-					indexedMatrixesPos[memAddr//chunkLength] = mtxIndex
-				elif cmd == 0x28: # indexed 3x3 normal matrix (same as above)
-					mtxIndex = readAndParseIntBig(f,2)
-					otherStuff = readAndParseIntBig(f,2)
-					chunkLength = (otherStuff >> 12)+1
-					memAddr = otherStuff & 0xff
-					indexedMatrixesNrm[memAddr//chunkLength] = mtxIndex
-				# draw commands not put in yet: 0x80 quads, 0xa0 tri-fan, 0xa8 lines, 0xb0 line-strip, 0xb8 points
-				elif cmd == 0x90 or cmd == 0x98: # draw commands
-					vertCount = readAndParseIntBig(f,2)
-					vertData = []
-					for i in range(vertCount):
-						vert = []
-						for j,v in enumerate(indexWidths):
-							vert.append(-1) # add a null, then replace it with what's read
-							if v == 1 and combinedCPIndexedFlags[j] == 1:
-								vert[-1] = readAndParseIntBig(f,1)
-							elif v == 2:
-								if combinedCPIndexedFlags[j] == 1:
-									print_warning("direct embedded draw cmds not currently supported")
-								elif combinedCPIndexedFlags[j] == 2:
-									vert[-1] = readAndParseIntBig(f,1)
-								elif combinedCPIndexedFlags[j] == 3:
-									vert[-1] = readAndParseIntBig(f,2)
-						vertData.append(vert)
-					if cmd == 0x90: # triangles
-						for v in range(0,len(vertData),3):
-							# the vert order is backwards (2,1,0) for normals purposes
-							faces.append([vertData[v+2],vertData[v+1],vertData[v]])
-					if cmd == 0x98: # triangle strip
-						for v in range(len(vertData)-2):
-							# if we just add the verts in order, the strip will keep alternating between clockwise and CCW
-							# so we have to invert the direction of every other face
-							if v % 2 == 0:
+			indexedMatrixesTex = {}
+			indexedMatrixesLgt = {}
+			try: # this try is primarily so we can still print unknownCmds if something goes wrong
+				while f.tell() < meshSize+meshDataOffset:
+					faces = []
+					cmd = readAndParseIntBig(f,1)
+					if cmd == 0x00: # no-op
+						pass
+					elif cmd == 0x08: # load CP
+						subcmd = readAndParseIntBig(f,1)
+						params = f.read(4)
+						bits = BitReader(params)
+						readFields = []
+						# the flag patterns are reversed (and then unreversed via [::-1] after being read so the unused are skipped)
+						# because they're in little-first order but we kinda have to read in big-first order
+						if subcmd == 0x50:
+							for p in reversed(flagPatterns["0850"]):
+								readFields.append(bits.readbits(p))
+							combinedCPIndexedFlags[0:13] = readFields[13:0:-1]
+						elif subcmd == 0x60:
+							for p in reversed(flagPatterns["0860"]):
+								readFields.append(bits.readbits(p))
+							combinedCPIndexedFlags[13:21] = readFields[8:0:-1]
+						elif subcmd == 0x70:
+							for p in reversed(flagPatterns["0870"]):
+								readFields.append(bits.readbits(p))
+							combinedCPEmbeddedFlags[0:14] = readFields[14:0:-1]
+						elif subcmd == 0x80:
+							for p in reversed(flagPatterns["0880"]):
+								readFields.append(bits.readbits(p))
+							combinedCPEmbeddedFlags[14:25] = readFields[11:0:-1]
+						elif subcmd == 0x90:
+							for p in reversed(flagPatterns["0890"]):
+								readFields.append(bits.readbits(p))
+							combinedCPEmbeddedFlags[25:35] = readFields[10:0:-1]
+					elif cmd == 0x10: # load XF
+						# don't know how much we need this yet, so only kinda roughing it in
+						transferSize = readAndParseIntBig(f,2) + 1
+						address = readAndParseIntBig(f,2)
+						params = f.read(4)
+						bits = BitReader(params)
+						# reminder: have to read things in backwards
+						if address == 0x1008:
+							unused = bits.readbits(24)
+							texCoordCount = bits.readbits(4)
+							normalCount = bits.readbits(2)
+							colourCount = bits.readbits(2)
+						#elif address == 0x1040 # uhhh not yet sure how to deal with the 4th digit also being a value (hopefully don't need it)
+					# okay according to the BrawlBox code some of this stuff is:
+					# 16 bits of index
+					# 4 bits of "length-1" (says you have to add 1 to get the true value)
+					# 8 bits of memory address (needed to know what's being replaced from the current array)
+					elif cmd == 0x20: # indexed 4x3 position matrix (...what does that mean exactly?)
+						mtxIndex = readAndParseIntBig(f,2)
+						otherStuff = readAndParseIntBig(f,2)
+						chunkLength = (otherStuff >> 12)+1
+						memAddr = otherStuff & 0xff
+						indexedMatrixesPos[memAddr//chunkLength] = mtxIndex
+					elif cmd == 0x28: # indexed 3x3 normal matrix (same as above)
+						mtxIndex = readAndParseIntBig(f,2)
+						otherStuff = readAndParseIntBig(f,2)
+						chunkLength = (otherStuff >> 12)+1
+						memAddr = otherStuff & 0xff
+						indexedMatrixesNrm[memAddr//chunkLength] = mtxIndex
+					elif cmd == 0x30: # indexed 4x4 texture matrix (same as above)
+						mtxIndex = readAndParseIntBig(f,2)
+						otherStuff = readAndParseIntBig(f,2)
+						chunkLength = (otherStuff >> 12)+1
+						memAddr = otherStuff & 0xff
+						indexedMatrixesTex[memAddr//chunkLength] = mtxIndex
+					elif cmd == 0x38: # light-based something or other???
+						mtxIndex = readAndParseIntBig(f,2)
+						otherStuff = readAndParseIntBig(f,2)
+						chunkLength = (otherStuff >> 12)+1
+						memAddr = otherStuff & 0xff
+						indexedMatrixesLgt[memAddr//chunkLength] = mtxIndex
+					# draw commands not put in yet: 0x80 quads, 0xa0 tri-fan, 0xa8 lines, 0xb0 line-strip, 0xb8 points
+					elif cmd == 0x90 or cmd == 0x98: # draw commands
+						vertCount = readAndParseIntBig(f,2)
+						vertData = []
+						for i in range(vertCount):
+							vert = []
+							for j,v in enumerate(indexWidths):
+								vert.append(-1) # add a null, then replace it with what's read
+								if v == 1:
+									if combinedCPIndexedFlags[j] == 0:
+										pass # not present
+									elif combinedCPIndexedFlags[j] == 1:
+										vert[-1] = readAndParseIntBig(f,1)
+									else:
+										print_warning("unsupported situation found @ "+str(f.tell()))
+								elif v == 2:
+									if combinedCPIndexedFlags[j] == 0:
+										pass # not present
+									elif combinedCPIndexedFlags[j] == 1:
+										print_warning("direct embedded draw cmds not currently supported @ "+str(f.tell()))
+									elif combinedCPIndexedFlags[j] == 2:
+										vert[-1] = readAndParseIntBig(f,1)
+									elif combinedCPIndexedFlags[j] == 3:
+										vert[-1] = readAndParseIntBig(f,2)
+									else:
+										print_warning("unsupported situation found @ "+str(f.tell()))
+							vertData.append(vert)
+						if cmd == 0x90: # triangles
+							for v in range(0,len(vertData),3):
+								# the vert order is backwards (2,1,0) for normals purposes
 								faces.append([vertData[v+2],vertData[v+1],vertData[v]])
+						if cmd == 0x98: # triangle strip
+							for v in range(len(vertData)-2):
+								# if we just add the verts in order, the strip will keep alternating between clockwise and CCW
+								# so we have to invert the direction of every other face
+								if v % 2 == 0:
+									faces.append([vertData[v+2],vertData[v+1],vertData[v]])
+								else:
+									faces.append([vertData[v],vertData[v+1],vertData[v+2]])
+					else: # all options exhausted, not a known/supported code
+						if cmd not in unknownCmds: unknownCmds.append(cmd)
+					for face in faces:
+						faceVerts = []
+						for vert in face:
+							newVertex = MonadoForgeVertex()
+							newVertex._id = curVIndex
+							if vert[9] != -1: # should never happen (a vertex without position), but
+								pos = positions[meshVerticesIndex][vert[9]]
+								if vert[10] != -1: # normal
+									nrm = normals[meshNormalsIndex][vert[10]]
+								singleBone = None
+								boneListIndex = -1
+								if singleBoneWeightIndex != -1: # entire mesh uses the same bone
+									boneListIndexTarget = singleBoneWeightIndex
+								else: # per-vertex weights
+									# but what if vert[0] is -1? apparently that's a thing
+									boneListIndexTarget = indexedMatrixesPos[vert[0]//3]
+								boneListIndex = weightLinkTable[boneListIndexTarget]
+								newVertex.setWeightSetIndex(boneListIndex)
+								if boneListIndex == -1: # not a single bone vertex
+									newVertex.setWeightSetIndex(boneListIndexTarget+multiWeightShiftIndex)
+								else: # is a single bone vertex
+									# these vertices are origin-clustered and modified into position based on their bone
+									singleBone = boneList[boneListIndex]
+									boneMatrix = globalBoneMatrixes[boneListIndex]
+									pos = boneMatrix @ mathutils.Vector(pos)
+									if vert[10] != -1:
+										# rotation part only
+										nrmMatrix = boneMatrix.to_quaternion().to_matrix()
+										nrm = nrmMatrix @ mathutils.Vector(nrm)
+								newVertex.setPosition(pos)
+								if vert[10] != -1: # normal
+									newVertex.setNormal(nrm)
 							else:
-								faces.append([vertData[v],vertData[v+1],vertData[v+2]])
-				else: # all options exhausted, not a known/supported code
-					if cmd not in unknownCmds: unknownCmds.append(cmd)
-				for face in faces:
-					faceVerts = []
-					for vert in face:
-						newVertex = MonadoForgeVertex()
-						newVertex._id = curVIndex
-						if vert[9] != -1: # should never happen (a vertex without position), but
-							pos = positions[meshVerticesIndex][vert[9]]
-							if vert[10] != -1: # normal
-								nrm = normals[meshNormalsIndex][vert[10]]
-							singleBone = None
-							boneListIndex = -1
-							if singleBoneWeightIndex != -1: # entire mesh uses the same bone
-								boneListIndexTarget = singleBoneWeightIndex
-							else: # per-vertex weights
-								boneListIndexTarget = indexedMatrixesPos[vert[0]//3]
-							boneListIndex = weightLinkTable[boneListIndexTarget]
-							newVertex.setWeightSetIndex(boneListIndex)
-							if boneListIndex == -1: # not a single bone vertex
-								newVertex.setWeightSetIndex(boneListIndexTarget+multiWeightShiftIndex)
-							else: # is a single bone vertex
-								# these vertices are origin-clustered and modified into position based on their bone
-								singleBone = boneList[boneListIndex]
-								boneMatrix = globalBoneMatrixes[boneListIndex]
-								pos = boneMatrix @ mathutils.Vector(pos)
-								if vert[10] != -1:
-									# rotation part only
-									nrmMatrix = boneMatrix.to_quaternion().to_matrix()
-									nrm = nrmMatrix @ mathutils.Vector(nrm)
-							newVertex.setPosition(pos)
-							if vert[10] != -1: # normal
-								newVertex.setNormal(nrm)
-						if vert[11] != -1: # colour 1
-							newVertex.setColour(0,colours[meshColourIndexes[0]][vert[11]])
-						if vert[12] != -1: # colour 2
-							newVertex.setColour(1,colours[meshColourIndexes[1]][vert[12]])
-						for uvLayer,uvIndex in enumerate(vert[13:21]):
-							uvMatrixIndex = vert[uvLayer+1] # vert[1] - vert[8]
-							if uvMatrixIndex != -1: # don't know what to do here yet, have not yet found an example
-								print_warning("uvMatrixIndex == ",uvMatrixIndex)
-							if uvIndex != -1:
-								newVertex.setUV(uvLayer,uvs[meshUVIndexes[uvLayer]][uvIndex])
-						# before adding this vertex, we must check for if it's a duplicate, and if so use the existing other instead
-						# this would be very expensive without hashing the position
-						foundDouble = False
-						thisPosHashed = tuple(newVertex.getPosition())
-						if thisPosHashed in hashedVertsByPosition.keys():
-							others = hashedVertsByPosition[thisPosHashed]
-							for other in others:
-								if newVertex.isDouble(other):
-									faceVerts.append(other.getID())
-									foundDouble = True
-									hashedVertsByPosition[thisPosHashed].append(newVertex)
-									break
-						if not foundDouble:
-							forgeVerts.append(newVertex)
-							faceVerts.append(curVIndex)
-							hashedVertsByPosition[tuple(newVertex.getPosition())] = [newVertex]
-							curVIndex += 1
-					newFace = MonadoForgeFace()
-					newFace.setVertexIndexes(faceVerts)
-					forgeFaces.append(newFace)
-			if unknownCmds:
-				print_warning("found unknown graphic commands: "+", ".join(hex(x) for x in unknownCmds))
+								print_warning("vertex without position: "+str(vert))
+							if vert[11] != -1: # colour 1
+								newVertex.setColour(0,colours[meshColourIndexes[0]][vert[11]])
+							if vert[12] != -1: # colour 2
+								newVertex.setColour(1,colours[meshColourIndexes[1]][vert[12]])
+							for uvLayer,uvIndex in enumerate(vert[13:21]):
+								uvMatrixIndex = vert[uvLayer+1] # vert[1] - vert[8]
+								if uvMatrixIndex != -1: # don't know what to do here yet
+									print_warning("uvMatrixIndex == "+str(uvMatrixIndex))
+								if uvIndex != -1:
+									newVertex.setUV(uvLayer,uvs[meshUVIndexes[uvLayer]][uvIndex])
+							# before adding this vertex, we must check for if it's a duplicate, and if so use the existing other instead
+							# this would be very expensive without hashing the position
+							foundDouble = False
+							thisPosHashed = tuple(newVertex.getPosition())
+							if thisPosHashed in hashedVertsByPosition.keys():
+								others = hashedVertsByPosition[thisPosHashed]
+								for other in others:
+									if newVertex.isDouble(other):
+										faceVerts.append(other.getID())
+										foundDouble = True
+										hashedVertsByPosition[thisPosHashed].append(newVertex)
+										break
+							if not foundDouble:
+								forgeVerts.append(newVertex)
+								faceVerts.append(curVIndex)
+								hashedVertsByPosition[tuple(newVertex.getPosition())] = [newVertex]
+								curVIndex += 1
+						newFace = MonadoForgeFace()
+						newFace.setVertexIndexes(faceVerts)
+						forgeFaces.append(newFace)
+			finally:
+				if unknownCmds:
+					print_warning("found unknown graphic commands: "+", ".join(hex(x) for x in unknownCmds))
 			newMesh = MonadoForgeMesh()
 			newMesh.setName(name+"_"+meshName)
 			newMesh.setVertices(forgeVerts)
