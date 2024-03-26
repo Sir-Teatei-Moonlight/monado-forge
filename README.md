@@ -73,7 +73,6 @@ Roughly in order of badness.
   * Face drawcodes for "quad", "tri fan", "lines", "line strip", and "points"
   * Face drawcodes with embedded data (as opposed to indexed data)
   * All but the most basic normals type (i.e. not anything based on tangent or bitangent)
-  * The RGBA32 (RGBA8) image format
 #### .wimdo/wismt
 * Many XC3 models for party members (and possibly others) appear to use an unknown parenting mechanism for several bones (believed to be constraint-related), so they end up not being parented at all. You'll have to guess how things need to be attached.
 * Images that aren't power-of-two dimensions are not descrambled/deswizzled correctly. Very rare, but there.
@@ -81,6 +80,7 @@ Roughly in order of badness.
 * Outline meshes are not recognised or treated as anything special. If you get two entirely identical meshes, consider that one may be the outline, in which case you can delete one of them (probably the one with no textures in its material). Unclear how to automatically handle this, it's not immediately obvious how the game treats it (and guessing based on the name containing "outline" is not ideal).
 * Outline data is not yet processed. Not quite sure how to be honest, perhaps will leverage a vertex colour layer for it.
 * There's an extra bit of data that we don't know what it does. It shows up as a "29,4" warning in the console. You can ignore it.
+* If a texture needs to be repeating in one direction but clamped in another, it comes in as repeating for both because Blender no longer allows setting the two axes independently. This will eventually be fixed by providing a node library item.
 * Some materials only have a base colour (no textures). These import as the Actual Raw Colour Values, and so might look incorrect when Blender's colour spaces get involved. Don't ask me how to fix this.
 * Everything assumes Eevee for rendering. I have no idea what will happen if you try to use Cycles.
 

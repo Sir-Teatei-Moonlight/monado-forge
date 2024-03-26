@@ -31,8 +31,6 @@ def parse_texture_brres(textureName,imgType,imgWidth,imgHeight,rawData,palette,p
 	if imgType > 0xe:
 		print_error(textureName+" is of an unknown/unsupported image type (id "+str(imgType)+")")
 		return
-	if imgType in [6]:
-		print_warning(textureName+" is of a format that is not yet supported (id "+str(imgType)+")")
 	if imgType in [8,9,10] and not palette:
 		print_error(textureName+" uses a palette format but no palette was provided")
 		return
@@ -108,7 +106,23 @@ def parse_texture_brres(textureName,imgType,imgWidth,imgHeight,rawData,palette,p
 					for p,pi in enumerate(pixelIndexes):
 						pixels[(blockRootPixelX + p % 4) + ((blockRootPixelY + p // 4) * virtImgWidth)] = colours[pi]
 				elif imgFormat == "RGBA32":
-					pass # need to find an example for teesting
+					chunkAR = [readAndParseIntBig(d,1) for x in range(blockBytesize//2)]
+					chunkGB = [readAndParseIntBig(d,1) for x in range(blockBytesize//2)]
+					chunkA = chunkAR[::2]
+					chunkR = chunkAR[1::2]
+					chunkG = chunkGB[::2]
+					chunkB = chunkGB[1::2]
+					colours = []
+					for c in range(len(chunkA)):
+						colours.append([chunkR[c],chunkG[c],chunkB[c],chunkA[c]])
+					blockedColours = [
+										colours[12],colours[13],colours[14],colours[15],
+										colours[ 8],colours[ 9],colours[10],colours[11],
+										colours[ 4],colours[ 5],colours[ 6],colours[ 7],
+										colours[ 0],colours[ 1],colours[ 2],colours[ 3],
+										]
+					for p,pv in enumerate(blockedColours):
+						pixels[(blockRootPixelX + p % blockWidth) + ((blockRootPixelY + p // blockWidth) * virtImgWidth)] = [x/255 for x in pv]
 				else: # every other format can be done fairly similarly
 					data = d.read(blockBytesize)
 					br = BitReader(data)
