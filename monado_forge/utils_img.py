@@ -62,11 +62,11 @@ def parse_texture_brres(textureName,imgType,imgWidth,imgHeight,rawData,palette,p
 	
 	d = io.BytesIO(rawData)
 	
-	for b in range(blockCount):
-		if printProgress and b % 64 == 0: # printing for every single b racks up the import time a lot (e.g. 12s to 20s)
-			print_progress_bar(b,blockCount,textureName)
-		for b2 in range(blockWidth):
-			targetBlock = b*blockWidth + b2
+	for block in range(blockCount):
+		if printProgress and block % 64 == 0: # printing for every single b racks up the import time a lot (e.g. 12s to 20s)
+			print_progress_bar(block,blockCount,textureName)
+		for block2 in range(blockWidth):
+			targetBlock = block*blockWidth + block2
 			if targetBlock >= blockCount: continue # can happen for tiny textures, not a problem
 			targetBlockX = targetBlock % blockCountX
 			targetBlockY = targetBlock // blockCountX
