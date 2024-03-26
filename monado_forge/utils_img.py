@@ -62,114 +62,111 @@ def parse_texture_brres(textureName,imgType,imgWidth,imgHeight,rawData,palette,p
 	
 	d = io.BytesIO(rawData)
 	
-	for block in range(blockCount):
-		if printProgress and block % 64 == 0: # printing for every single b racks up the import time a lot (e.g. 12s to 20s)
-			print_progress_bar(block,blockCount,textureName)
-		for block2 in range(blockWidth):
-			targetBlock = block*blockWidth + block2
-			if targetBlock >= blockCount: continue # can happen for tiny textures, not a problem
-			targetBlockX = targetBlock % blockCountX
-			targetBlockY = targetBlock // blockCountX
-			subBlocks = 4 if imgFormat == "CMPR" else 1
-			for sb in range(subBlocks): # sub-blocks, if necessary
-				# convert block to pixel (Y is inverted, X is not)
-				blockRootPixelX = targetBlockX*blockWidth + (4 if (subBlocks>1 and sb%2==1) else 0)
-				blockRootPixelY = virtImgHeight - targetBlockY*blockHeight - blockHeight + (4 if (subBlocks>1 and sb <=1) else 0)
-				if imgFormat == "CMPR": # mostly copy-pasted form the BC1 section in parse_texture_wismt
-					endpoint0 = readAndParseIntBig(d,2)
-					endpoint1 = readAndParseIntBig(d,2)
-					row0 = readAndParseIntBig(d,1)
-					row1 = readAndParseIntBig(d,1)
-					row2 = readAndParseIntBig(d,1)
-					row3 = readAndParseIntBig(d,1)
-					r0,g0,b0 = ((endpoint0 & 0b1111100000000000) >> 11),((endpoint0 & 0b0000011111100000) >> 5),(endpoint0 & 0b0000000000011111)
-					r1,g1,b1 = ((endpoint1 & 0b1111100000000000) >> 11),((endpoint1 & 0b0000011111100000) >> 5),(endpoint1 & 0b0000000000011111)
-					# potential future feature: autodetect images that are supposed to be greyscale and only use the higher-resolution green channel
-					#if monochrome and not(r0 == b0 and r1 == b1 and abs(r0*2 - g0) <= 1 and abs(r1*2 - g1) <= 1):
-					#	monochrome = False
-					colours = [[],[],[],[]]
-					colours[0] = [r0/0b11111,g0/0b111111,b0/0b11111,1.0]
-					colours[1] = [r1/0b11111,g1/0b111111,b1/0b11111,1.0]
-					if endpoint0 > endpoint1:
-						colours[2] = [2/3*colours[0][0]+1/3*colours[1][0],2/3*colours[0][1]+1/3*colours[1][1],2/3*colours[0][2]+1/3*colours[1][2],1.0]
-						colours[3] = [1/3*colours[0][0]+2/3*colours[1][0],1/3*colours[0][1]+2/3*colours[1][1],1/3*colours[0][2]+2/3*colours[1][2],1.0]
-					else:
-						colours[2] = [1/2*colours[0][0]+1/2*colours[1][0],1/2*colours[0][1]+1/2*colours[1][1],1/2*colours[0][2]+1/2*colours[1][2],1.0]
-						colours[3] = [0.0,0.0,0.0,0.0] # binary alpha
-					# the X-position of pixels in blocks is inverted compared to wismt
-					pixelIndexes = [
-									(row3 & 0b11000000) >> 6, (row3 & 0b00110000) >> 4, (row3 & 0b00001100) >> 2, (row3 & 0b00000011),
-									(row2 & 0b11000000) >> 6, (row2 & 0b00110000) >> 4, (row2 & 0b00001100) >> 2, (row2 & 0b00000011),
-									(row1 & 0b11000000) >> 6, (row1 & 0b00110000) >> 4, (row1 & 0b00001100) >> 2, (row1 & 0b00000011),
-									(row0 & 0b11000000) >> 6, (row0 & 0b00110000) >> 4, (row0 & 0b00001100) >> 2, (row0 & 0b00000011),
+	for targetBlock in range(blockCount):
+		if printProgress and targetBlock % 64 == 0: # printing for every single block racks up the import time a lot (e.g. 12s to 20s)
+			print_progress_bar(targetBlock,blockCount,textureName)
+		targetBlockX = targetBlock % blockCountX
+		targetBlockY = targetBlock // blockCountX
+		subBlocks = 4 if imgFormat == "CMPR" else 1
+		for sb in range(subBlocks): # sub-blocks, if necessary
+			# convert block to pixel (Y is inverted, X is not)
+			blockRootPixelX = targetBlockX*blockWidth + (4 if (subBlocks>1 and sb%2==1) else 0)
+			blockRootPixelY = virtImgHeight - targetBlockY*blockHeight - blockHeight + (4 if (subBlocks>1 and sb <=1) else 0)
+			if imgFormat == "CMPR": # mostly copy-pasted form the BC1 section in parse_texture_wismt
+				endpoint0 = readAndParseIntBig(d,2)
+				endpoint1 = readAndParseIntBig(d,2)
+				row0 = readAndParseIntBig(d,1)
+				row1 = readAndParseIntBig(d,1)
+				row2 = readAndParseIntBig(d,1)
+				row3 = readAndParseIntBig(d,1)
+				r0,g0,b0 = ((endpoint0 & 0b1111100000000000) >> 11),((endpoint0 & 0b0000011111100000) >> 5),(endpoint0 & 0b0000000000011111)
+				r1,g1,b1 = ((endpoint1 & 0b1111100000000000) >> 11),((endpoint1 & 0b0000011111100000) >> 5),(endpoint1 & 0b0000000000011111)
+				# potential future feature: autodetect images that are supposed to be greyscale and only use the higher-resolution green channel
+				#if monochrome and not(r0 == b0 and r1 == b1 and abs(r0*2 - g0) <= 1 and abs(r1*2 - g1) <= 1):
+				#	monochrome = False
+				colours = [[],[],[],[]]
+				colours[0] = [r0/0b11111,g0/0b111111,b0/0b11111,1.0]
+				colours[1] = [r1/0b11111,g1/0b111111,b1/0b11111,1.0]
+				if endpoint0 > endpoint1:
+					colours[2] = [2/3*colours[0][0]+1/3*colours[1][0],2/3*colours[0][1]+1/3*colours[1][1],2/3*colours[0][2]+1/3*colours[1][2],1.0]
+					colours[3] = [1/3*colours[0][0]+2/3*colours[1][0],1/3*colours[0][1]+2/3*colours[1][1],1/3*colours[0][2]+2/3*colours[1][2],1.0]
+				else:
+					colours[2] = [1/2*colours[0][0]+1/2*colours[1][0],1/2*colours[0][1]+1/2*colours[1][1],1/2*colours[0][2]+1/2*colours[1][2],1.0]
+					colours[3] = [0.0,0.0,0.0,0.0] # binary alpha
+				# the X-position of pixels in blocks is inverted compared to wismt
+				pixelIndexes = [
+								(row3 & 0b11000000) >> 6, (row3 & 0b00110000) >> 4, (row3 & 0b00001100) >> 2, (row3 & 0b00000011),
+								(row2 & 0b11000000) >> 6, (row2 & 0b00110000) >> 4, (row2 & 0b00001100) >> 2, (row2 & 0b00000011),
+								(row1 & 0b11000000) >> 6, (row1 & 0b00110000) >> 4, (row1 & 0b00001100) >> 2, (row1 & 0b00000011),
+								(row0 & 0b11000000) >> 6, (row0 & 0b00110000) >> 4, (row0 & 0b00001100) >> 2, (row0 & 0b00000011),
+								]
+				for p,pi in enumerate(pixelIndexes):
+					pixels[(blockRootPixelX + p % 4) + ((blockRootPixelY + p // 4) * virtImgWidth)] = colours[pi]
+			elif imgFormat == "RGBA32":
+				chunkAR = [readAndParseIntBig(d,1) for x in range(blockBytesize//2)]
+				chunkGB = [readAndParseIntBig(d,1) for x in range(blockBytesize//2)]
+				chunkA = chunkAR[::2]
+				chunkR = chunkAR[1::2]
+				chunkG = chunkGB[::2]
+				chunkB = chunkGB[1::2]
+				colours = []
+				for c in range(len(chunkA)):
+					colours.append([chunkR[c],chunkG[c],chunkB[c],chunkA[c]])
+				blockedColours = [
+									colours[12],colours[13],colours[14],colours[15],
+									colours[ 8],colours[ 9],colours[10],colours[11],
+									colours[ 4],colours[ 5],colours[ 6],colours[ 7],
+									colours[ 0],colours[ 1],colours[ 2],colours[ 3],
 									]
-					for p,pi in enumerate(pixelIndexes):
-						pixels[(blockRootPixelX + p % 4) + ((blockRootPixelY + p // 4) * virtImgWidth)] = colours[pi]
-				elif imgFormat == "RGBA32":
-					chunkAR = [readAndParseIntBig(d,1) for x in range(blockBytesize//2)]
-					chunkGB = [readAndParseIntBig(d,1) for x in range(blockBytesize//2)]
-					chunkA = chunkAR[::2]
-					chunkR = chunkAR[1::2]
-					chunkG = chunkGB[::2]
-					chunkB = chunkGB[1::2]
-					colours = []
-					for c in range(len(chunkA)):
-						colours.append([chunkR[c],chunkG[c],chunkB[c],chunkA[c]])
-					blockedColours = [
-										colours[12],colours[13],colours[14],colours[15],
-										colours[ 8],colours[ 9],colours[10],colours[11],
-										colours[ 4],colours[ 5],colours[ 6],colours[ 7],
-										colours[ 0],colours[ 1],colours[ 2],colours[ 3],
-										]
-					for p,pv in enumerate(blockedColours):
-						pixels[(blockRootPixelX + p % blockWidth) + ((blockRootPixelY + p // blockWidth) * virtImgWidth)] = [x/255 for x in pv]
-				else: # every other format can be done fairly similarly
-					data = d.read(blockBytesize)
-					br = BitReader(data)
-					rowData = [] # using numpy for this seems to be slower? guessing there's too much churn in these small loops
-					for row in range(blockHeight):
-						rowData.append([])
-						for col in range(blockWidth):
-							if imgFormat == "I4":
-								rowData[-1].append([br.readbits(4) * 0x11]*3+[255]) # reminder: [read(x)]*3 results in [v,v,v], not [read(x),read(x),read(x)]
-							elif imgFormat == "I8":
-								rowData[-1].append([br.readbits(8)]*3+[255])
-							elif imgFormat == "IA4":
-								alpha = br.readbits(4)
-								value = br.readbits(4)
-								rowData[-1].append([value * 0x11]*3+[alpha])
-							elif imgFormat == "IA8":
-								alpha = br.readbits(8)
-								value = br.readbits(8)
-								rowData[-1].append([value]*3+[alpha])
-							elif imgFormat == "RGB565":
+				for p,pv in enumerate(blockedColours):
+					pixels[(blockRootPixelX + p % blockWidth) + ((blockRootPixelY + p // blockWidth) * virtImgWidth)] = [x/255 for x in pv]
+			else: # every other format can be done fairly similarly
+				data = d.read(blockBytesize)
+				br = BitReader(data)
+				rowData = [] # using numpy for this seems to be slower? guessing there's too much churn in these small loops
+				for row in range(blockHeight):
+					rowData.append([])
+					for col in range(blockWidth):
+						if imgFormat == "I4":
+							rowData[-1].append([br.readbits(4) * 0x11]*3+[255]) # reminder: [read(x)]*3 results in [v,v,v], not [read(x),read(x),read(x)]
+						elif imgFormat == "I8":
+							rowData[-1].append([br.readbits(8)]*3+[255])
+						elif imgFormat == "IA4":
+							alpha = br.readbits(4)
+							value = br.readbits(4)
+							rowData[-1].append([value * 0x11]*3+[alpha])
+						elif imgFormat == "IA8":
+							alpha = br.readbits(8)
+							value = br.readbits(8)
+							rowData[-1].append([value]*3+[alpha])
+						elif imgFormat == "RGB565":
+							r = br.readbits(5)/31*255
+							g = br.readbits(6)/63*255
+							b = br.readbits(5)/31*255
+							rowData[-1].append([r,g,b,255])
+						elif imgFormat == "RGB5A3":
+							mode = br.readbits(1)
+							if mode:
+								a = 255
 								r = br.readbits(5)/31*255
-								g = br.readbits(6)/63*255
+								g = br.readbits(5)/31*255
 								b = br.readbits(5)/31*255
-								rowData[-1].append([r,g,b,255])
-							elif imgFormat == "RGB5A3":
-								mode = br.readbits(1)
-								if mode:
-									a = 255
-									r = br.readbits(5)/31*255
-									g = br.readbits(5)/31*255
-									b = br.readbits(5)/31*255
-								else:
-									a = br.readbits(3)/7*255
-									r = br.readbits(4)/15*255
-									g = br.readbits(4)/15*255
-									b = br.readbits(4)/15*255
-								rowData[-1].append([r,g,b,a])
-							elif imgFormat == "C4":
-								rowData[-1].append(palette[br.readbits(4)])
-							elif imgFormat == "C8":
-								rowData[-1].append(palette[br.readbits(8)])
-							elif imgFormat == "C14X2":
-								waste = br.readbits(2)
-								rowData[-1].append(palette[br.readbits(14)])
-						pixelValues = list(reversed(rowData))
-						for p,pv in enumerate(flattened_list(pixelValues)):
-							pixels[(blockRootPixelX + p % blockWidth) + ((blockRootPixelY + p // blockWidth) * virtImgWidth)] = [x/255 for x in pv]
+							else:
+								a = br.readbits(3)/7*255
+								r = br.readbits(4)/15*255
+								g = br.readbits(4)/15*255
+								b = br.readbits(4)/15*255
+							rowData[-1].append([r,g,b,a])
+						elif imgFormat == "C4":
+							rowData[-1].append(palette[br.readbits(4)])
+						elif imgFormat == "C8":
+							rowData[-1].append(palette[br.readbits(8)])
+						elif imgFormat == "C14X2":
+							waste = br.readbits(2)
+							rowData[-1].append(palette[br.readbits(14)])
+					pixelValues = list(reversed(rowData))
+					for p,pv in enumerate(flattened_list(pixelValues)):
+						pixels[(blockRootPixelX + p % blockWidth) + ((blockRootPixelY + p // blockWidth) * virtImgWidth)] = [x/255 for x in pv]
 	if printProgress:
 		print_progress_bar(blockCount,blockCount,textureName)
 	d.close()
