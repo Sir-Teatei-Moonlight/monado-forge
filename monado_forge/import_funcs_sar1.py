@@ -636,7 +636,7 @@ def import_wismt(f, wimdoResults, context):
 						newMesh = MonadoForgeMesh()
 						sf.seek(dataOffset+vtDataOffset)
 						for j in range(vtDataCount):
-							newVertex = MonadoForgeVertex()
+							newVertex = MonadoForgeVertex(j)
 							weightVertex = [[],[]]
 							hasColourLayers = [False] # only one colour layer is known at this time
 							hasUVLayers = [False,False,False]
@@ -684,7 +684,8 @@ def import_wismt(f, wimdoResults, context):
 						faceData[i] = []
 						ftDataOffset,ftVertCount,ftVertexes = faceTables[i]
 						for j in range(0,len(ftVertexes),3):
-							newFace = MonadoForgeFace()
+							newFaceIndex = len(faceData[i])
+							newFace = MonadoForgeFace(newFaceIndex)
 							newFace.setVertexIndexes([ftVertexes[j],ftVertexes[j+1],ftVertexes[j+2]])
 							faceData[i].append(newFace)
 					if printProgress and faceData != {}:
@@ -714,14 +715,15 @@ def import_wismt(f, wimdoResults, context):
 							sf.seek(dataOffset+targetDataChunkOffset)
 							newShape = MonadoForgeMeshShape()
 							for k in range(targetVertexCount):
-								newVertex = MonadoForgeVertex()
-								newVertex.setPosition([readAndParseFloat(sf),readAndParseFloat(sf),readAndParseFloat(sf)])
+								newPosition = [readAndParseFloat(sf),readAndParseFloat(sf),readAndParseFloat(sf)]
 								readAndParseInt(sf,4) # dummy
 								newNormal = [(readAndParseInt(sf,1)/255.0)*2-1,(readAndParseInt(sf,1)/255.0)*2-1,(readAndParseInt(sf,1)/255.0)*2-1]
 								readAndParseInt(sf,1) # more dummies
 								readAndParseInt(sf,4)
 								readAndParseInt(sf,4)
 								index = readAndParseInt(sf,4)
+								newVertex = MonadoForgeVertex(index)
+								newVertex.setPosition(newPosition)
 								# doesn't necessarily read as normalized
 								newVertex.setNormal(mathutils.Vector(newNormal).normalized()[:])
 								newShape.addVertex(index,newVertex)
@@ -991,9 +993,6 @@ def import_wismt(f, wimdoResults, context):
 			newTex.setFiltered(not noFiltering) # yes we're flipping the meaning, "true means don't" is confusing
 			newMat.addTexture(newTex)
 		resultMaterials.append(newMat)
-	
-	for m in meshes:
-		m.indexVertices()
 	
 	results = MonadoForgeImportedPackage()
 	results.setSkeleton(wimdoResults.getSkeleton())

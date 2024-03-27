@@ -508,7 +508,6 @@ def parse_mdl0(f, context, subfileOffset):
 			combinedCPEmbeddedFlags = [0]*(14+11+10)
 			unknownCmds = []
 			# there will be a lot of duplicate vertices, that's fine for now
-			# we also have to index them manually (i.e. no calling .indexVertices() later)
 			forgeVerts = []
 			forgeFaces = []
 			hashedVertsByPosition = {} # this is for faster duplicate culling later
@@ -637,9 +636,9 @@ def parse_mdl0(f, context, subfileOffset):
 						if cmd not in unknownCmds: unknownCmds.append(cmd)
 					for face in faces:
 						faceVerts = []
+						newFaceIndex = len(forgeFaces)
 						for vert in face:
-							newVertex = MonadoForgeVertex()
-							newVertex._id = curVIndex
+							newVertex = MonadoForgeVertex(curVIndex)
 							if vert[9] != -1: # should never happen (a vertex without position), but
 								pos = positions[meshVerticesIndex][vert[9]]
 								if vert[10] != -1: # normal
@@ -687,7 +686,7 @@ def parse_mdl0(f, context, subfileOffset):
 								others = hashedVertsByPosition[thisPosHashed]
 								for other in others:
 									if newVertex.isDouble(other):
-										faceVerts.append(other.getID())
+										faceVerts.append(other.getIndex())
 										foundDouble = True
 										hashedVertsByPosition[thisPosHashed].append(newVertex)
 										break
@@ -696,7 +695,7 @@ def parse_mdl0(f, context, subfileOffset):
 								faceVerts.append(curVIndex)
 								hashedVertsByPosition[tuple(newVertex.getPosition())] = [newVertex]
 								curVIndex += 1
-						newFace = MonadoForgeFace()
+						newFace = MonadoForgeFace(newFaceIndex)
 						newFace.setVertexIndexes(faceVerts)
 						forgeFaces.append(newFace)
 			finally:

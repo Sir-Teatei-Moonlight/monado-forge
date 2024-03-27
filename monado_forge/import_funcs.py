@@ -576,7 +576,7 @@ def realise_results(forgeResults, mainName, self, context):
 					if groupValue == 0: continue
 					vertexGroup = newMeshObject.vertex_groups[groupIndex]
 					vertexesToAdd = vertexesInEachSet[weightIndex]
-					vertexIDsToAdd = [v.getID() for v in vertexesToAdd]
+					vertexIDsToAdd = [v.getIndex() for v in vertexesToAdd]
 					newMeshObject.vertex_groups[groupIndex].add(vertexIDsToAdd,groupValue,"ADD")
 		elif mesh.hasWeights(): # no indexes, but do have directly-applied weights
 			pass # not needed at the present time

@@ -302,18 +302,19 @@ class MonadoForgeMaterial:
 		self._uvLayerCount = x
 
 class MonadoForgeVertex:
-	def __init__(self):
-		self._id = -1
+	def __init__(self,i):
+		self._index = i
 		self._position = [0,0,0] # having position ever be None seems to cause Problems
-		self._uvs = {}
-		self._normal = None
-		self._colours = {} # in 255 format
+		self._loops = {} # keyed by face index
 		self._weightSetIndex = -1 # pre-bake
 		self._weights = {} # post-bake (must also be by index rather than name since we don't necessarily know names)
+		self._normal = None
+		self._uvs = {}
+		self._colours = {} # in 255 format
 	
-	def getID(self):
-		return self._id
-	# only set by the parent mesh
+	def getIndex(self):
+		return self._index
+	# no setter, immutable
 	
 	def getPosition(self):
 		return self._position
@@ -322,6 +323,29 @@ class MonadoForgeVertex:
 			raise ValueError("sequence must be length 3, not "+str(len(a)))
 		self._position = a[:]
 	# there is no "clearPosition" because of the None problem
+	
+	def getLoops(self):
+		return self._loops
+	def getLoop(self,faceIndex):
+		if not isinstance(faceIndex,int):
+			raise TypeError("expected an int, not a(n) "+str(type(faceIndex)))
+		return self._loops[faceIndex]
+	def clearLoops(self):
+		self._loops = {}
+	def createLoop(self,faceIndex):
+		if not isinstance(faceIndex,int):
+			raise TypeError("expected an int, not a(n) "+str(type(faceIndex)))
+		if faceIndex in self._loops.keys(): # (currently) do not want this to be a valid operation, too much potential for silent problems
+			raise ValueError("vertex "+str(self._index)+" already has a loop with face "+str(faceIndex))
+		self._loops[faceIndex] = MonadoForgeLoop(self._index,faceIndex)
+	def addLoop(self,loop):
+		if not isinstance(loop,MonadoForgeLoop):
+			raise TypeError("expected a MonadoForgeLoop, not a(n) "+str(type(loop)))
+		faceIndex = loop.getFace()
+		if faceIndex in self._loops.keys(): # (currently) do not want this to be a valid operation, too much potential for silent problems
+			raise ValueError("vertex "+str(self._index)+" already has a loop with face "+str(faceIndex))
+		self._loops[faceIndex] = loop
+	# there is no bulk "setLoops", for now anyway
 	
 	def hasUVs(self):
 		return self._uvs != {}
@@ -397,9 +421,14 @@ class MonadoForgeVertex:
 		)
 
 class MonadoForgeFace:
-	def __init__(self):
+	def __init__(self,i):
+		self._index = i
 		self._vertexIndexes = []
 		self._materialIndex = 0
+	
+	def getIndex(self):
+		return self._index
+	# no setter, immutable
 	
 	def getVertexIndexes(self):
 		return self._vertexIndexes
@@ -413,6 +442,59 @@ class MonadoForgeFace:
 		if not isinstance(a,list):
 			raise TypeError("expected a list, not a(n) "+str(type(a)))
 		self._vertexIndexes = a[:]
+
+# the fact that the official API has to explain that "loop" means "face corner" tells us how bad even they think the term is
+# but it's probably better to just use it than to make something else up just for this add-on
+class MonadoForgeLoop:
+	def __init__(self,v,f):
+		self._vertex = v
+		self._face = f
+		self._normal = None
+		self._uvs = {}
+		self._colours = {} # in 255 format
+	
+	def getVertex(self):
+		return self._vertex
+	def getFace(self):
+		return self._face
+	# not settable; intended to be immutable
+	
+	def hasNormal(self):
+		return self._normal != None
+	def getNormal(self):
+		return self._normal
+	def clearNormal(self):
+		self._normal = None
+	def setNormal(self,a):
+		if len(a) != 3:
+			raise ValueError("sequence must be length 3, not "+str(len(a)))
+		self._normal = a[:]
+	
+	def hasUVs(self):
+		return self._uvs != {}
+	def getUVs(self):
+		return self._uvs
+	def getUV(self,layer):
+		return self._uvs[layer]
+	def clearUVs(self):
+		self._uvs = {}
+	def setUV(self,layer,value):
+		if len(value) != 2:
+			raise ValueError("sequence must be length 2, not "+str(len(value)))
+		self._uvs[layer] = value
+	
+	def hasColours(self):
+		return self._colours != {}
+	def getColours(self):
+		return self._colours
+	def getColour(self,layer):
+		return self._colours[layer]
+	def clearColours(self):
+		self._colours = []
+	def setColour(self,layer,value):
+		if len(value) != 4: # Blender really pushes alpha for everything
+			raise ValueError("sequence must be length 4, not "+str(len(value)))
+		self._colours[layer] = value[:]
 
 class MonadoForgeMeshShape:
 	def __init__(self):
@@ -536,10 +618,6 @@ class MonadoForgeMesh:
 		return False
 	def hasShapes(self):
 		return len(self._shapes) > 0
-	
-	def indexVertices(self):
-		for i,v in enumerate(self._vertices):
-			v._id = i
 	
 	def getVertexPositionsList(self):
 		return [v.getPosition() for v in self._vertices]
