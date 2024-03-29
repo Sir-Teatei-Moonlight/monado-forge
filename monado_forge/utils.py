@@ -89,7 +89,7 @@ fpCodeL = "<f"
 # old games are big and new ones are little, so assume little as default
 def readAndParseInt(inFile,bytes,signed=False,endian="little"):
 	if endian == "big":
-		return readAndParseIntBig(infile,bytes,signed)
+		return readAndParseIntBig(inFile,bytes,signed)
 	if bytes == 1:
 		parseString = i8CodeL if signed else u8CodeL
 	elif bytes == 2:
@@ -112,7 +112,7 @@ def readAndParseIntBig(inFile,bytes,signed=False):
 
 def readAndParseFloat(inFile,endian="little"):
 	if endian == "big":
-		return readAndParseFloatBig(infile)
+		return readAndParseFloatBig(inFile)
 	return struct.unpack(fpCodeL,inFile.read(struct.calcsize(fpCodeL)))[0]
 def readAndParseFloatBig(inFile):
 	return struct.unpack(fpCodeB,inFile.read(struct.calcsize(fpCodeB)))[0]

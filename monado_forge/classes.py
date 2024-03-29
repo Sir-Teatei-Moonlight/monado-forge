@@ -1,8 +1,8 @@
 # because just packing/unpacking arrays gets old and error-prone
 
-def ensure_type(var,type):
-	if not isinstance(var,type):
-		raise TypeError("expected "+str(type)+", not "+str(type(x)))
+def ensure_type(var,intended):
+	if not isinstance(var,intended):
+		raise TypeError("expected "+str(intended)+", not "+str(type(var)))
 def ensure_length(seq,length):
 	if len(seq) != length:
 		raise ValueError("sequence must be length "+str(length)+", not "+str(len(seq)))
