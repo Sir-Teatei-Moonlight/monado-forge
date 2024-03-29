@@ -1,5 +1,12 @@
 # because just packing/unpacking arrays gets old and error-prone
 
+def ensure_type(var,type):
+	if not isinstance(var,type):
+		raise TypeError("expected "+str(type)+", not "+str(type(x)))
+def ensure_length(seq,length):
+	if len(seq) != length:
+		raise ValueError("sequence must be length "+str(length)+", not "+str(len(seq)))
+
 class MonadoForgeBone:
 	def __init__(self,i):
 		self._name = "Bone"
@@ -16,47 +23,41 @@ class MonadoForgeBone:
 	
 	def getName(self):
 		return self._name
-	def setName(self,x):
-		if not isinstance(x,str):
-			raise TypeError("expected a string, not a(n) "+str(type(x)))
-		self._name = x
+	def setName(self,name):
+		ensure_type(name,str)
+		self._name = name
 	
 	def getParent(self):
 		return self._parent
 	def clearParent(self):
 		self._parent = -1
-	def setParent(self,x):
-		if not isinstance(x,int):
-			raise TypeError("expected an int, not a(n) "+str(type(x)))
-		self._parent = x
+	def setParent(self,parent):
+		ensure_type(parent,int)
+		self._parent = parent
 	
 	def getPosition(self):
 		return self._position
-	def setPosition(self,a):
-		if len(a) != 4:
-			raise ValueError("sequence must be length 4, not "+str(len(a)))
-		self._position = a[:]
+	def setPosition(self,pos):
+		ensure_length(pos,4)
+		self._position = pos[:]
 	
 	def getRotation(self):
 		return self._rotation
-	def setRotation(self,a):
-		if len(a) != 4:
-			raise ValueError("sequence must be length 4, not "+str(len(a)))
-		self._rotation = a[:]
+	def setRotation(self,rot):
+		ensure_length(rot,4)
+		self._rotation = rot[:]
 	
 	def getScale(self):
 		return self._scale
-	def setScale(self,a):
-		if len(a) != 4:
-			raise ValueError("sequence must be length 4, not "+str(len(a)))
-		self._scale = a[:]
+	def setScale(self,scl):
+		ensure_length(scl,4)
+		self._scale = scl[:]
 	
 	def isEndpoint(self):
 		return self._endpoint
-	def setEndpoint(self,x):
-		if not isinstance(x,bool):
-			raise TypeError("expected a bool, not a(n) "+str(type(x)))
-		self._endpoint = x
+	def setEndpoint(self,ep):
+		ensure_type(ep,bool)
+		self._endpoint = ep
 
 class MonadoForgeSkeleton:
 	def __init__(self):
@@ -67,12 +68,12 @@ class MonadoForgeSkeleton:
 	def clearBones(self):
 		self._bones = []
 	def addBone(self,bone):
-		if not isinstance(bone,MonadoForgeBone):
-			raise TypeError("expected a MonadoForgeBone, not a(n) "+str(type(bone)))
+		ensure_type(bone,MonadoForgeBone)
 		self._bones.append(bone)
 	def setBones(self,bones):
 		self.clearBones()
-		for b in bones: self.addBone(b)
+		for b in bones:
+			self.addBone(b)
 
 # this class is specifically for keeping hold of wimdo data to be passed to a wismt
 class MonadoForgeWimdoMaterial:
@@ -86,75 +87,69 @@ class MonadoForgeWimdoMaterial:
 		self._extraDataIndex = 0 # needed because of how extra data needs to be read separately
 		self._renderPassType = 0
 	
-	# no setter (index should be immutable)
 	def getIndex(self):
 		return self._index
+	# no setter (index should be immutable)
 	
 	def getName(self):
 		return self._name
-	def setName(self,x):
-		if not isinstance(x,str):
-			raise TypeError("expected a string, not a(n) "+str(type(x)))
-		self._name = x
+	def setName(self,name):
+		ensure_type(name,str)
+		self._name = name
 	
 	def getBaseColour(self):
 		return self._baseColour
-	def setBaseColour(self,a):
-		if len(a) != 4:
-			raise ValueError("sequence must be length 4, not "+str(len(a)))
-		self._baseColour = a[:]
+	def setBaseColour(self,col):
+		ensure_length(col,4)
+		self._baseColour = col[:]
 	
 	def getTextureTable(self):
 		return self._textureTable
 	def clearTextureTable(self):
 		self._textureTable = []
-	def addTextureTableItem(self,a):
-		if len(a) != 4:
-			raise ValueError("sequence must be length 4, not "+str(len(a)))
-		self._textureTable.append(a)
-	def setTextureTable(self,ts):
-		if not isinstance(ts,list):
-			raise TypeError("expected a list, not a(n) "+str(type(ts)))
-		for t in ts: self.addTextureTableItem(t)
+	def addTextureTableItem(self,tti):
+		ensure_length(tti,4)
+		self._textureTable.append(tti)
+	def setTextureTable(self,table):
+		ensure_type(table,list)
+		for tt in table:
+			self.addTextureTableItem(tt)
 	
 	def getSamplers(self):
 		return self._samplers
 	def clearSamplers(self):
 		self._samplers = []
-	def addSampler(self,a):
-		if len(a) != 2:
-			raise ValueError("sequence must be length 2, not "+str(len(a)))
-		self._samplers.append(a)
-	def setSamplers(self,ss):
-		if not isinstance(ss,list):
-			raise TypeError("expected a list, not a(n) "+str(type(ss)))
-		for s in ss: self.addSampler(s)
+	def addSampler(self,sampler):
+		ensure_length(sampler,2)
+		self._samplers.append(sampler)
+	def setSamplers(self,samplers):
+		ensure_type(samplers,list)
+		for s in samplers:
+			self.addSampler(s)
 	
 	def getExtraData(self):
 		return self._extraData
 	def clearExtraData(self):
 		self._extraData = []
 	def addExtraData(self,ex):
-		if not isinstance(ex,float):
-			raise TypeError("expected a float, not a(n) "+str(type(ex)))
+		ensure_type(ex,float)
 		self._extraData.append(ex)
 	def setExtraData(self,exs):
 		self.clearExtraData()
-		for ex in exs: self.addExtraData(ex)
+		for ex in exs:
+			self.addExtraData(ex)
 	
 	def getExtraDataIndex(self):
 		return self._extraDataIndex
-	def setExtraDataIndex(self,x):
-		if not isinstance(x,int):
-			raise TypeError("expected an int, not a(n) "+str(type(x)))
-		self._extraDataIndex = x
+	def setExtraDataIndex(self,xdi):
+		ensure_type(xdi,int)
+		self._extraDataIndex = xdi
 	
 	def getRenderPassType(self):
 		return self._renderPassType
-	def setRenderPassType(self,x):
-		if not isinstance(x,int):
-			raise TypeError("expected an int, not a(n) "+str(type(x)))
-		self._renderPassType = x
+	def setRenderPassType(self,rpt):
+		ensure_type(rpt,int)
+		self._renderPassType = rpt
 
 class MonadoForgeTexture: # 2D only, no 3D texture support (for now?)
 	def __init__(self):
@@ -165,31 +160,27 @@ class MonadoForgeTexture: # 2D only, no 3D texture support (for now?)
 	
 	def getName(self):
 		return self._name
-	def setName(self,x):
-		if not isinstance(x,str):
-			raise TypeError("expected a string, not a(n) "+str(type(x)))
-		self._name = x
+	def setName(self,name):
+		ensure_type(name,str)
+		self._name = name
 	
 	def getRepeating(self):
 		return self._repeating
-	def setRepeating(self,a):
-		if len(a) != 2:
-			raise ValueError("sequence must be length 2, not "+str(len(a)))
-		self._repeating = a[:]
+	def setRepeating(self,rpt):
+		ensure_length(rpt,2)
+		self._repeating = rpt[:]
 	
 	def getMirroring(self):
 		return self._mirroring
-	def setMirroring(self,a):
-		if len(a) != 2:
-			raise ValueError("sequence must be length 2, not "+str(len(a)))
-		self._mirroring = a[:]
+	def setMirroring(self,mir):
+		ensure_length(mir,2)
+		self._mirroring = mir[:]
 	
 	def isFiltered(self):
 		return self._isFiltered
-	def setFiltered(self,x):
-		if not isinstance(x,bool):
-			raise TypeError("expected a bool, not a(n) "+str(type(x)))
-		self._isFiltered = x
+	def setFiltered(self,filt):
+		ensure_type(filt,bool)
+		self._isFiltered = filt
 
 class MonadoForgeMaterial:
 	def __init__(self,i):
@@ -210,24 +201,21 @@ class MonadoForgeMaterial:
 	
 	def getName(self):
 		return self._name
-	def setName(self,x):
-		if not isinstance(x,str):
-			raise TypeError("expected a string, not a(n) "+str(type(x)))
-		self._name = x
+	def setName(self,name):
+		ensure_type(name,str)
+		self._name = name
 	
 	def getBaseColour(self):
 		return self._baseColour
-	def setBaseColour(self,a):
-		if len(a) != 4:
-			raise ValueError("sequence must be length 4, not "+str(len(a)))
-		self._baseColour = a[:]
+	def setBaseColour(self,col):
+		ensure_length(col,4)
+		self._baseColour = col[:]
 	
 	def getViewportColour(self):
 		return self._viewportColour
-	def setViewportColour(self,a):
-		if len(a) != 4:
-			raise ValueError("sequence must be length 4, not "+str(len(a)))
-		self._viewportColour = a[:]
+	def setViewportColour(self,vpc):
+		ensure_length(vpc,4)
+		self._viewportColour = vpc[:]
 	
 	def getCulling(self):
 		return self._culling
@@ -235,25 +223,21 @@ class MonadoForgeMaterial:
 		return self._culling[0]
 	def getCullingBack(self):
 		return self._culling[1]
-	def setCulling(self,a):
-		if len(a) != 2:
-			raise ValueError("sequence must be length 2, not "+str(len(a)))
-		self._culling = a[:]
-	def setCullingFront(self,x):
-		if not isinstance(x,bool):
-			raise TypeError("expected a bool, not a(n) "+str(type(x)))
-		self._culling[0] = x
-	def setCullingBack(self,x):
-		if not isinstance(x,bool):
-			raise TypeError("expected a bool, not a(n) "+str(type(x)))
-		self._culling[1] = x
+	def setCulling(self,cull):
+		ensure_length(cull,2)
+		self._culling = cull[:]
+	def setCullingFront(self,cull):
+		ensure_type(cull,bool)
+		self._culling[0] = cull
+	def setCullingBack(self,cull):
+		ensure_type(cull,bool)
+		self._culling[1] = cull
 	
 	def getTransparency(self):
 		return self._transparency
-	def setTransparency(self,x):
-		if not isinstance(x,int):
-			raise TypeError("expected an int, not a(n) "+str(type(x)))
-		self._transparency = x
+	def setTransparency(self,trns):
+		ensure_type(trns,int)
+		self._transparency = trns
 	def isOpaque(self):
 		return self._transparency == 0
 	def isTransparent(self):
@@ -267,39 +251,37 @@ class MonadoForgeMaterial:
 		return self._textures
 	def clearTextures(self):
 		self._textures = []
-	def addTexture(self,x):
-		if not isinstance(x,MonadoForgeTexture):
-			raise TypeError("expected a MonadoForgeTexture, not a(n) "+str(type(x)))
-		self._textures.append(x)
-	def setTextures(self,a):
+	def addTexture(self,tex):
+		ensure_type(tex,MonadoForgeTexture)
+		self._textures.append(tex)
+	def setTextures(self,texs):
 		self.clearTextures()
-		for x in a: self.addTexture(x)
+		for tex in texs:
+			self.addTexture(texs)
 	
 	def getExtraData(self):
 		return self._extraData
 	def clearExtraData(self):
 		self._extraData = []
 	def addExtraData(self,ex):
-		if not isinstance(ex,float):
-			raise TypeError("expected a float, not a(n) "+str(type(ex)))
+		ensure_type(ex,float)
 		self._extraData.append(ex)
 	def setExtraData(self,exs):
 		self.clearExtraData()
-		for ex in exs: self.addExtraData(ex)
+		for ex in exs:
+			self.addExtraData(ex)
 	
 	def getColourLayerCount(self):
 		return self._colourLayerCount
-	def setColourLayerCount(self,x):
-		if not isinstance(x,int):
-			raise TypeError("expected an int, not a(n) "+str(type(x)))
-		self._colourLayerCount = x
+	def setColourLayerCount(self,clc):
+		ensure_type(clc,int)
+		self._colourLayerCount = clc
 	
 	def getUVLayerCount(self):
 		return self._uvLayerCount
-	def setUVLayerCount(self,x):
-		if not isinstance(x,int):
-			raise TypeError("expected an int, not a(n) "+str(type(x)))
-		self._uvLayerCount = x
+	def setUVLayerCount(self,uvlc):
+		ensure_type(uvlc,int)
+		self._uvLayerCount = uvlc
 
 class MonadoForgeVertex:
 	def __init__(self,i):
@@ -318,29 +300,25 @@ class MonadoForgeVertex:
 	
 	def getPosition(self):
 		return self._position
-	def setPosition(self,a):
-		if len(a) != 3:
-			raise ValueError("sequence must be length 3, not "+str(len(a)))
-		self._position = a[:]
+	def setPosition(self,pos):
+		ensure_length(pos,3)
+		self._position = pos[:]
 	# there is no "clearPosition" because of the None problem
 	
 	def getLoops(self):
 		return self._loops
 	def getLoop(self,faceIndex):
-		if not isinstance(faceIndex,int):
-			raise TypeError("expected an int, not a(n) "+str(type(faceIndex)))
+		ensure_type(faceIndex,int)
 		return self._loops[faceIndex]
 	def clearLoops(self):
 		self._loops = {}
 	def createLoop(self,faceIndex):
-		if not isinstance(faceIndex,int):
-			raise TypeError("expected an int, not a(n) "+str(type(faceIndex)))
+		ensure_type(faceIndex,int)
 		if faceIndex in self._loops.keys(): # (currently) do not want this to be a valid operation, too much potential for silent problems
 			raise ValueError("vertex "+str(self._index)+" already has a loop with face "+str(faceIndex))
 		self._loops[faceIndex] = MonadoForgeLoop(self._index,faceIndex)
 	def addLoop(self,loop):
-		if not isinstance(loop,MonadoForgeLoop):
-			raise TypeError("expected a MonadoForgeLoop, not a(n) "+str(type(loop)))
+		ensure_type(loop,MonadoForgeLoop)
 		faceIndex = loop.getFace()
 		if faceIndex in self._loops.keys(): # (currently) do not want this to be a valid operation, too much potential for silent problems
 			raise ValueError("vertex "+str(self._index)+" already has a loop with face "+str(faceIndex))
@@ -355,10 +333,9 @@ class MonadoForgeVertex:
 		return self._uvs[layer]
 	def clearUVs(self):
 		self._uvs = {}
-	def setUV(self,layer,value):
-		if len(value) != 2:
-			raise ValueError("sequence must be length 2, not "+str(len(value)))
-		self._uvs[layer] = value
+	def setUV(self,layer,uv):
+		ensure_length(uv,2)
+		self._uvs[layer] = uv
 	
 	def hasNormal(self):
 		return self._normal != None
@@ -366,10 +343,9 @@ class MonadoForgeVertex:
 		return self._normal
 	def clearNormal(self):
 		self._normal = None
-	def setNormal(self,a):
-		if len(a) != 3:
-			raise ValueError("sequence must be length 3, not "+str(len(a)))
-		self._normal = a[:]
+	def setNormal(self,nrm):
+		ensure_length(nrm,3)
+		self._normal = nrm[:]
 	
 	def hasColours(self):
 		return self._colours != {}
@@ -379,10 +355,9 @@ class MonadoForgeVertex:
 		return self._colours[layer]
 	def clearColours(self):
 		self._colours = []
-	def setColour(self,layer,value):
-		if len(value) != 4: # Blender really pushes alpha for everything
-			raise ValueError("sequence must be length 4, not "+str(len(value)))
-		self._colours[layer] = value[:]
+	def setColour(self,layer,colour):
+		ensure_length(colour,4) # Blender really pushes alpha for everything
+		self._colours[layer] = colour[:]
 	
 	def hasWeightIndex(self):
 		return self._weightSetIndex != -1
@@ -390,10 +365,9 @@ class MonadoForgeVertex:
 		return self._weightSetIndex
 	def clearWeightSetIndex(self):
 		self._weightSetIndex = -1
-	def setWeightSetIndex(self,x):
-		if not isinstance(x,int):
-			raise TypeError("expected an int, not a(n) "+str(type(x)))
-		self._weightSetIndex = x
+	def setWeightSetIndex(self,wsi):
+		ensure_type(wsi,int)
+		self._weightSetIndex = wsi
 	
 	def hasWeights(self):
 		return self._weights != {}
@@ -403,12 +377,9 @@ class MonadoForgeVertex:
 		return self._weights[groupIndex]
 	def clearWeights(self):
 		self._weights = {}
-	def setWeight(self,groupIndex,value):
-		if not isinstance(groupIndex,int):
-			raise TypeError("expected an int, not a(n) "+str(type(groupIndex)))
-		if not isinstance(value,float):
-			raise TypeError("expected a float, not a(n) "+str(type(value)))
-		self._weights[groupIndex] = value
+	def setWeight(self,groupIndex,weight):
+		ensure_type(weight,float)
+		self._weights[groupIndex] = weight
 	
 	def isDouble(self,other):
 		return self == other or (
@@ -435,13 +406,10 @@ class MonadoForgeFace:
 	def clearVertexIndexes(self):
 		self._vertexIndexes = []
 	def addVertexIndex(self,v):
-		if not isinstance(v,int):
-			raise TypeError("expected an int, not a(n) "+str(type(v)))
+		ensure_type(v,int)
 		self._vertexIndexes.append(v)
-	def setVertexIndexes(self,a):
-		if not isinstance(a,list):
-			raise TypeError("expected a list, not a(n) "+str(type(a)))
-		self._vertexIndexes = a[:]
+	def setVertexIndexes(self,v):
+		self._vertexIndexes = v[:]
 
 # the fact that the official API has to explain that "loop" means "face corner" tells us how bad even they think the term is
 # but it's probably better to just use it than to make something else up just for this add-on
@@ -465,10 +433,9 @@ class MonadoForgeLoop:
 		return self._normal
 	def clearNormal(self):
 		self._normal = None
-	def setNormal(self,a):
-		if len(a) != 3:
-			raise ValueError("sequence must be length 3, not "+str(len(a)))
-		self._normal = a[:]
+	def setNormal(self,nrm):
+		ensure_length(nrm,3)
+		self._normal = nrm[:]
 	
 	def hasUVs(self):
 		return self._uvs != {}
@@ -478,10 +445,9 @@ class MonadoForgeLoop:
 		return self._uvs[layer]
 	def clearUVs(self):
 		self._uvs = {}
-	def setUV(self,layer,value):
-		if len(value) != 2:
-			raise ValueError("sequence must be length 2, not "+str(len(value)))
-		self._uvs[layer] = value
+	def setUV(self,layer,uv):
+		ensure_length(uv,2)
+		self._uvs[layer] = uv
 	
 	def hasColours(self):
 		return self._colours != {}
@@ -491,10 +457,9 @@ class MonadoForgeLoop:
 		return self._colours[layer]
 	def clearColours(self):
 		self._colours = []
-	def setColour(self,layer,value):
-		if len(value) != 4: # Blender really pushes alpha for everything
-			raise ValueError("sequence must be length 4, not "+str(len(value)))
-		self._colours[layer] = value[:]
+	def setColour(self,layer,colour):
+		ensure_length(colour,4) # Blender really pushes alpha for everything
+		self._colours[layer] = colour[:]
 
 class MonadoForgeMeshShape:
 	def __init__(self):
@@ -518,10 +483,9 @@ class MonadoForgeMeshShape:
 	
 	def getName(self):
 		return self._name
-	def setName(self,x):
-		if not isinstance(x,str):
-			raise TypeError("expected a string, not a(n) "+str(type(x)))
-		self._name = x
+	def setName(self,name):
+		ensure_type(name,str)
+		self._name = name
 
 class MonadoForgeMesh:
 	def __init__(self):
@@ -534,65 +498,61 @@ class MonadoForgeMesh:
 	
 	def getName(self):
 		return self._name
-	def setName(self,x):
-		if not isinstance(x,str):
-			raise TypeError("expected a string, not a(n) "+str(type(x)))
-		self._name = x
+	def setName(self,name):
+		ensure_type(name,str)
+		self._name = name
 	
 	def getVertices(self):
 		return self._vertices
 	def clearVertices(self):
 		self._vertices = []
 	def addVertex(self,v):
-		if not isinstance(v,MonadoForgeVertex):
-			raise TypeError("expected a MonadoForgeVertex, not a(n) "+str(type(v)))
+		ensure_type(v,MonadoForgeVertex)
 		self._vertices.append(v)
-	def setVertices(self,a):
-		self._vertices = []
-		for v in a: self.addVertex(v)
+	def setVertices(self,verts):
+		self.clearVertices()
+		for v in verts:
+			self.addVertex(v)
 	
 	def getFaces(self):
 		return self._faces
 	def clearFaces(self):
 		self._faces = []
 	def addFace(self,f):
-		if not isinstance(f,MonadoForgeFace):
-			raise TypeError("expected a MonadoForgeFace, not a(n) "+str(type(f)))
+		ensure_type(f,MonadoForgeFace)
 		self._faces.append(f)
-	def setFaces(self,a):
-		self._faces = []
-		for f in a: self.addFace(f)
+	def setFaces(self,faces):
+		self.clearFaces()
+		for f in faces:
+			self.addFace(f)
 	
 	def getWeightSets(self):
 		return self._weightSets
 	def clearWeightSets(self):
 		self._weightSets = []
-	def addWeightSet(self,a):
-		if not isinstance(a,list):
-			raise TypeError("expected a list, not a(n) "+str(type(a)))
-		self._weightSets.append(a)
-	def setWeightSets(self,d):
-		if not isinstance(d,list):
-			raise TypeError("expected a list, not a(n) "+str(type(d)))
-		self._weightSets = d
+	def addWeightSet(self,ws):
+		ensure_type(ws,list)
+		self._weightSets.append(ws)
+	def setWeightSets(self,ws):
+		ensure_type(ws,list)
+		self._weightSets = ws
 	
 	def getShapes(self):
 		return self._shapes
 	def clearShapes(self):
 		self._shapes = []
 	def addShape(self,shape):
-		if not isinstance(shape,MonadoForgeMeshShape):
-			raise TypeError("expected a MonadoForgeMeshShape, not a(n) "+str(type(shape)))
+		ensure_type(shape,MonadoForgeMeshShape)
 		self._shapes.append(shape)
 	def setShapes(self,shapeList):
-		self._shapes = []
-		for s in shapeList: self.addShape(s)
+		self.clearShapes()
+		for s in shapeList:
+			self.addShape(s)
 	
 	def getMaterialIndex(self):
 		return self._materialIndex
 	def setMaterialIndex(self,i):
-		if not isinstance(i,int):
-			raise TypeError("expected an int, not a(n) "+str(type(i)))
+		ensure_type(i,int)
 		self._materialIndex = i
 	
 	# assumption: if a single vertex has any of these, all the other vertices must also
@@ -677,16 +637,12 @@ class MonadoForgeMeshHeader:
 # assumption: there can only be one skeleton from the .wimdo and a second from an external source (i.e. an .arc/.chr file)
 class MonadoForgeWimdoPackage:
 	def __init__(self,skel,skelEx,mh,sh,mat):
-		if not isinstance(skel,MonadoForgeSkeleton):
-			raise TypeError("expected a MonadoForgeSkeleton, not a(n) "+str(type(skel)))
-		if skelEx and not isinstance(skelEx,MonadoForgeSkeleton):
-			raise TypeError("expected a MonadoForgeSkeleton, not a(n) "+str(type(skelEx)))
-		if not isinstance(mh,list):
-			raise TypeError("expected a list, not a(n) "+str(type(mh)))
-		if not isinstance(sh,list):
-			raise TypeError("expected a list, not a(n) "+str(type(sh)))
-		if not isinstance(mat,list):
-			raise TypeError("expected a list, not a(n) "+str(type(mat)))
+		ensure_type(skel,MonadoForgeSkeleton)
+		if skelEx:
+			ensure_type(skelEx,MonadoForgeSkeleton)
+		ensure_type(mh,list)
+		ensure_type(sh,list)
+		ensure_type(mat,list)
 		self._skeleton = skel
 		self._externalSkeleton = skelEx
 		self._meshHeaders = mh
