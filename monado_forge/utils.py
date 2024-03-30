@@ -172,9 +172,9 @@ def calculateGlobalBoneMatrixes(boneList):
 	localMats = {}
 	globalMats = {}
 	for b in boneList:
-		if b.getIndex() in localMats.keys():
-			raise ValueError("Multiple bones with index "+str(b.getIndex())+" in list")
-		localMats[b.getIndex()] = [b.getParent(),mathutils.Matrix.LocRotScale(b.getPosition()[0:3],mathutils.Quaternion(b.getRotation()),b.getScale()[0:3])]
+		if b.index in localMats.keys():
+			raise ValueError("Multiple bones with index "+str(b.index)+" in list")
+		localMats[b.index] = [b.parent,mathutils.Matrix.LocRotScale(b.position[0:3],mathutils.Quaternion(b.rotation),b.scale[0:3])]
 	# assumption: bones will only be parented to a previous bone (never a yet-to-be-seen one)
 	for b,[p,mtx] in localMats.items():
 		if p == -1: # no parent, no transformation
@@ -239,7 +239,7 @@ def isBonePairIdentical(thisBone,otherBone,positionEpsilon,angleEpsilon,mirrorab
 
 def create_armature_from_bones(boneList,name,pos,rot,boneSize,positionEpsilon,angleEpsilon):
 	if isinstance(boneList,MonadoForgeSkeleton): # this way either "a Forge skeleton object" or "a list of Forge bone objects" can be used
-		boneList = boneList.getBones()
+		boneList = boneList.bones
 	bpy.ops.object.select_all(action="DESELECT")
 	bpy.ops.object.armature_add(enter_editmode=True, align="WORLD", location=pos, rotation=rot, scale=(1,1,1))
 	skelObj = bpy.context.view_layer.objects.active
@@ -252,19 +252,19 @@ def create_armature_from_bones(boneList,name,pos,rot,boneSize,positionEpsilon,an
 	editBones = skeleton.edit_bones
 	for b in boneList:
 		# assumption: no bone will ever precede its parent (i.e. the parent will always be there already to attach to, no second pass needed)
-		newBone = editBones.new(b.getName())
+		newBone = editBones.new(b.name)
 		newBone.length = boneSize
-		newBone.parent = editBones[b.getParent()] if b.getParent() != 0xffff else None
+		newBone.parent = editBones[b.parent] if b.parent != -1 else None
 		parentMatrix = newBone.parent.matrix if newBone.parent else mathutils.Matrix.Identity(4)
-		posMatrix = mathutils.Matrix.Translation(b.getPosition())
-		rotMatrix = mathutils.Quaternion(b.getRotation()).to_matrix()
+		posMatrix = mathutils.Matrix.Translation(b.position)
+		rotMatrix = mathutils.Quaternion(b.rotation).to_matrix()
 		rotMatrix.resize_4x4()
 		newBone.matrix = parentMatrix @ (posMatrix @ rotMatrix)
 		newBone.length = boneSize # have seen odd non-rounding when not doing this
 		# put "normal" bones in layer 1 and endpoints in layer 2
 		# must be done in this order or the [0] set will be dropped because bones must be in at least one layer
-		newBone.layers[1] = b.isEndpoint()
-		newBone.layers[0] = not b.isEndpoint()
+		newBone.layers[1] = b.isEndpoint
+		newBone.layers[0] = not b.isEndpoint
 	# now that the bones are in, spin them around so they point in a more logical-for-Blender direction
 	for b in editBones:
 		# transform from lying down (+Y up +Z forward) to standing up (+Z up -Y forward)

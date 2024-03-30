@@ -100,7 +100,7 @@ def import_sar1_skel_subfile(f, context):
 		for b in range(skelTocItems[2][2]):
 			# parent
 			f.seek(offset+skelTocItems[2][0]+b*2)
-			parent = readAndParseInt(f,2)
+			parent = readAndParseInt(f,2,signed=True)
 			# name
 			f.seek(offset+skelTocItems[3][0]+b*16)
 			nameOffset = readAndParseInt(f,4)
@@ -122,18 +122,18 @@ def import_sar1_skel_subfile(f, context):
 			sw = readAndParseFloat(f)
 			# reminder that the pos and scale are x,y,z,w but the rotation is w,x,y,z
 			fb = MonadoForgeBone(len(forgeBones))
-			fb.setParent(parent)
-			fb.setName(name)
-			fb.setPosition([px,py,pz,pw])
-			fb.setRotation([rw,rx,ry,rz])
-			fb.setScale([sx,sy,sz,sw])
-			fb.setEndpoint(False)
+			fb.name = name
+			fb.parent = parent
+			fb.position = [px,py,pz,pw]
+			fb.rotation = [rw,rx,ry,rz]
+			fb.scale = [sx,sy,sz,sw]
+			fb.isEndpoint = False
 			forgeBones.append(fb)
 		if importEndpoints:
 			for ep in range(skelTocItems[6][2]):
 				# parent
 				f.seek(offset+skelTocItems[6][0]+ep*2)
-				parent = readAndParseInt(f,2)
+				parent = readAndParseInt(f,2,signed=True)
 				# name
 				f.seek(offset+skelTocItems[7][0]+ep*8) # yeah endpoint names are packed tighter than "normal" bone names
 				nameOffset = readAndParseInt(f,4)
@@ -157,12 +157,12 @@ def import_sar1_skel_subfile(f, context):
 				if pw == 0.0: pw = 1.0
 				# reminder that the pos and scale are x,y,z,w but the rotation is w,x,y,z
 				fb = MonadoForgeBone(len(forgeBones))
-				fb.setParent(parent)
-				fb.setName(name)
-				fb.setPosition([px,py,pz,pw])
-				fb.setRotation([rw,rx,ry,rz])
-				fb.setScale([sx,sy,sz,sw])
-				fb.setEndpoint(True)
+				fb.name = name
+				fb.parent = parent
+				fb.position = [px,py,pz,pw]
+				fb.rotation = [rw,rx,ry,rz]
+				fb.scale = [sx,sy,sz,sw]
+				fb.isEndpoint = True
 				forgeBones.append(fb)
 		if printProgress:
 			print("Read "+str(len(forgeBones))+" bones.")
@@ -175,7 +175,7 @@ def import_sar1_skel_subfile(f, context):
 	if len(importedSkeletons) > 1:
 		print_warning(".skl file has multiple skeletons; returning only the first (please report this issue)")
 	skeleton = MonadoForgeSkeleton()
-	skeleton.setBones(importedSkeletons[0])
+	skeleton.bones = importedSkeletons[0]
 	return skeleton
 
 def import_wimdo(f, context, externalSkeleton=None):
@@ -269,9 +269,9 @@ def import_wimdo(f, context, externalSkeleton=None):
 				rotMatrix = mathutils.Matrix([boneXAxis,boneYAxis,boneZAxis,bonePosition])
 				bonePosition = (rotMatrix @ posMatrix).to_translation().to_4d()
 				fb = MonadoForgeBone(len(forgeBones))
-				fb.setName(boneName)
-				fb.setPosition(bonePosition[:]) # the [:] is because we're turning a Vector into a list
-				fb.setRotation(rotMatrix.to_quaternion())
+				fb.name = boneName
+				fb.position = bonePosition[:] # the [:] is because we're turning a Vector into a list
+				fb.rotation = rotMatrix.to_quaternion()
 				forgeBones.append(fb)
 			if printProgress:
 				print("Found "+str(len(forgeBones))+" bones.")
@@ -363,12 +363,12 @@ def import_wimdo(f, context, externalSkeleton=None):
 			f.seek(ftemp)
 			#materials.append([matName,matBaseColour,matTextureTable,matExtraDataIndex])
 			mat = MonadoForgeWimdoMaterial(m)
-			mat.setName(matName)
-			mat.setBaseColour(matBaseColour)
-			mat.setTextureTable(matTextureTable)
-			mat.setSamplers(samplers) # yes this means each material has the samplers duplicated, but that's not really a big deal (it's two numbers)
-			mat.setExtraDataIndex(matExtraDataIndex)
-			mat.setRenderPassType(renderPassType)
+			mat.name = matName
+			mat.baseColour = matBaseColour
+			mat.textureTable = matTextureTable
+			mat.samplers = samplers # yes this means each material has the samplers duplicated, but that's not really a big deal (it's two numbers)
+			mat.extraDataIndex = matExtraDataIndex
+			mat.renderPassType = renderPassType
 			materials.append(mat)
 		f.seek(materialsOffset+materialExtraDataOffset)
 		materialExtraData = []
@@ -376,21 +376,19 @@ def import_wimdo(f, context, externalSkeleton=None):
 			materialExtraData.append(readAndParseFloat(f))
 		splitExtraData = []
 		matCounter = -1
-		nextStart = materials[0].getExtraDataIndex()
+		nextStart = materials[0].extraDataIndex
 		for i,x in enumerate(materialExtraData):
 			if i >= nextStart:
 				splitExtraData.append([])
 				if len(splitExtraData) < len(materials):
-					nextStart = materials[len(splitExtraData)].getExtraDataIndex()
+					nextStart = materials[len(splitExtraData)].extraDataIndex
 				else:
 					nextStart = 10000000
 			splitExtraData[-1].append(x)
 		for i,sxd in enumerate(splitExtraData):
-			materials[i].setExtraData(sxd)
+			materials[i].extraData = sxd
 		if printProgress:
 			print("Found "+str(len(materials))+" materials.")
-			#for m in materials:
-			#	print(m.getName(),m.getBaseColour(),m.getTextureTable(),m.getExtraDataIndex(),m.getExtraData())
 	if vertexBufferOffset > 0:
 		f.seek(vertexBufferOffset)
 	if shadersOffset > 0:
@@ -401,7 +399,7 @@ def import_wimdo(f, context, externalSkeleton=None):
 		f.seek(uncachedTexturesTableOffset)
 	
 	skeleton = MonadoForgeSkeleton()
-	skeleton.setBones(forgeBones)
+	skeleton.bones = forgeBones
 	results = MonadoForgeWimdoPackage(skeleton,externalSkeleton,meshHeaders,shapeHeaders,materials)
 	if printProgress:
 		print("Finished parsing .wimdo file.")
@@ -643,9 +641,9 @@ def import_wismt(f, wimdoResults, context):
 							for vd in vertexDescriptors:
 								vdType,vdSize = vd
 								if vdType == 0: # position
-									newVertex.setPosition([readAndParseFloat(sf),readAndParseFloat(sf),readAndParseFloat(sf)])
+									newVertex.position = [readAndParseFloat(sf),readAndParseFloat(sf),readAndParseFloat(sf)]
 								elif vdType == 3: # weights index
-									newVertex.setWeightSetIndex(readAndParseInt(sf,4))
+									newVertex.weightSetIndex = readAndParseInt(sf,4)
 								elif vdType == 5: # UV 1 (inverted Y reminder) (yes this is copy/pasted for other layers but this is kind of easier actually)
 									newVertex.setUV(0,[readAndParseFloat(sf),1.0-readAndParseFloat(sf)])
 									hasUVLayers[0] = True
@@ -663,7 +661,7 @@ def import_wismt(f, wimdoResults, context):
 									newNormal = [readAndParseInt(sf,1,signed=True)/128.0,readAndParseInt(sf,1,signed=True)/128.0,readAndParseInt(sf,1,signed=True)/128.0]
 									readAndParseInt(sf,1,signed=True) # dummy
 									# doesn't necessarily read as normalized
-									newVertex.setNormal(mathutils.Vector(newNormal).normalized()[:])
+									newVertex.normal = mathutils.Vector(newNormal).normalized()[:]
 								elif vdType == 41: # weight values (weightTable verts only)
 									weightVertex[1] = [readAndParseInt(sf,2)/65535.0,readAndParseInt(sf,2)/65535.0,readAndParseInt(sf,2)/65535.0,readAndParseInt(sf,2)/65535.0]
 								elif vdType == 42: # weight IDs (weightTable verts only)
@@ -686,7 +684,7 @@ def import_wismt(f, wimdoResults, context):
 						for j in range(0,len(ftVertexes),3):
 							newFaceIndex = len(faceData[i])
 							newFace = MonadoForgeFace(newFaceIndex)
-							newFace.setVertexIndexes([ftVertexes[j],ftVertexes[j+1],ftVertexes[j+2]])
+							newFace.vertexIndexes = [ftVertexes[j],ftVertexes[j+1],ftVertexes[j+2]]
 							faceData[i].append(newFace)
 					if printProgress and faceData != {}:
 						print("Finished reading face data.")
@@ -702,12 +700,12 @@ def import_wismt(f, wimdoResults, context):
 						# it seems that "has shapes" is the difference for whether normals are signed or not
 						for j in range(targetVertexCount):
 							vertexBeingModified = vertexData[shapeDataChunkID][j]
-							vertexBeingModified.setPosition([readAndParseFloat(sf),readAndParseFloat(sf),readAndParseFloat(sf)])
+							vertexBeingModified.position = [readAndParseFloat(sf),readAndParseFloat(sf),readAndParseFloat(sf)]
 							newNormal = [(readAndParseInt(sf,1)/255.0)*2-1,(readAndParseInt(sf,1)/255.0)*2-1,(readAndParseInt(sf,1)/255.0)*2-1]
 							# doesn't necessarily read as normalized
-							vertexBeingModified.setNormal(mathutils.Vector(newNormal).normalized()[:])
+							vertexBeingModified.normal = mathutils.Vector(newNormal).normalized()[:]
 							sf.seek(sf.tell()+targetBlockSize-15) # the magic -15 is the length of the position+normal (4*3 + 3)
-						shapeNameList = ["basis"] + [h[0] for h in wimdoResults.getShapeHeaders()] # "basis" needs to be added because the first target is also the base shape for some reason
+						shapeNameList = ["basis"] + [h[0] for h in wimdoResults.shapeHeaders] # "basis" needs to be added because the first target is also the base shape for some reason
 						for j in range(shapeTargetCounts+1):
 							if j == 0: continue # as above, the first is the basis so we don't need it
 							# it's okay to overwrite these variables, we don't need the above ones anymore
@@ -723,18 +721,18 @@ def import_wismt(f, wimdoResults, context):
 								readAndParseInt(sf,4)
 								index = readAndParseInt(sf,4)
 								newVertex = MonadoForgeVertex(index)
-								newVertex.setPosition(newPosition)
+								newVertex.position = newPosition
 								# doesn't necessarily read as normalized
-								newVertex.setNormal(mathutils.Vector(newNormal).normalized()[:])
-								newShape.addVertex(index,newVertex)
-							newShape.setVertexTableIndex(shapeDataChunkID)
-							newShape.setName(shapeNameList[j]) # probably wrong but need to find a counterexample
+								newVertex.normal = mathutils.Vector(newNormal).normalized()[:]
+								newShape.setVertex(index,newVertex)
+							newShape.vertexTableIndex = shapeDataChunkID
+							newShape.name = shapeNameList[j] # probably wrong but need to find a counterexample
 							shapes.append(newShape)
 					if printProgress and shapes != []:
 						print("Finished reading shape data.")
 					shapesByVertexTableIndex = {}
 					for s in shapes:
-						thisShapesIndex = s.getVertexTableIndex()
+						thisShapesIndex = s.vertexTableIndex
 						if thisShapesIndex in shapesByVertexTableIndex.keys():
 							shapesByVertexTableIndex[thisShapesIndex].append(s)
 						else:
@@ -755,21 +753,21 @@ def import_wismt(f, wimdoResults, context):
 						endIndex = weightTables[splitTableIndex][1]+weightTables[splitTableIndex][2]
 						splitVertexWeights[splitTableIndex] = vertexWeights[startIndex:endIndex]
 					# now for the meshes themselves
-					for md in wimdoResults.getMeshHeaders():
-						vtIndex = md.getMeshVertTableIndex()
-						ftIndex = md.getMeshFaceTableIndex()
-						mtIndex = md.getMeshMaterialIndex()
+					for md in wimdoResults.meshHeaders:
+						vtIndex = md.meshVertTableIndex
+						ftIndex = md.meshFaceTableIndex
+						mtIndex = md.meshMaterialIndex
 						
 						# here is where we can determine the necessary weight table for this mesh
 						# this is entirely based on what xc3_lib does (no further trying to understand it has been done)
-						flags1 = md.getMeshFlags1()
-						meshLod = md.getMeshLODValue()
+						flags1 = md.meshFlags1
+						meshLod = md.meshLODValue
 						tableID = 0
 						if flags1 == 64:
 							tableID = 4
 						else:
 							passLookup = {0:0,1:1,7:3}
-							passType = wimdoResults.getMaterials()[mtIndex].getRenderPassType()
+							passType = wimdoResults.materials[mtIndex].renderPassType
 							try:
 								tableID = passLookup[passType]
 							except KeyError:
@@ -786,16 +784,16 @@ def import_wismt(f, wimdoResults, context):
 							unusedFaceTables.remove(ftIndex)
 						# this order of operations means that tables are still marked as "used" even if they're of dropped LODs
 						if not context.scene.monado_forge_import.alsoImportLODs:
-							if md.getMeshLODValue() > bestLOD:
+							if md.meshLODValue > bestLOD:
 								continue
 						
 						newMesh = MonadoForgeMesh()
-						newMesh.setVertices(vertexData[vtIndex])
-						newMesh.setFaces(faceData[ftIndex])
-						newMesh.setWeightSets(splitVertexWeights[finalTableID])
-						newMesh.setMaterialIndex(mtIndex)
+						newMesh.vertices = vertexData[vtIndex]
+						newMesh.faces = faceData[ftIndex]
+						newMesh.weightSets = splitVertexWeights[finalTableID]
+						newMesh.materialIndex = mtIndex
 						if vtIndex in shapesByVertexTableIndex.keys():
-							newMesh.setShapes(shapesByVertexTableIndex[vtIndex])
+							newMesh.shapes = shapesByVertexTableIndex[vtIndex]
 						meshes.append(newMesh)
 					if unusedVertexTables:
 						print("Unused vertex tables: "+str(unusedVertexTables))
@@ -955,22 +953,22 @@ def import_wismt(f, wimdoResults, context):
 					sf.close()
 	
 	# time to ready materials
-	wimdoMaterials = wimdoResults.getMaterials()
+	wimdoMaterials = wimdoResults.materials
 	resultMaterials = []
 	for mat in wimdoMaterials:
-		newMat = MonadoForgeMaterial(mat.getIndex())
-		newMat.setName(mat.getName())
-		newMat.setBaseColour(mat.getBaseColour())
-		newMat.setViewportColour(mat.getBaseColour())
-		newMat.setExtraData(mat.getExtraData())
-		newMat.setColourLayerCount(maxColourLayers)
-		newMat.setUVLayerCount(maxUVLayers)
-		matSamplers = mat.getSamplers()
+		newMat = MonadoForgeMaterial(mat.index)
+		newMat.name = mat.name
+		newMat.baseColour = mat.baseColour
+		newMat.viewportColour = mat.baseColour
+		newMat.extraData = mat.extraData
+		newMat.colourLayerCount = maxColourLayers
+		newMat.uvLayerCount = maxUVLayers
+		matSamplers = mat.samplers
 		# this is done in a way that "duplicates" texture references, but that's fairly harmless at this stage
-		for ti,t in enumerate(mat.getTextureTable()):
+		for ti,t in enumerate(mat.textureTable):
 			newTex = MonadoForgeTexture()
 			texIndex = t[0] # ignore the unknowns for now
-			newTex.setName(textureAlignment[textureHeaders[texIndex][3]])
+			newTex.name = textureAlignment[textureHeaders[texIndex][3]]
 			texSampler = matSamplers[t[1]]
 			samplerFlags = texSampler[0]
 			# the known sampler flags:
@@ -988,17 +986,17 @@ def import_wismt(f, wimdoResults, context):
 			uMirror = (samplerFlags & 0x04) != 0
 			vMirror = (samplerFlags & 0x08) != 0
 			noFiltering = (samplerFlags & 0x10) != 0
-			newTex.setRepeating([uRepeat,vRepeat])
-			newTex.setMirroring([uMirror,vMirror])
-			newTex.setFiltered(not noFiltering) # yes we're flipping the meaning, "true means don't" is confusing
+			newTex.repeating = [uRepeat,vRepeat]
+			newTex.mirroring = [uMirror,vMirror]
+			newTex.isFiltered = not noFiltering # yes we're flipping the meaning, "true means don't" is confusing
 			newMat.addTexture(newTex)
 		resultMaterials.append(newMat)
 	
 	results = MonadoForgeImportedPackage()
-	results.setSkeleton(wimdoResults.getSkeleton())
-	results.setExternalSkeleton(wimdoResults.getExternalSkeleton())
-	results.setMeshes(meshes)
-	results.setMaterials(resultMaterials)
+	results.skeleton = wimdoResults.skeleton
+	results.externalSkeleton = wimdoResults.externalSkeleton
+	results.meshes = meshes
+	results.materials = resultMaterials
 	if printProgress:
 		print("Finished parsing .wismt file.")
 	return results
@@ -1013,7 +1011,7 @@ def import_sar1_skeleton_only(self, context):
 		skeleton = import_sar1_skel_subfile(f, context)
 	
 	# we now have the skeleton in generic format - create the armature
-	armatureName = skeleton.getBones()[0].getName()
+	armatureName = skeleton.bones[0].name
 	if armatureName.endswith("_top"):
 		armatureName = armatureName[:-4]
 	if armatureName.endswith("_Bone"):

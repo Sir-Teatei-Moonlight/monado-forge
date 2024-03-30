@@ -240,12 +240,11 @@ def parse_mdl0(f, context, subfileOffset):
 				f.seek(boneDataOffset+boneParentOffset+4*3)
 				parentIndex = readAndParseIntBig(f,4)
 			newBone = MonadoForgeBone(boneIndex)
-			newBone.setName(boneName)
-			newBone.setParent(parentIndex)
-			newBone.setPosition(bonePos+[1.0])
-			newBone.setRotation(mathutils.Euler(boneRot,"XYZ").to_quaternion())
-			newBone.setRotation(mathutils.Euler([math.radians(d) for d in boneRot],"XYZ").to_quaternion())
-			newBone.setScale(boneScale+[1.0])
+			newBone.name = boneName
+			newBone.parent = parentIndex
+			newBone.position = bonePos+[1.0]
+			newBone.rotation = mathutils.Euler([math.radians(d) for d in boneRot],"XYZ").to_quaternion()
+			newBone.scale = boneScale+[1.0]
 			boneList.append(newBone)
 		# fill in the weight list with a bunch of 1.0 influence on every bone (to be used for single-bone verts)
 		weightsList[0] = [[[x],[1.0]] for x in range(len(boneList))]
@@ -651,9 +650,9 @@ def parse_mdl0(f, context, subfileOffset):
 									# but what if vert[0] is -1? apparently that's a thing
 									boneListIndexTarget = indexedMatrixesPos[vert[0]//3]
 								boneListIndex = weightLinkTable[boneListIndexTarget]
-								newVertex.setWeightSetIndex(boneListIndex)
+								newVertex.weightSetIndex = boneListIndex
 								if boneListIndex == -1: # not a single bone vertex
-									newVertex.setWeightSetIndex(boneListIndexTarget+multiWeightShiftIndex)
+									newVertex.weightSetIndex = boneListIndexTarget+multiWeightShiftIndex
 								else: # is a single bone vertex
 									# these vertices are origin-clustered and modified into position based on their bone
 									singleBone = boneList[boneListIndex]
@@ -663,9 +662,9 @@ def parse_mdl0(f, context, subfileOffset):
 										# rotation part only
 										nrmMatrix = boneMatrix.to_quaternion().to_matrix()
 										nrm = nrmMatrix @ mathutils.Vector(nrm)
-								newVertex.setPosition(pos)
+								newVertex.position = pos
 								if vert[10] != -1: # normal
-									newVertex.setNormal(nrm)
+									newVertex.normal = nrm
 							else:
 								print_warning("vertex without position: "+str(vert))
 							if vert[11] != -1: # colour 1
@@ -681,32 +680,32 @@ def parse_mdl0(f, context, subfileOffset):
 							# before adding this vertex, we must check for if it's a duplicate, and if so use the existing other instead
 							# this would be very expensive without hashing the position
 							foundDouble = False
-							thisPosHashed = tuple(newVertex.getPosition())
+							thisPosHashed = tuple(newVertex.position)
 							if thisPosHashed in hashedVertsByPosition.keys():
 								others = hashedVertsByPosition[thisPosHashed]
 								for other in others:
 									if newVertex.isDouble(other):
-										faceVerts.append(other.getIndex())
+										faceVerts.append(other.index)
 										foundDouble = True
 										hashedVertsByPosition[thisPosHashed].append(newVertex)
 										break
 							if not foundDouble:
 								forgeVerts.append(newVertex)
 								faceVerts.append(curVIndex)
-								hashedVertsByPosition[tuple(newVertex.getPosition())] = [newVertex]
+								hashedVertsByPosition[tuple(newVertex.position)] = [newVertex]
 								curVIndex += 1
 						newFace = MonadoForgeFace(newFaceIndex)
-						newFace.setVertexIndexes(faceVerts)
+						newFace.vertexIndexes = faceVerts
 						forgeFaces.append(newFace)
 			finally:
 				if unknownCmds:
 					print_warning("found unknown graphic commands: "+", ".join(hex(x) for x in unknownCmds))
 			newMesh = MonadoForgeMesh()
-			newMesh.setName(name+"_"+meshName)
-			newMesh.setVertices(forgeVerts)
-			newMesh.setFaces(forgeFaces)
-			newMesh.setMaterialIndex(defsMeshDraw[meshIndex][0])
-			newMesh.setWeightSets(fullWeightIndexesList)
+			newMesh.name = name+"_"+meshName
+			newMesh.vertices = forgeVerts
+			newMesh.faces = forgeFaces
+			newMesh.materialIndex = defsMeshDraw[meshIndex][0]
+			newMesh.weightSets = fullWeightIndexesList
 			meshes[m] = newMesh
 	
 	materials = {}
@@ -802,31 +801,31 @@ def parse_mdl0(f, context, subfileOffset):
 				textureData.append([textureName,texWrapU,texWrapV,texFilterModeLarger])
 			# all the stuff is in now, process it
 			newMat = MonadoForgeMaterial(materialIndex)
-			newMat.setName(materialName)
-			newMat.setCullingFront((materialCulling & 1) == 1)
-			newMat.setCullingBack(((materialCulling & 2)>>1) == 1)
-			newMat.setTransparency(2 if flagIsXLU else 0) # alpha clip not yet detected
-			newMat.setColourLayerCount(maxColourLayers)
-			newMat.setUVLayerCount(maxUVLayers)
+			newMat.name = materialName
+			newMat.cullingFront = (materialCulling & 1) == 1
+			newMat.cullingBack = ((materialCulling & 2)>>1) == 1
+			newMat.transparency = 2 if flagIsXLU else 0 # alpha clip not yet detected
+			newMat.colourLayerCount = maxColourLayers
+			newMat.uvLayerCount = maxUVLayers
 			for tex in textureData:
 				newTex = MonadoForgeTexture()
-				newTex.setName(tex[0])
+				newTex.name = tex[0]
 				uRepeat = tex[1] != 0 # not "== 1" because mirror also requires repeat
 				vRepeat = tex[2] != 0
 				uMirror = tex[1] == 2
 				vMirror = tex[2] == 2
-				newTex.setRepeating([uRepeat,vRepeat])
-				newTex.setMirroring([uMirror,vMirror])
-				newTex.setFiltered(tex[3] == 1)
+				newTex.repeating = [uRepeat,vRepeat]
+				newTex.mirroring = [uMirror,vMirror]
+				newTex.isFiltered = tex[3] == 1
 				newMat.addTexture(newTex)
 			materials[materialIndex] = newMat
 	
 	results = MonadoForgeImportedPackage()
 	skel = MonadoForgeSkeleton()
-	skel.setBones(boneList)
-	results.setSkeleton(skel)
-	results.setMeshes(list(meshes.values()))
-	results.setMaterials(list(materials.values()))
+	skel.bones = boneList
+	results.skeleton = skel
+	results.meshes = list(meshes.values())
+	results.materials = list(materials.values())
 	if printProgress:
 		print("Finished parsing MDL0 from .brres file.")
 	return results

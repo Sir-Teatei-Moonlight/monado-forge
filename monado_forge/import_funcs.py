@@ -374,14 +374,14 @@ def realise_results(forgeResults, mainName, self, context):
 	else:
 		pos = (0,0,0)
 		rot = (0,0,0)
-	externalSkeleton = forgeResults.getExternalSkeleton()
+	externalSkeleton = forgeResults.externalSkeleton
 	if externalSkeleton:
 		armatureName = mainName
 		externalArmature = create_armature_from_bones(externalSkeleton,armatureName,pos,rot,boneSize,positionEpsilon,angleEpsilon)
 		armaturesCreated += 1
 	else:
 		externalArmature = None
-	baseSkeleton = forgeResults.getSkeleton()
+	baseSkeleton = forgeResults.skeleton
 	if baseSkeleton:
 		armatureName = mainName
 		baseArmature = create_armature_from_bones(baseSkeleton,armatureName,pos,rot,boneSize,positionEpsilon,angleEpsilon)
@@ -391,19 +391,19 @@ def realise_results(forgeResults, mainName, self, context):
 	if printProgress:
 		print("Finished creating "+str(armaturesCreated)+" armatures.")
 	
-	materials = forgeResults.getMaterials()
+	materials = forgeResults.materials
 	newMatsByIndex = {}
 	for m,mat in enumerate(materials):
-		newMat = bpy.data.materials.new(name=mat.getName())
+		newMat = bpy.data.materials.new(name=mat.name)
 		if context.scene.monado_forge_import.fixedViewportColour:
 			newMat.diffuse_color = context.scene.monado_forge_import.viewportColour
 		else:
-			newMat.diffuse_color = mat.getViewportColour()
+			newMat.diffuse_color = mat.viewportColour
 		transparencyEnum = ["OPAQUE","CLIP","BLEND"]
-		newMat.blend_method = transparencyEnum[mat.getTransparency()]
+		newMat.blend_method = transparencyEnum[mat.transparency]
 		shadowTransparencyEnum = ["OPAQUE","CLIP","OPAQUE"] # only binary shadows allowed
-		newMat.shadow_method = shadowTransparencyEnum[mat.getTransparency()]
-		newMat.use_backface_culling = mat.getCullingBack() # dunno what to do about any that cull front, so leaving it out
+		newMat.shadow_method = shadowTransparencyEnum[mat.transparency]
+		newMat.use_backface_culling = mat.cullingBack # dunno what to do about any that cull front, so leaving it out
 		newMat.show_transparent_back = True # not ideal but believed to be correct
 		newMat.use_nodes = True # the default creation is "Principled BSDF" into "Material Output"
 		n = newMat.node_tree.nodes
@@ -429,38 +429,38 @@ def realise_results(forgeResults, mainName, self, context):
 			shaderSubnode.node_tree = dummyShader
 			newMat.node_tree.links.new(shaderSubnode.outputs[0],n.get("Material Output").inputs[0])
 		baseColourNode = n.new("ShaderNodeRGB")
-		baseColourNode.outputs[0].default_value = mat.getBaseColour()
+		baseColourNode.outputs[0].default_value = mat.baseColour
 		baseColourNode.label = "Base Colour"
 		baseColourNode.location = [-650,300]
 		n.get("Material Output").location = [950,300]
 		texNodes = []
 		mirroring = {"":[],"x":[],"y":[],"xy":[]}
-		if createDummyShader and not mat.getTextures(): # no textures, plug in the base colour directly
+		if createDummyShader and not mat.textures: # no textures, plug in the base colour directly
 			newMat.node_tree.links.new(baseColourNode.outputs[0],shaderSubnode.inputs["Base Color"])
-		for ti,t in enumerate(mat.getTextures()):
+		for ti,t in enumerate(mat.textures):
 			texNode = n.new("ShaderNodeTexImage")
 			texNode.extension = "EXTEND"
-			repeat = t.getRepeating()
+			repeat = t.repeating
 			if repeat[0] or repeat[1]: # Blender only supports "all extend" or "all repeat", so will have to make a new node to support mixed cases (probably not common)
 				texNode.extension = "REPEAT"
 			if repeat[0] != repeat[1]:
-				print_warning("Texture "+t.getName()+" wants to be clamped in one direction but repeat in another, which is not yet supported (setting to repeat in both)")
+				print_warning("Texture "+t.name+" wants to be clamped in one direction but repeat in another, which is not yet supported (setting to repeat in both)")
 			texNode.interpolation = "Closest"
-			if t.isFiltered():
+			if t.isFiltered:
 				texNode.interpolation = "Linear"
-			texNode.image = bpy.data.images[t.getName()]
+			texNode.image = bpy.data.images[t.name]
 			# use the name to guess what should be non-colour data
 			if any([
-				"_NRM" in t.getName(),"_NML" in t.getName(), # normal
-				"_MTL" in t.getName(), # metal
-				"_SHY" in t.getName(), # gloss
-				"_ALP" in t.getName(), # alpha
-				"_AO" in t.getName(), # ambient occlusion
-				"_GLO" in t.getName(), # glow/emit
-				"_MSK" in t.getName(), # mask
-				"_VEL" in t.getName(), # velocity (fur/hair map)
-				"_DPS" in t.getName(), # displacement?
-				"temp" in t.getName(), # channelised
+				"_NRM" in t.name,"_NML" in t.name, # normal
+				"_MTL" in t.name, # metal
+				"_SHY" in t.name, # gloss
+				"_ALP" in t.name, # alpha
+				"_AO" in t.name, # ambient occlusion
+				"_GLO" in t.name, # glow/emit
+				"_MSK" in t.name, # mask
+				"_VEL" in t.name, # velocity (fur/hair map)
+				"_DPS" in t.name, # displacement?
+				"temp" in t.name, # channelised
 				]):
 					texNode.image.colorspace_settings.name = "Non-Color"
 			tx = ti%4
@@ -469,18 +469,18 @@ def realise_results(forgeResults, mainName, self, context):
 			# guess: the first texture is the base colour
 			if ti == 0 and createDummyShader:
 				newMat.node_tree.links.new(texNode.outputs["Color"],shaderSubnode.inputs["Base Color"])
-			mir = t.getMirroring()
+			mir = t.mirroring
 			mX = "x" if mir[0] else ""
 			mY = "y" if mir[1] else ""
 			mirroring[mX+mY].append(texNode)
 			# for temp files, add a colour splitter for convenience
-			if "temp" in t.getName():
+			if "temp" in t.name:
 				sepNode = n.new("ShaderNodeSeparateColor")
 				sepNode.location = texNode.location + mathutils.Vector([125,-25])
 				sepNode.hide = True
 				newMat.node_tree.links.new(texNode.outputs["Color"],sepNode.inputs[0])
-		colourCount = mat.getColourLayerCount() # this will probably result in overestimation, but that's okay
-		uvCount = mat.getUVLayerCount() # same
+		colourCount = mat.colourLayerCount # this will probably result in overestimation, but that's okay
+		uvCount = mat.uvLayerCount # same
 		pushdownValue = 100 # to keep track of node posititon across multiple for loops
 		# we do UVs first because the node is shorter and they're more common than colours
 		for uv in range(uvCount):
@@ -490,7 +490,7 @@ def realise_results(forgeResults, mainName, self, context):
 			uvInputNode.location = [-650,pushdownValue]
 			uvInputNode.uv_map = "UV"+str(uv+1)
 			pushdownValue -= 40
-			if mirroring[""] or not mat.getTextures(): # no textures means no mirroring defined: assume none
+			if mirroring[""] or not mat.textures: # no textures means no mirroring defined: assume none
 				if uv == 0:
 					for mt in mirroring[""]:
 						newMat.node_tree.links.new(uvInputNode.outputs["UV"],mt.inputs["Vector"])
@@ -518,26 +518,26 @@ def realise_results(forgeResults, mainName, self, context):
 			colourInputNode.attribute_name = "VertexColours"+str(colour+1)
 			colourInputNode.hide = True
 			pushdownValue -= 40
-		for xi,x in enumerate(mat.getExtraData()):
+		for xi,x in enumerate(mat.extraData):
 			extraDataNode = n.new("ShaderNodeValue")
 			extraDataNode.outputs["Value"].default_value = x
 			extraDataNode.label = "Extra Data Value "+str(xi+1)
 			extraDataNode.location = [-475,xi*-100+300]
-		newMatsByIndex[mat.getIndex()] = newMat
+		newMatsByIndex[mat.index] = newMat
 	
-	meshes = forgeResults.getMeshes()
+	meshes = forgeResults.meshes
 	for m,mesh in enumerate(meshes):
 		if printProgress:
 			print_progress_bar(m,len(meshes),"Mesh creation")
 		bpy.ops.object.add(type="MESH", enter_editmode=False, align="WORLD", location=(0,0,0), rotation=(0,0,0), scale=(1,1,1))
 		newMeshObject = bpy.context.view_layer.objects.active
-		if mesh.getName():
-			newMeshObject.name = f"{mainName}_{mesh.getName()}"
+		if mesh.name:
+			newMeshObject.name = f"{mainName}_{mesh.name}"
 		else:
 			newMeshObject.name = f"{mainName}_mesh{m:03d}"
 		meshData = newMeshObject.data
 		meshData.name = "Mesh"
-		vertCount = len(mesh.getVertices())
+		vertCount = len(mesh.vertices)
 		meshData.from_pydata(mesh.getVertexPositionsList(),[],mesh.getFaceVertexIndexesList())
 		for f in meshData.polygons:
 			f.use_smooth = True
@@ -567,7 +567,7 @@ def realise_results(forgeResults, mainName, self, context):
 			vertexesInEachSet = {}
 			for i in weightIndexes:
 				vertexesInEachSet[i] = mesh.getVertexesWithWeightIndex(i)
-			weightSets = mesh.getWeightSets()
+			weightSets = mesh.weightSets
 			for weightIndex in weightIndexes:
 				weightSetData = weightSets[weightIndex]
 				for j in range(len(weightSetData[0])):
@@ -576,21 +576,21 @@ def realise_results(forgeResults, mainName, self, context):
 					if groupValue == 0: continue
 					vertexGroup = newMeshObject.vertex_groups[groupIndex]
 					vertexesToAdd = vertexesInEachSet[weightIndex]
-					vertexIDsToAdd = [v.getIndex() for v in vertexesToAdd]
+					vertexIDsToAdd = [v.index for v in vertexesToAdd]
 					newMeshObject.vertex_groups[groupIndex].add(vertexIDsToAdd,groupValue,"ADD")
 		elif mesh.hasWeights(): # no indexes, but do have directly-applied weights
 			pass # not needed at the present time
 		if mesh.hasShapes():
-			shapes = mesh.getShapes()
+			shapes = mesh.shapes
 			if not meshData.shape_keys:
 				newMeshObject.shape_key_add(name="basis",from_mix=False)
 			meshData.shape_keys.use_relative = True
 			for s in shapes:
-				newShape = newMeshObject.shape_key_add(name=s.getName(),from_mix=False)
-				for vertexIndex,vertex in s.getVertices().items():
-					newShape.data[vertexIndex].co += mathutils.Vector(vertex.getPosition())
-		if materials and not context.scene.monado_forge_import.skipMaterialImport and mesh.getMaterialIndex() != -1:
-			meshData.materials.append(newMatsByIndex[mesh.getMaterialIndex()])
+				newShape = newMeshObject.shape_key_add(name=s.name,from_mix=False)
+				for vertexIndex,vertex in s.vertices.items():
+					newShape.data[vertexIndex].co += mathutils.Vector(vertex.position)
+		if materials and not context.scene.monado_forge_import.skipMaterialImport and mesh.materialIndex != -1:
+			meshData.materials.append(newMatsByIndex[mesh.materialIndex])
 		
 		# import complete, cleanup time
 		cleanup_mesh(context,newMeshObject,
