@@ -507,7 +507,7 @@ def parse_mdl0(f, context, subfileOffset):
 			combinedCPEmbeddedFlags = [0]*(14+11+10)
 			unknownCmds = []
 			# there will be a lot of duplicate vertices, that's fine for now
-			forgeVerts = []
+			forgeVerts = MonadoForgeVertexList()
 			forgeFaces = []
 			hashedVertsByPosition = {} # this is for faster duplicate culling later
 			curVIndex = 0
@@ -690,7 +690,7 @@ def parse_mdl0(f, context, subfileOffset):
 										hashedVertsByPosition[thisPosHashed].append(newVertex)
 										break
 							if not foundDouble:
-								forgeVerts.append(newVertex)
+								forgeVerts.addVertex(curVIndex,newVertex)
 								faceVerts.append(curVIndex)
 								hashedVertsByPosition[tuple(newVertex.position)] = [newVertex]
 								curVIndex += 1

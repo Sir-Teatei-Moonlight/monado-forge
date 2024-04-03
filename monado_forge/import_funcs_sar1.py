@@ -628,13 +628,12 @@ def import_wismt(f, wimdoResults, context):
 					faceData = {}
 					vertexWeightData = {} # assumption: a single vertex cannot both contain actual data and be one of the "weight container only" vertices
 					for i in range(len(vertexTables)):
-						vertexData[i] = []
+						vertexData[i] = MonadoForgeVertexList()
 						vertexWeightData[i] = []
 						vtDataOffset,vtDataCount,vtBlockSize,vtDescOffset,vtDescCount,vertexDescriptors = vertexTables[i]
-						newMesh = MonadoForgeMesh()
 						sf.seek(dataOffset+vtDataOffset)
-						for j in range(vtDataCount):
-							newVertex = MonadoForgeVertex(j)
+						for vIndex in range(vtDataCount):
+							newVertex = MonadoForgeVertex(vIndex)
 							weightVertex = [[],[]]
 							hasColourLayers = [False] # only one colour layer is known at this time
 							hasUVLayers = [False,False,False]
@@ -669,8 +668,7 @@ def import_wismt(f, wimdoResults, context):
 								else:
 									unknownVDTypes[vdType] = vdSize
 									sf.seek(sf.tell()+vdSize)
-							newMesh.addVertex(newVertex)
-							vertexData[i].append(newVertex)
+							vertexData[i].addVertex(vIndex,newVertex)
 							vertexWeightData[i].append(weightVertex)
 							maxColourLayers = max(maxColourLayers,sum(hasColourLayers))
 							maxUVLayers = max(maxUVLayers,sum(hasUVLayers))

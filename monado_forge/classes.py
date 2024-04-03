@@ -481,6 +481,37 @@ class MonadoForgeVertex:
 			self._colours == other._colours
 		)
 
+class MonadoForgeVertexList:
+	def __init__(self):
+		self._vertices = {} # by index
+		self._hashedByPos = {} # by position tuple (not really "hashed", but rather "hashable")
+	
+	def __getitem__(self,index):
+		return self._vertices[index]
+	def __len__(self):
+		return len(self._vertices)
+	def __iter__(self):
+		return iter(self._vertices.items())
+	
+	@property
+	def vertices(self):
+		return self._vertices
+	# no setter
+	def addVertex(self,index,vertex,automerge=False):
+		ensure_type(index,int)
+		if index in self._vertices.keys(): # a sign of a problem
+			raise ValueError("this MonadoForgeVertexList already contains a vertex of index "+str(index))
+		ensure_type(vertex,MonadoForgeVertex)
+		self._vertices[index] = vertex
+		tupPos = tuple(vertex.position)
+		if tupPos not in self._hashedByPos.keys():
+			self._hashedByPos[tupPos] = []
+		#if automerge:
+		#	for other in self._hashedByPos[tupPos]:
+		#		if vertex.isDouble(other):
+		#			break
+		self._hashedByPos[tupPos].append(index)
+
 class MonadoForgeFace:
 	def __init__(self,i):
 		self._index = i
@@ -603,7 +634,7 @@ class MonadoForgeMeshShape:
 class MonadoForgeMesh:
 	def __init__(self):
 		self._name = ""
-		self._vertices = []
+		self._vertices = MonadoForgeVertexList()
 		self._faces = []
 		self._weightSets = [] # because it can be convenient to hold these here and have vertexes just refer with index
 		self._shapes = [] # list of MonadoForgeMeshShapes
@@ -623,10 +654,13 @@ class MonadoForgeMesh:
 	@vertices.setter
 	def vertices(self,value):
 		self.clearVertices()
-		for v in value:
-			self.addVertex(v)
+		if isinstance(value,MonadoForgeVertexList):
+			self._vertices = value
+		else:
+			for v in value:
+				self.addVertex(v)
 	def clearVertices(self):
-		self._vertices = []
+		self._vertices = MonadoForgeVertexList()
 	def addVertex(self,v):
 		ensure_type(v,MonadoForgeVertex)
 		self._vertices.append(v)
@@ -684,54 +718,54 @@ class MonadoForgeMesh:
 	# assumption: if a single vertex has any of these, all the other vertices must also\
 	# too potentially expensive to be reasonable @properties
 	def hasUVs(self):
-		for v in self._vertices:
+		for i,v in self._vertices:
 			if v.hasUVs: return True
 		return False
 	def hasNormals(self):
-		for v in self._vertices:
+		for i,v in self._vertices:
 			if v.hasNormal: return True
 		return False
 	def hasColours(self):
-		for v in self._vertices:
+		for i,v in self._vertices:
 			if v.hasColours: return True
 		return False
 	def hasWeightIndexes(self):
-		for v in self._vertices:
+		for i,v in self._vertices:
 			if v.hasWeightIndex: return True
 		return False
 	def hasWeights(self):
-		for v in self._vertices:
+		for i,v in self._vertices:
 			if v.hasWeights: return True
 		return False
 	def hasShapes(self):
 		return len(self._shapes) > 0
 	
 	def getVertexPositionsList(self):
-		return [v.position for v in self._vertices]
+		return [v.position for i,v in self._vertices]
 	def getUVLayerList(self):
 		layers = []
-		for v in self._vertices:
+		for i,v in self._vertices:
 			layers += [k for k in v.uvs.keys()]
 		return list(set(layers))
 	def getVertexUVsLayer(self,layer):
-		return [v.uvs[layer] for v in self._vertices]
+		return [v.uvs[layer] for i,v in self._vertices]
 	def getVertexNormalsList(self):
-		return [v.normal for v in self._vertices]
+		return [v.normal for i,v in self._vertices]
 	def getColourLayerList(self):
 		layers = []
-		for v in self._vertices:
+		for i,v in self._vertices:
 			layers += [k for k in v.colours.keys()]
 		return list(set(layers))
 	def getVertexColoursLayer(self,layer):
-		return [v.colours[layer] for v in self._vertices]
+		return [v.colours[layer] for i,v in self._vertices]
 	def getVertexWeightIndexesList(self):
-		return [v.weightSetIndex for v in self._vertices]
+		return [v.weightSetIndex for i,v in self._vertices]
 	def getVertexWeightsList(self):
-		return [v.weights for v in self._vertices]
+		return [v.weights for i,v in self._vertices]
 	def getVertexesInWeightGroup(self,groupID):
-		return [v for v in self._vertices if groupID in v.weights.keys()]
+		return [v for i,v in self._vertices if groupID in v.weights.keys()]
 	def getVertexesWithWeightIndex(self,index):
-		return [v for v in self._vertices if v.weightSetIndex == index]
+		return [v for i,v in self._vertices if v.weightSetIndex == index]
 	def getFaceVertexIndexesList(self):
 		return [f.vertexIndexes for f in self._faces]
 
