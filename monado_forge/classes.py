@@ -361,7 +361,7 @@ class MonadoForgeVertex:
 		self._loops = {} # keyed by face index
 		self._weightSetIndex = -1 # pre-bake
 		self._weights = {} # post-bake (must also be by index rather than name since we don't necessarily know names)
-		self._normal = None
+		self._normals = {}
 		self._uvs = {}
 		self._colours = {} # in 255 format
 	
@@ -402,17 +402,17 @@ class MonadoForgeVertex:
 		self._loops[faceIndex] = loop
 	
 	@property
-	def normal(self):
-		return self._normal
-	@normal.setter
-	def normal(self,value):
-		ensure_length(value,3)
-		self._normal = value[:]
-	def clearNormal(self):
-		self._normal = None
+	def normals(self):
+		return self._normals
+	# no @setter (requires index)
+	def setNormal(self,index,normal):
+		ensure_length(normal,3)
+		self._normals[index] = normal
+	def clearNormals(self):
+		self._normals = {}
 	@property
-	def hasNormal(self):
-		return self._normal != None
+	def hasNormals(self):
+		return self._normals != {}
 	# no setter
 	
 	@property
@@ -472,22 +472,34 @@ class MonadoForgeVertex:
 	# no setter
 	
 	def isDouble(self,other):
-		return self == other or (
-			self._position == other._position and
-			self._weightSetIndex == other._weightSetIndex and
-			self._weights == other._weights and
-			self._normal == other._normal and
-			self._uvs == other._uvs and
-			self._colours == other._colours
-		)
+		if self == other:
+			return True
+		if self._position != other._position:
+			return False
+		if self._weightSetIndex != other._weightSetIndex:
+			return False
+		if self._weights != other._weights:
+			return False
+		# we only compare one of the normals (the primary index's) because
+		# if a vertex has been merged previously, we already know its normals are all the same
+		if (self.hasNormals and other.hasNormals) and self._normals[self.index] != other._normals[other.index]:
+			return False
+		if self._colours != other._colours:
+			return False
+		if self._uvs != other._uvs:
+			return False
+		return True
 	
-	# checks if a merge is valid, and if so, self takes on other's index and values
+	# checks if a merge is valid, and if so, self takes on other's indexes and values
 	def tryMerge(self,other):
 		if self == other:
 			return False
+		if self.index == other.index: # something is very wrong, do not continue
+			raise ValueError("we have somehow tried to merge two different vertices that share the index "+str(self.index))
 		if not self.isDouble(other):
 			return False
-		self._indexes.append(other.index)
+		self._indexes += other._indexes
+		self._normals |= other._normals # since indexes cannot be the same, this is "safe" (no collisions)
 		return True
 
 class MonadoForgeVertexList:
@@ -739,7 +751,7 @@ class MonadoForgeMesh:
 		return False
 	def hasNormals(self):
 		for i,v in self._vertices:
-			if v.hasNormal: return True
+			if v.hasNormals: return True
 		return False
 	def hasColours(self):
 		for i,v in self._vertices:
@@ -791,7 +803,7 @@ class MonadoForgeMesh:
 		normalsList = []
 		for f in self._faces:
 			for i in f.vertexIndexes:
-				normalsList.append(self._vertices[i].normal)
+				normalsList.append(self._vertices[i].normals[i])
 		return normalsList
 
 class MonadoForgeMeshHeader:

@@ -660,7 +660,7 @@ def import_wismt(f, wimdoResults, context):
 									newNormal = [readAndParseInt(sf,1,signed=True)/128.0,readAndParseInt(sf,1,signed=True)/128.0,readAndParseInt(sf,1,signed=True)/128.0]
 									readAndParseInt(sf,1,signed=True) # dummy
 									# doesn't necessarily read as normalized
-									newVertex.normal = mathutils.Vector(newNormal).normalized()[:]
+									newVertex.setNormal(vIndex,mathutils.Vector(newNormal).normalized()[:])
 								elif vdType == 41: # weight values (weightTable verts only)
 									weightVertex[1] = [readAndParseInt(sf,2)/65535.0,readAndParseInt(sf,2)/65535.0,readAndParseInt(sf,2)/65535.0,readAndParseInt(sf,2)/65535.0]
 								elif vdType == 42: # weight IDs (weightTable verts only)
@@ -668,8 +668,9 @@ def import_wismt(f, wimdoResults, context):
 								else:
 									unknownVDTypes[vdType] = vdSize
 									sf.seek(sf.tell()+vdSize)
-							vertexData[i].addVertex(vIndex,newVertex,automerge=True)
-							vertexWeightData[i].append(weightVertex)
+							vertexData[i].addVertex(vIndex,newVertex,automerge=(weightVertex != [[],[]])) # don't merge weight-only vertices
+							if weightVertex != [[],[]]: # it's harmless to skip this check, but it makes a lot of useless empty lists
+								vertexWeightData[i].append(weightVertex)
 							maxColourLayers = max(maxColourLayers,sum(hasColourLayers))
 							maxUVLayers = max(maxUVLayers,sum(hasUVLayers))
 					if printProgress and vertexData != {}:
@@ -701,7 +702,7 @@ def import_wismt(f, wimdoResults, context):
 							vertexBeingModified.position = [readAndParseFloat(sf),readAndParseFloat(sf),readAndParseFloat(sf)]
 							newNormal = [(readAndParseInt(sf,1)/255.0)*2-1,(readAndParseInt(sf,1)/255.0)*2-1,(readAndParseInt(sf,1)/255.0)*2-1]
 							# doesn't necessarily read as normalized
-							vertexBeingModified.normal = mathutils.Vector(newNormal).normalized()[:]
+							vertexBeingModified.setNormal(j,mathutils.Vector(newNormal).normalized()[:])
 							sf.seek(sf.tell()+targetBlockSize-15) # the magic -15 is the length of the position+normal (4*3 + 3)
 						shapeNameList = ["basis"] + [h[0] for h in wimdoResults.shapeHeaders] # "basis" needs to be added because the first target is also the base shape for some reason
 						for j in range(shapeTargetCounts+1):
@@ -721,7 +722,7 @@ def import_wismt(f, wimdoResults, context):
 								newVertex = MonadoForgeVertex(index)
 								newVertex.position = newPosition
 								# doesn't necessarily read as normalized
-								newVertex.normal = mathutils.Vector(newNormal).normalized()[:]
+								newVertex.setNormal(index,mathutils.Vector(newNormal).normalized()[:])
 								newShape.setVertex(index,newVertex)
 							newShape.vertexTableIndex = shapeDataChunkID
 							newShape.name = shapeNameList[j] # probably wrong but need to find a counterexample

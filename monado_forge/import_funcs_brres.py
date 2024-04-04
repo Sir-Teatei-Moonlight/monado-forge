@@ -664,7 +664,7 @@ def parse_mdl0(f, context, subfileOffset):
 										nrm = nrmMatrix @ mathutils.Vector(nrm)
 								newVertex.position = pos
 								if vert[10] != -1: # normal
-									newVertex.normal = nrm
+									newVertex.setNormal(curVIndex,nrm)
 							else:
 								print_warning("vertex without position: "+str(vert))
 							if vert[11] != -1: # colour 1
