@@ -668,7 +668,7 @@ def import_wismt(f, wimdoResults, context):
 								else:
 									unknownVDTypes[vdType] = vdSize
 									sf.seek(sf.tell()+vdSize)
-							vertexData[i].addVertex(vIndex,newVertex)
+							vertexData[i].addVertex(vIndex,newVertex,automerge=True)
 							vertexWeightData[i].append(weightVertex)
 							maxColourLayers = max(maxColourLayers,sum(hasColourLayers))
 							maxUVLayers = max(maxUVLayers,sum(hasUVLayers))

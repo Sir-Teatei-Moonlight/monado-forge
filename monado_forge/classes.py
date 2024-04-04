@@ -356,7 +356,7 @@ class MonadoForgeMaterial:
 
 class MonadoForgeVertex:
 	def __init__(self,i):
-		self._index = i
+		self._indexes = [i]
 		self._position = [0,0,0] # having position ever be None seems to cause Problems
 		self._loops = {} # keyed by face index
 		self._weightSetIndex = -1 # pre-bake
@@ -367,7 +367,7 @@ class MonadoForgeVertex:
 	
 	@property
 	def index(self):
-		return self._index
+		return self._indexes[0] # returns only the "primary" index
 	# no setter
 	
 	@property
@@ -480,6 +480,15 @@ class MonadoForgeVertex:
 			self._uvs == other._uvs and
 			self._colours == other._colours
 		)
+	
+	# checks if a merge is valid, and if so, self takes on other's index and values
+	def tryMerge(self,other):
+		if self == other:
+			return False
+		if not self.isDouble(other):
+			return False
+		self._indexes.append(other.index)
+		return True
 
 class MonadoForgeVertexList:
 	def __init__(self):
@@ -502,15 +511,22 @@ class MonadoForgeVertexList:
 		if index in self._vertices.keys(): # a sign of a problem
 			raise ValueError("this MonadoForgeVertexList already contains a vertex of index "+str(index))
 		ensure_type(vertex,MonadoForgeVertex)
-		self._vertices[index] = vertex
 		tupPos = tuple(vertex.position)
 		if tupPos not in self._hashedByPos.keys():
 			self._hashedByPos[tupPos] = []
-		#if automerge:
-		#	for other in self._hashedByPos[tupPos]:
-		#		if vertex.isDouble(other):
-		#			break
-		self._hashedByPos[tupPos].append(index)
+		if automerge:
+			succeeded = False
+			for otherIndex in self._hashedByPos[tupPos]:
+				other = self[otherIndex]
+				succeeded = other.tryMerge(vertex)
+				if succeeded:
+					self._vertices[index] = other # this index now belongs to the existing vertex, not the provided one
+					break
+			if not succeeded:
+				self._vertices[index] = vertex
+		else: # no automerge
+			self._vertices[index] = vertex
+		self._hashedByPos[tupPos].append(index) # has to be this late or it'll try to compare with itself up there
 
 class MonadoForgeFace:
 	def __init__(self,i):
@@ -715,7 +731,7 @@ class MonadoForgeMesh:
 		ensure_type(value,int)
 		self._materialIndex = value
 	
-	# assumption: if a single vertex has any of these, all the other vertices must also\
+	# assumption: if a single vertex has any of these, all the other vertices must also
 	# too potentially expensive to be reasonable @properties
 	def hasUVs(self):
 		for i,v in self._vertices:
@@ -766,8 +782,17 @@ class MonadoForgeMesh:
 		return [v for i,v in self._vertices if groupID in v.weights.keys()]
 	def getVertexesWithWeightIndex(self,index):
 		return [v for i,v in self._vertices if v.weightSetIndex == index]
+	
 	def getFaceVertexIndexesList(self):
-		return [f.vertexIndexes for f in self._faces]
+		# this is where each face can finally ask its vertices "should I use a different index to avoid doubling"
+		return [[self._vertices[i].index for i in f.vertexIndexes] for f in self._faces]
+	
+	def getLoopNormalsList(self):
+		normalsList = []
+		for f in self._faces:
+			for i in f.vertexIndexes:
+				normalsList.append(self._vertices[i].normal)
+		return normalsList
 
 class MonadoForgeMeshHeader:
 	# intended to be immutable, so no setters

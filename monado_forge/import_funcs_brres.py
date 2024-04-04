@@ -677,23 +677,9 @@ def parse_mdl0(f, context, subfileOffset):
 									print_warning("uvMatrixIndex == "+str(uvMatrixIndex))
 								if uvIndex != -1:
 									newVertex.setUV(uvLayer,uvs[meshUVIndexes[uvLayer]][uvIndex])
-							# before adding this vertex, we must check for if it's a duplicate, and if so use the existing other instead
-							# this would be very expensive without hashing the position
-							foundDouble = False
-							thisPosHashed = tuple(newVertex.position)
-							if thisPosHashed in hashedVertsByPosition.keys():
-								others = hashedVertsByPosition[thisPosHashed]
-								for other in others:
-									if newVertex.isDouble(other):
-										faceVerts.append(other.index)
-										foundDouble = True
-										hashedVertsByPosition[thisPosHashed].append(newVertex)
-										break
-							if not foundDouble:
-								forgeVerts.addVertex(curVIndex,newVertex)
-								faceVerts.append(curVIndex)
-								hashedVertsByPosition[tuple(newVertex.position)] = [newVertex]
-								curVIndex += 1
+							forgeVerts.addVertex(curVIndex,newVertex,automerge=True)
+							faceVerts.append(curVIndex)
+							curVIndex += 1
 						newFace = MonadoForgeFace(newFaceIndex)
 						newFace.vertexIndexes = faceVerts
 						forgeFaces.append(newFace)

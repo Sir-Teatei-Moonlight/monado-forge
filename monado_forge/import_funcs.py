@@ -542,15 +542,9 @@ def realise_results(forgeResults, mainName, self, context):
 		for f in meshData.polygons:
 			f.use_smooth = True
 		meshData.use_auto_smooth = True
-		if mesh.hasUVs():
-			for layer in mesh.getUVLayerList():
-				meshUVs = mesh.getVertexUVsLayer(layer)
-				newUVsLayer = meshData.uv_layers.new(name="UV"+str(layer+1))
-				for l in meshData.loops:
-					newUVsLayer.data[l.index].uv = meshUVs[l.vertex_index]
 		if mesh.hasNormals():
-			normalsList = mesh.getVertexNormalsList()
-			meshData.normals_split_custom_set_from_vertices(normalsList)
+			normalsList = mesh.getLoopNormalsList()
+			meshData.normals_split_custom_set(normalsList)
 			meshData.calc_normals_split()
 		if mesh.hasColours():
 			for layer in mesh.getColourLayerList():
@@ -558,6 +552,12 @@ def realise_results(forgeResults, mainName, self, context):
 				newColoursLayer = meshData.color_attributes.new("VertexColours"+str(layer+1),"FLOAT_COLOR","POINT") # BYTE_COLOR *should* be correct, but in practice it isn't
 				for i in range(len(meshColours)):
 					newColoursLayer.data[i].color = [c/255.0 for c in meshColours[i]]
+		if mesh.hasUVs():
+			for layer in mesh.getUVLayerList():
+				meshUVs = mesh.getVertexUVsLayer(layer)
+				newUVsLayer = meshData.uv_layers.new(name="UV"+str(layer+1))
+				for l in meshData.loops:
+					newUVsLayer.data[l.index].uv = meshUVs[l.vertex_index]
 		if mesh.hasWeightIndexes() and baseArmature: # try the indexes method first (faster) (and also needs a baseArmature or it makes no sense)
 			weightIndexes = set(mesh.getVertexWeightIndexesList())
 			vertexesInEachGroup = {}
