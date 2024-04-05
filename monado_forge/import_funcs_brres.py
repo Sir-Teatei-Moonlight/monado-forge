@@ -676,7 +676,7 @@ def parse_mdl0(f, context, subfileOffset):
 								if uvMatrixIndex != -1: # don't know what to do here yet
 									print_warning("uvMatrixIndex == "+str(uvMatrixIndex))
 								if uvIndex != -1:
-									newVertex.setUV(uvLayer,uvs[meshUVIndexes[uvLayer]][uvIndex])
+									newVertex.setUV(curVIndex,uvLayer,uvs[meshUVIndexes[uvLayer]][uvIndex])
 							forgeVerts.addVertex(curVIndex,newVertex,automerge=True)
 							faceVerts.append(curVIndex)
 							curVIndex += 1

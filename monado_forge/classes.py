@@ -443,16 +443,20 @@ class MonadoForgeVertex:
 	@property
 	def uvs(self):
 		return self._uvs
-	# no @setter (requires layer)
-	def setUV(self,layer,uv):
+	# no @setter (requires index and layer)
+	def setUV(self,index,layer,uv):
 		ensure_length(uv,2)
-		self._uvs[layer] = uv
+		if index not in self._uvs.keys():
+			self._uvs[index] = {}
+		self._uvs[index][layer] = uv[:]
 	def clearUVs(self):
 		self._uvs = {}
 	@property
 	def hasUVs(self):
 		return self._uvs != {}
 	# no setter
+	def getUVLayerIndexes(self,index):
+		return list(self._uvs[index].keys())
 	
 	def isDouble(self,other):
 		if self == other:
@@ -484,6 +488,7 @@ class MonadoForgeVertex:
 		self._indexes += other._indexes
 		self._normals |= other._normals # since indexes cannot be the same, this is "safe" (no collisions)
 		self._colours |= other._colours
+		self._uvs |= other._uvs
 		return True
 
 class MonadoForgeVertexList:
@@ -736,6 +741,15 @@ class MonadoForgeMesh:
 						coloursList[layer] = []
 					coloursList[layer].append(self._vertices[i].colours[i][layer])
 		return coloursList
+	def getLoopUVsList(self):
+		uvsList = {}
+		for f in self._faces:
+			for i in f.vertexIndexes:
+				for layer in self._vertices[i].getUVLayerIndexes(i):
+					if layer not in uvsList:
+						uvsList[layer] = []
+					uvsList[layer].append(self._vertices[i].uvs[i][layer])
+		return uvsList
 
 class MonadoForgeMeshHeader:
 	# intended to be immutable, so no setters

@@ -575,11 +575,11 @@ def realise_results(forgeResults, mainName, self, context):
 				for loop in meshData.loops:
 					newColoursLayer.data[loop.index].color = [c/255.0 for c in colours[loop.index]]
 		if mesh.hasUVs():
-			for layer in mesh.getUVLayerList():
-				meshUVs = mesh.getVertexUVsLayer(layer)
+			meshUVs = mesh.getLoopUVsList()
+			for layer,uvs in meshUVs.items():
 				newUVsLayer = meshData.uv_layers.new(name="UV"+str(layer+1))
-				for l in meshData.loops:
-					newUVsLayer.data[l.index].uv = meshUVs[l.vertex_index]
+				for loop in meshData.loops:
+					newUVsLayer.data[loop.index].uv = uvs[loop.index]
 		if mesh.hasShapes():
 			shapes = mesh.shapes
 			if not meshData.shape_keys:
