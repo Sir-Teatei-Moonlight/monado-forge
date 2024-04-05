@@ -381,25 +381,32 @@ class MonadoForgeVertex:
 		self._position = [0,0,0]
 	
 	@property
-	def loops(self):
-		return self._loops
-	# no setter, for now anyway
-	def getLoop(self,faceIndex):
-		ensure_type(faceIndex,int)
-		return self._loops[faceIndex]
-	def clearLoops(self):
-		self._loops = {}
-	def createLoop(self,faceIndex):
-		ensure_type(faceIndex,int)
-		if faceIndex in self._loops.keys(): # (currently) do not want this to be a valid operation, too much potential for silent problems
-			raise ValueError("vertex "+str(self._index)+" already has a loop with face "+str(faceIndex))
-		self._loops[faceIndex] = MonadoForgeLoop(self._index,faceIndex)
-	def addLoop(self,loop):
-		ensure_type(loop,MonadoForgeLoop)
-		faceIndex = loop.getFace()
-		if faceIndex in self._loops.keys(): # (currently) do not want this to be a valid operation, too much potential for silent problems
-			raise ValueError("vertex "+str(self._index)+" already has a loop with face "+str(faceIndex))
-		self._loops[faceIndex] = loop
+	def weightSetIndex(self):
+		return self._weightSetIndex
+	@weightSetIndex.setter
+	def weightSetIndex(self,value):
+		ensure_type(value,int)
+		self._weightSetIndex = value
+	def clearWeightSetIndex(self):
+		self._weightSetIndex = -1
+	@property
+	def hasWeightIndex(self):
+		return self._weightSetIndex != -1
+	# no setter
+	
+	@property
+	def weights(self):
+		return self._weights
+	# no @setter (requires group index)
+	def setWeight(self,groupIndex,weight):
+		ensure_type(weight,float)
+		self._weights[groupIndex] = weight
+	def clearWeights(self):
+		self._weights = {}
+	@property
+	def hasWeights(self):
+		return self._weights != {}
+	# no setter
 	
 	@property
 	def normals(self):
@@ -407,7 +414,7 @@ class MonadoForgeVertex:
 	# no @setter (requires index)
 	def setNormal(self,index,normal):
 		ensure_length(normal,3)
-		self._normals[index] = normal
+		self._normals[index] = normal[:]
 	def clearNormals(self):
 		self._normals = {}
 	@property
@@ -441,34 +448,6 @@ class MonadoForgeVertex:
 	@property
 	def hasColours(self):
 		return self._colours != {}
-	# no setter
-	
-	@property
-	def weightSetIndex(self):
-		return self._weightSetIndex
-	@weightSetIndex.setter
-	def weightSetIndex(self,value):
-		ensure_type(value,int)
-		self._weightSetIndex = value
-	def clearWeightSetIndex(self):
-		self._weightSetIndex = -1
-	@property
-	def hasWeightIndex(self):
-		return self._weightSetIndex != -1
-	# no setter
-	
-	@property
-	def weights(self):
-		return self._weights
-	# no @setter (requires group index)
-	def setWeight(self,groupIndex,weight):
-		ensure_type(weight,float)
-		self._weights[groupIndex] = weight
-	def clearWeights(self):
-		self._weights = {}
-	@property
-	def hasWeights(self):
-		return self._weights != {}
 	# no setter
 	
 	def isDouble(self,other):
@@ -564,68 +543,6 @@ class MonadoForgeFace:
 	def addVertexIndex(self,v):
 		ensure_type(v,int)
 		self._vertexIndexes.append(v)
-
-# the fact that the official API has to explain that "loop" means "face corner" tells us how bad even they think the term is
-# but it's probably better to just use it than to make something else up just for this add-on
-class MonadoForgeLoop:
-	def __init__(self,v,f):
-		self._vertex = v
-		self._face = f
-		self._normal = None
-		self._uvs = {}
-		self._colours = {} # in 255 format
-	
-	@property
-	def vertex(self):
-		return self._vertex
-	# no setter
-	
-	@property
-	def face(self):
-		return self._face
-	# no setter
-	
-	@property
-	def normal(self):
-		return self._normal
-	@normal.setter
-	def normal(self,value):
-		ensure_length(value,3)
-		self._normal = value[:]
-	def clearNormal(self):
-		self._normal = None
-	@property
-	def hasNormal(self):
-		return self._normal != None
-	# no setter
-	
-	@property
-	def uvs(self):
-		return self._uvs
-	# no @setter (requires layer)
-	def setUV(self,layer,uv):
-		ensure_length(uv,2)
-		self._uvs[layer] = uv
-	def clearUVs(self):
-		self._uvs = {}
-	@property
-	def hasUVs(self):
-		return self._uvs != {}
-	# no setter
-	
-	@property
-	def colours(self):
-		return self._colours
-	# no @setter (requires layer)
-	def setColour(self,layer,colour):
-		ensure_length(colour,4) # Blender really pushes alpha for everything
-		self._colours[layer] = colour[:]
-	def clearColours(self):
-		self._colours = []
-	@property
-	def hasColours(self):
-		return self._colours != {}
-	# no setter
 
 class MonadoForgeMeshShape:
 	def __init__(self):
@@ -745,9 +662,13 @@ class MonadoForgeMesh:
 	
 	# assumption: if a single vertex has any of these, all the other vertices must also
 	# too potentially expensive to be reasonable @properties
-	def hasUVs(self):
+	def hasWeightIndexes(self):
 		for i,v in self._vertices:
-			if v.hasUVs: return True
+			if v.hasWeightIndex: return True
+		return False
+	def hasWeights(self):
+		for i,v in self._vertices:
+			if v.hasWeights: return True
 		return False
 	def hasNormals(self):
 		for i,v in self._vertices:
@@ -757,26 +678,23 @@ class MonadoForgeMesh:
 		for i,v in self._vertices:
 			if v.hasColours: return True
 		return False
-	def hasWeightIndexes(self):
+	def hasUVs(self):
 		for i,v in self._vertices:
-			if v.hasWeightIndex: return True
-		return False
-	def hasWeights(self):
-		for i,v in self._vertices:
-			if v.hasWeights: return True
+			if v.hasUVs: return True
 		return False
 	def hasShapes(self):
 		return len(self._shapes) > 0
 	
 	def getVertexPositionsList(self):
 		return [v.position for i,v in self._vertices]
-	def getUVLayerList(self):
-		layers = []
-		for i,v in self._vertices:
-			layers += [k for k in v.uvs.keys()]
-		return list(set(layers))
-	def getVertexUVsLayer(self,layer):
-		return [v.uvs[layer] for i,v in self._vertices]
+	def getVertexWeightIndexesList(self):
+		return [v.weightSetIndex for i,v in self._vertices]
+	def getVertexWeightsList(self):
+		return [v.weights for i,v in self._vertices]
+	def getVertexesInWeightGroup(self,groupID):
+		return [v for i,v in self._vertices if groupID in v.weights.keys()]
+	def getVertexesWithWeightIndex(self,index):
+		return [v for i,v in self._vertices if v.weightSetIndex == index]
 	def getVertexNormalsList(self):
 		return [v.normal for i,v in self._vertices]
 	def getColourLayerList(self):
@@ -786,14 +704,13 @@ class MonadoForgeMesh:
 		return list(set(layers))
 	def getVertexColoursLayer(self,layer):
 		return [v.colours[layer] for i,v in self._vertices]
-	def getVertexWeightIndexesList(self):
-		return [v.weightSetIndex for i,v in self._vertices]
-	def getVertexWeightsList(self):
-		return [v.weights for i,v in self._vertices]
-	def getVertexesInWeightGroup(self,groupID):
-		return [v for i,v in self._vertices if groupID in v.weights.keys()]
-	def getVertexesWithWeightIndex(self,index):
-		return [v for i,v in self._vertices if v.weightSetIndex == index]
+	def getUVLayerList(self):
+		layers = []
+		for i,v in self._vertices:
+			layers += [k for k in v.uvs.keys()]
+		return list(set(layers))
+	def getVertexUVsLayer(self,layer):
+		return [v.uvs[layer] for i,v in self._vertices]
 	
 	def getFaceVertexIndexesList(self):
 		# this is where each face can finally ask its vertices "should I use a different index to avoid doubling"
