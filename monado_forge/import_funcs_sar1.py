@@ -627,11 +627,66 @@ def import_wismt(f, wimdoResults, context):
 					vertexData = {}
 					faceData = {}
 					vertexWeightData = {} # assumption: a single vertex cannot both contain actual data and be one of the "weight container only" vertices
+					# we need to read shapes (if any) first
+					# this is because a mesh with a shape does not define positions or normals for its vertices,
+					# instead relying on the base shape to do that for it,
+					# which means we need that data for correct double detection later
+					baseShapeData = {}
+					for i in range(len(shapeHeaders)):
+						shapeDataChunkID,shapeTargetIndex,shapeTargetCounts,shapeTargetIDOffset = shapeHeaders[i]
+						targetDataChunkOffset,targetVertexCount,targetBlockSize,targetUnknown,targetType = shapeTargets[shapeTargetIndex]
+						sf.seek(shapeTargetIDOffset)
+						targetIDs = []
+						for j in range(shapeTargetCounts):
+							targetIDs.append(readAndParseInt(sf,2))
+						sf.seek(dataOffset+targetDataChunkOffset)
+						# first, get the base shape
+						# having shapes means that normals are unsigned (unlike elsewhere) so compensate for that
+						baseShapeData[shapeDataChunkID] = {"v":[],"n":[]}
+						for j in range(targetVertexCount):
+							baseShapeData[shapeDataChunkID]["v"].append([readAndParseFloat(sf),readAndParseFloat(sf),readAndParseFloat(sf)])
+							newNormal = [(readAndParseInt(sf,1)/255.0)*2-1,(readAndParseInt(sf,1)/255.0)*2-1,(readAndParseInt(sf,1)/255.0)*2-1]
+							# doesn't necessarily read as normalized
+							baseShapeData[shapeDataChunkID]["n"].append(mathutils.Vector(newNormal).normalized()[:])
+							sf.seek(sf.tell()+targetBlockSize-15) # the magic -15 is the length of the position+normal (4*3 + 3)
+						shapeNameList = ["basis"] + [h[0] for h in wimdoResults.shapeHeaders] # "basis" needs to be added because the first target is also the base shape for some reason
+						for j in range(shapeTargetCounts+1):
+							if j == 0: continue # as above, the first is the basis so we don't need it
+							# it's okay to overwrite these variables, we don't need the above ones anymore
+							targetDataChunkOffset,targetVertexCount,targetBlockSize,targetUnknown,targetType = shapeTargets[shapeTargetIndex+j+1]
+							sf.seek(dataOffset+targetDataChunkOffset)
+							newShape = MonadoForgeMeshShape()
+							for k in range(targetVertexCount):
+								newPosition = [readAndParseFloat(sf),readAndParseFloat(sf),readAndParseFloat(sf)]
+								readAndParseInt(sf,4) # dummy
+								newNormal = [(readAndParseInt(sf,1)/255.0)*2-1,(readAndParseInt(sf,1)/255.0)*2-1,(readAndParseInt(sf,1)/255.0)*2-1]
+								readAndParseInt(sf,1) # more dummies
+								readAndParseInt(sf,4)
+								readAndParseInt(sf,4)
+								index = readAndParseInt(sf,4)
+								newVertex = MonadoForgeVertex(index)
+								newVertex.position = newPosition
+								# doesn't necessarily read as normalized
+								newVertex.setNormal(index,mathutils.Vector(newNormal).normalized()[:])
+								newShape.setVertex(index,newVertex)
+							newShape.vertexTableIndex = shapeDataChunkID
+							newShape.name = shapeNameList[j] # probably wrong but need to find a counterexample
+							shapes.append(newShape)
+					shapesByVertexTableIndex = {}
+					for s in shapes:
+						thisShapesIndex = s.vertexTableIndex
+						if thisShapesIndex in shapesByVertexTableIndex.keys():
+							shapesByVertexTableIndex[thisShapesIndex].append(s)
+						else:
+							shapesByVertexTableIndex[thisShapesIndex] = [s]
+					if printProgress and shapes != []:
+						print("Finished reading shape data.")
 					for i in range(len(vertexTables)):
 						vertexData[i] = MonadoForgeVertexList()
 						vertexWeightData[i] = []
 						vtDataOffset,vtDataCount,vtBlockSize,vtDescOffset,vtDescCount,vertexDescriptors = vertexTables[i]
 						sf.seek(dataOffset+vtDataOffset)
+						hasShapes = i in baseShapeData.keys()
 						for vIndex in range(vtDataCount):
 							newVertex = MonadoForgeVertex(vIndex)
 							weightVertex = [[],[]]
@@ -668,8 +723,12 @@ def import_wismt(f, wimdoResults, context):
 								else:
 									unknownVDTypes[vdType] = vdSize
 									sf.seek(sf.tell()+vdSize)
-							vertexData[i].addVertex(vIndex,newVertex,automerge=(weightVertex != [[],[]])) # don't merge weight-only vertices
-							if weightVertex != [[],[]]: # it's harmless to skip this check, but it makes a lot of useless empty lists
+							if hasShapes:
+								newVertex.position = baseShapeData[i]["v"][vIndex]
+								newVertex.setNormal(vIndex,baseShapeData[i]["n"][vIndex])
+							if weightVertex == [[],[]]: # a "normal" vertex
+								vertexData[i].addVertex(vIndex,newVertex,automerge=True)
+							else: # a weight table vertex
 								vertexWeightData[i].append(weightVertex)
 							maxColourLayers = max(maxColourLayers,sum(hasColourLayers))
 							maxUVLayers = max(maxUVLayers,sum(hasUVLayers))
@@ -687,55 +746,6 @@ def import_wismt(f, wimdoResults, context):
 							faceData[i].append(newFace)
 					if printProgress and faceData != {}:
 						print("Finished reading face data.")
-					for i in range(len(shapeHeaders)):
-						shapeDataChunkID,shapeTargetIndex,shapeTargetCounts,shapeTargetIDOffset = shapeHeaders[i]
-						targetDataChunkOffset,targetVertexCount,targetBlockSize,targetUnknown,targetType = shapeTargets[shapeTargetIndex]
-						sf.seek(shapeTargetIDOffset)
-						targetIDs = []
-						for j in range(shapeTargetCounts):
-							targetIDs.append(readAndParseInt(sf,2))
-						sf.seek(dataOffset+targetDataChunkOffset)
-						# first, get the base shape
-						# it seems that "has shapes" is the difference for whether normals are signed or not
-						for j in range(targetVertexCount):
-							vertexBeingModified = vertexData[shapeDataChunkID][j]
-							vertexBeingModified.position = [readAndParseFloat(sf),readAndParseFloat(sf),readAndParseFloat(sf)]
-							newNormal = [(readAndParseInt(sf,1)/255.0)*2-1,(readAndParseInt(sf,1)/255.0)*2-1,(readAndParseInt(sf,1)/255.0)*2-1]
-							# doesn't necessarily read as normalized
-							vertexBeingModified.setNormal(j,mathutils.Vector(newNormal).normalized()[:])
-							sf.seek(sf.tell()+targetBlockSize-15) # the magic -15 is the length of the position+normal (4*3 + 3)
-						shapeNameList = ["basis"] + [h[0] for h in wimdoResults.shapeHeaders] # "basis" needs to be added because the first target is also the base shape for some reason
-						for j in range(shapeTargetCounts+1):
-							if j == 0: continue # as above, the first is the basis so we don't need it
-							# it's okay to overwrite these variables, we don't need the above ones anymore
-							targetDataChunkOffset,targetVertexCount,targetBlockSize,targetUnknown,targetType = shapeTargets[shapeTargetIndex+j+1]
-							sf.seek(dataOffset+targetDataChunkOffset)
-							newShape = MonadoForgeMeshShape()
-							for k in range(targetVertexCount):
-								newPosition = [readAndParseFloat(sf),readAndParseFloat(sf),readAndParseFloat(sf)]
-								readAndParseInt(sf,4) # dummy
-								newNormal = [(readAndParseInt(sf,1)/255.0)*2-1,(readAndParseInt(sf,1)/255.0)*2-1,(readAndParseInt(sf,1)/255.0)*2-1]
-								readAndParseInt(sf,1) # more dummies
-								readAndParseInt(sf,4)
-								readAndParseInt(sf,4)
-								index = readAndParseInt(sf,4)
-								newVertex = MonadoForgeVertex(index)
-								newVertex.position = newPosition
-								# doesn't necessarily read as normalized
-								newVertex.setNormal(index,mathutils.Vector(newNormal).normalized()[:])
-								newShape.setVertex(index,newVertex)
-							newShape.vertexTableIndex = shapeDataChunkID
-							newShape.name = shapeNameList[j] # probably wrong but need to find a counterexample
-							shapes.append(newShape)
-					if printProgress and shapes != []:
-						print("Finished reading shape data.")
-					shapesByVertexTableIndex = {}
-					for s in shapes:
-						thisShapesIndex = s.vertexTableIndex
-						if thisShapesIndex in shapesByVertexTableIndex.keys():
-							shapesByVertexTableIndex[thisShapesIndex].append(s)
-						else:
-							shapesByVertexTableIndex[thisShapesIndex] = [s]
 					
 					unusedVertexTables = [k for k in vertexData.keys()]
 					unusedFaceTables = [k for k in faceData.keys()]
