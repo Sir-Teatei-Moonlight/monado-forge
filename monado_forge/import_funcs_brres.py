@@ -668,9 +668,9 @@ def parse_mdl0(f, context, subfileOffset):
 							else:
 								print_warning("vertex without position: "+str(vert))
 							if vert[11] != -1: # colour 1
-								newVertex.setColour(0,colours[meshColourIndexes[0]][vert[11]])
+								newVertex.setColour(curVIndex,0,colours[meshColourIndexes[0]][vert[11]])
 							if vert[12] != -1: # colour 2
-								newVertex.setColour(1,colours[meshColourIndexes[1]][vert[12]])
+								newVertex.setColour(curVIndex,1,colours[meshColourIndexes[1]][vert[12]])
 							for uvLayer,uvIndex in enumerate(vert[13:21]):
 								uvMatrixIndex = vert[uvLayer+1] # vert[1] - vert[8]
 								if uvMatrixIndex != -1: # don't know what to do here yet

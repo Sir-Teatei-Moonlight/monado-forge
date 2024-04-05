@@ -362,8 +362,8 @@ class MonadoForgeVertex:
 		self._weightSetIndex = -1 # pre-bake
 		self._weights = {} # post-bake (must also be by index rather than name since we don't necessarily know names)
 		self._normals = {}
-		self._uvs = {}
 		self._colours = {} # in 255 format
+		self._uvs = {}
 	
 	@property
 	def index(self):
@@ -423,6 +423,24 @@ class MonadoForgeVertex:
 	# no setter
 	
 	@property
+	def colours(self):
+		return self._colours
+	# no @setter (requires index and layer)
+	def setColour(self,index,layer,colour):
+		ensure_length(colour,4) # Blender really pushes alpha for everything
+		if index not in self._colours.keys():
+			self._colours[index] = {}
+		self._colours[index][layer] = colour[:]
+	def clearColours(self):
+		self._colours = {}
+	@property
+	def hasColours(self):
+		return self._colours != {}
+	# no setter
+	def getColourLayerIndexes(self,index):
+		return list(self._colours[index].keys())
+	
+	@property
 	def uvs(self):
 		return self._uvs
 	# no @setter (requires layer)
@@ -434,20 +452,6 @@ class MonadoForgeVertex:
 	@property
 	def hasUVs(self):
 		return self._uvs != {}
-	# no setter
-	
-	@property
-	def colours(self):
-		return self._colours
-	# no @setter (requires layer)
-	def setColour(self,layer,colour):
-		ensure_length(colour,4) # Blender really pushes alpha for everything
-		self._colours[layer] = colour[:]
-	def clearColours(self):
-		self._colours = []
-	@property
-	def hasColours(self):
-		return self._colours != {}
 	# no setter
 	
 	def isDouble(self,other):
@@ -479,6 +483,7 @@ class MonadoForgeVertex:
 			return False
 		self._indexes += other._indexes
 		self._normals |= other._normals # since indexes cannot be the same, this is "safe" (no collisions)
+		self._colours |= other._colours
 		return True
 
 class MonadoForgeVertexList:
@@ -722,6 +727,15 @@ class MonadoForgeMesh:
 			for i in f.vertexIndexes:
 				normalsList.append(self._vertices[i].normals[i])
 		return normalsList
+	def getLoopColoursList(self):
+		coloursList = {}
+		for f in self._faces:
+			for i in f.vertexIndexes:
+				for layer in self._vertices[i].getColourLayerIndexes(i):
+					if layer not in coloursList:
+						coloursList[layer] = []
+					coloursList[layer].append(self._vertices[i].colours[i][layer])
+		return coloursList
 
 class MonadoForgeMeshHeader:
 	# intended to be immutable, so no setters

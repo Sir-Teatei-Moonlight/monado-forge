@@ -569,11 +569,11 @@ def realise_results(forgeResults, mainName, self, context):
 			meshData.normals_split_custom_set(normalsList)
 			meshData.calc_normals_split()
 		if mesh.hasColours():
-			for layer in mesh.getColourLayerList():
-				meshColours = mesh.getVertexColoursLayer(layer)
-				newColoursLayer = meshData.color_attributes.new("VertexColours"+str(layer+1),"FLOAT_COLOR","POINT") # BYTE_COLOR *should* be correct, but in practice it isn't
-				for i in range(len(meshColours)):
-					newColoursLayer.data[i].color = [c/255.0 for c in meshColours[i]]
+			meshColours = mesh.getLoopColoursList()
+			for layer,colours in meshColours.items():
+				newColoursLayer = meshData.color_attributes.new("VertexColours"+str(layer+1),"FLOAT_COLOR","CORNER") # BYTE_COLOR *should* be correct, but in practice it isn't
+				for loop in meshData.loops:
+					newColoursLayer.data[loop.index].color = [c/255.0 for c in colours[loop.index]]
 		if mesh.hasUVs():
 			for layer in mesh.getUVLayerList():
 				meshUVs = mesh.getVertexUVsLayer(layer)

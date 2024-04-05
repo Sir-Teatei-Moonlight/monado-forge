@@ -709,7 +709,7 @@ def import_wismt(f, wimdoResults, context):
 									hasUVLayers[2] = True
 								elif vdType == 17: # colour 1
 									a,r,g,b = readAndParseInt(sf,1),readAndParseInt(sf,1),readAndParseInt(sf,1),readAndParseInt(sf,1)
-									newVertex.setColour(0,[r,g,b,a])
+									newVertex.setColour(vIndex,0,[r,g,b,a])
 									hasColourLayers[0] = True
 								elif vdType == 28: # normals
 									newNormal = [readAndParseInt(sf,1,signed=True)/128.0,readAndParseInt(sf,1,signed=True)/128.0,readAndParseInt(sf,1,signed=True)/128.0]
