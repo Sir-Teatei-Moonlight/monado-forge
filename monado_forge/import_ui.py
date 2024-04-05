@@ -282,6 +282,11 @@ class MonadoForgeViewImportProperties(PropertyGroup):
 		description="Include lower-detail meshes in the import",
 		default=False,
 	)
+	mergeSharpEdges : BoolProperty(
+		name="Merge Sharp Edges",
+		description="Merge vertices even if their normals are different, relying only on custom normals and Sharp Edges",
+		default=False,
+	)
 	doCleanupOnImport : BoolProperty(
 		name="Clean Up After Import",
 		description="Perform selected cleanup tasks once import is complete",
@@ -460,6 +465,7 @@ class OBJECT_PT_MonadoForgeViewImportModelOptionsPanel(Panel):
 		col.prop(scn.monado_forge_import, "importToCursor")
 		if scn.monado_forge_main.game != "XC1":
 			col.prop(scn.monado_forge_import, "alsoImportLODs")
+		col.prop(scn.monado_forge_import, "mergeSharpEdges")
 		col.prop(scn.monado_forge_import, "doCleanupOnImport")
 		col.operator(MonadoForgeViewImportCleanupModelOperator.bl_idname, text="Clean Up Selected Meshes", icon="BRUSH_DATA")
 

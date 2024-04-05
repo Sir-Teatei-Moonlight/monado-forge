@@ -433,6 +433,7 @@ def import_wismt(f, wimdoResults, context):
 	texPath = None
 	if context.scene.monado_forge_import.autoSaveTextures:
 		texPath = bpy.path.abspath(context.scene.monado_forge_import.texturePath)
+	mergeSharpEdges = context.scene.monado_forge_import.mergeSharpEdges
 	differentiate = context.scene.monado_forge_import.differentiateTextures
 	splitTemps = context.scene.monado_forge_import.splitTemps
 	listOfCachedTextureNames = [] # only needed for XC3 but no harm in building it regardless
@@ -722,7 +723,7 @@ def import_wismt(f, wimdoResults, context):
 								newVertex.position = baseShapeData[i]["v"][vIndex]
 								newVertex.setNormal(vIndex,baseShapeData[i]["n"][vIndex])
 							if weightVertex == [[],[]]: # a "normal" vertex
-								vertexData[i].addVertex(vIndex,newVertex,automerge=True)
+								vertexData[i].addVertex(vIndex,newVertex,automerge=True,mergeSharp=mergeSharpEdges)
 							else: # a weight table vertex
 								vertexWeightData[i].append(weightVertex)
 							maxColourLayers = max(maxColourLayers,sum(hasColourLayers))

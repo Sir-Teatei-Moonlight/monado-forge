@@ -59,6 +59,8 @@ def parse_brres_dict(f,prefix=""):
 
 def parse_mdl0(f, context, subfileOffset):
 	printProgress = context.scene.monado_forge_main.printProgress
+	mergeSharpEdges = context.scene.monado_forge_import.mergeSharpEdges
+	
 	subfileLength = readAndParseIntBig(f,4)
 	subfileVersion = readAndParseIntBig(f,4)
 	subfileParentOffset = readAndParseIntBig(f,4,signed=True)
@@ -677,7 +679,7 @@ def parse_mdl0(f, context, subfileOffset):
 									print_warning("uvMatrixIndex == "+str(uvMatrixIndex))
 								if uvIndex != -1:
 									newVertex.setUV(curVIndex,uvLayer,uvs[meshUVIndexes[uvLayer]][uvIndex])
-							forgeVerts.addVertex(curVIndex,newVertex,automerge=True)
+							forgeVerts.addVertex(curVIndex,newVertex,automerge=True,mergeSharp=mergeSharpEdges)
 							faceVerts.append(curVIndex)
 							curVIndex += 1
 						newFace = MonadoForgeFace(newFaceIndex)

@@ -4,6 +4,7 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 **General notice:** Keep the system console toggled on so you can see any potential warnings and non-fatal errors.
 
 ## Game support
+* :no_entry_sign: - Believed to be nonexistent or unnecessary.
 * :x: - Not supported, but planned (eventually).
 * :hash: - Partially supported; number is a basic "how done does this feel" estimate.
 * :o: - Not well-tested (if at all). _Ought_ to work just as well as the best-supported version, but no guarantees.
@@ -18,7 +19,7 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 | └ UVs | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Vertex normals | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Vertex groups | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
-| └ Shapes/Morphs | :x: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
+| └ Shapes/Morphs | :no_entry_sign: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Textures | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Materials | 50% | :x: | :beginner: | :beginner: | :o: |
 
@@ -39,6 +40,7 @@ Note that this list is of all features, not per-game features. Use the grid abov
 * Supports normals, UVs, vertex colours, rigging (vertex groups), and shapes (morphs). Models are automatically parented to the skeleton found in the .wimdo; if there is no skeleton, they are parented to a blank one.
 * By using the import-with-skeleton button instead, both the .wimdo's skeleton and the .arc/.chr skeleton will be imported, and then merged into one (giving the .arc/.chr one priority).
 * Optionally also import lower-LOD models. Doesn't currently distinguish them in any way.
+* Choice of whether to import sharp edges as merged vertices or split vertices.
 * Optional mesh cleanup, erasing unused vertices, vertex groups, vertex colours, and shapes.
 * Imports textures and saves them to a specified folder. By default, keeps only the biggest of each, but provides the option to keep all resolutions (using subfolders).
 * Optionally differentiates newly-imported textures with same-named existing ones by appending the imported .wismt's filename.
@@ -62,7 +64,6 @@ Note that this list is of all features, not per-game features. Use the grid abov
 ## Known issues
 Roughly in order of badness.
 ### Things with workarounds
-* Imported models will not have vertices merged if their UVs are different, even though this is almost always a valid/correct thing to do. Fixing this is on the table but may take some time since it might take much refactoring.
 * By default, images import as whatever the default colour setting is. It guesses whether they are non-colour data based on the name, so it can always get it wrong, and you'll have to manually notice and correct them. This will make them _look_ wrong, for whatever dumb reason, but they will _behave_ correctly.
   * .brres image names are not quite standardised enough to be worth doing this for them.
 ### Things with no workarounds
@@ -73,6 +74,7 @@ Roughly in order of badness.
   * Face drawcodes for "quad", "tri fan", "lines", "line strip", and "points"
   * Face drawcodes with embedded data (as opposed to indexed data)
   * All but the most basic normals type (i.e. not anything based on tangent or bitangent)
+  * Shapes/morphs
 #### .wimdo/wismt
 * Many XC3 models for party members (and possibly others) appear to use an unknown parenting mechanism for several bones (believed to be constraint-related), so they end up not being parented at all. You'll have to guess how things need to be attached.
 * Images that aren't power-of-two dimensions are not descrambled/deswizzled correctly. Very rare, but there.

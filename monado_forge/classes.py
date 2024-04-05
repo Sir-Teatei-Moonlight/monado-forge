@@ -458,7 +458,7 @@ class MonadoForgeVertex:
 	def getUVLayerIndexes(self,index):
 		return list(self._uvs[index].keys())
 	
-	def isDouble(self,other):
+	def isDouble(self,other,compareNormals=True):
 		if self == other:
 			return True
 		if self._position != other._position:
@@ -469,24 +469,23 @@ class MonadoForgeVertex:
 			return False
 		# we only compare one of the normals (the primary index's) because
 		# if a vertex has been merged previously, we already know its normals are all the same
-		if (self.hasNormals and other.hasNormals) and self._normals[self.index] != other._normals[other.index]:
+		if compareNormals and (self.hasNormals and other.hasNormals) and self._normals[self.index] != other._normals[other.index]:
 			return False
-		if self._colours != other._colours:
-			return False
-		if self._uvs != other._uvs:
-			return False
+		# unlike normals, there is no logical use case for "I don't want to merge vertices if their colours or UVs are different"
+		# (or at least I can't think of one)
+		# so don't offer an option, and don't compare them at all
 		return True
 	
 	# checks if a merge is valid, and if so, self takes on other's indexes and values
-	def tryMerge(self,other):
+	def tryMerge(self,other,mergeSharp=False):
 		if self == other:
 			return False
 		if self.index == other.index: # something is very wrong, do not continue
 			raise ValueError("we have somehow tried to merge two different vertices that share the index "+str(self.index))
-		if not self.isDouble(other):
+		if not self.isDouble(other, compareNormals = not mergeSharp):
 			return False
 		self._indexes += other._indexes
-		self._normals |= other._normals # since indexes cannot be the same, this is "safe" (no collisions)
+		self._normals |= other._normals # since indexes cannot be the same, these are "safe" (no collisions)
 		self._colours |= other._colours
 		self._uvs |= other._uvs
 		return True
@@ -507,7 +506,7 @@ class MonadoForgeVertexList:
 	def vertices(self):
 		return self._vertices
 	# no setter
-	def addVertex(self,index,vertex,automerge=False):
+	def addVertex(self,index,vertex,automerge=False,mergeSharp=False):
 		ensure_type(index,int)
 		if index in self._vertices.keys(): # a sign of a problem
 			raise ValueError("this MonadoForgeVertexList already contains a vertex of index "+str(index))
@@ -519,7 +518,7 @@ class MonadoForgeVertexList:
 			succeeded = False
 			for otherIndex in self._hashedByPos[tupPos]:
 				other = self[otherIndex]
-				succeeded = other.tryMerge(vertex)
+				succeeded = other.tryMerge(vertex,mergeSharp=mergeSharp)
 				if succeeded:
 					self._vertices[index] = other # this index now belongs to the existing vertex, not the provided one
 					break
