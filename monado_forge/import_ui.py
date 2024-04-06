@@ -358,6 +358,11 @@ class MonadoForgeViewImportProperties(PropertyGroup):
 		description="Appends the filename to the start of texture names (so they don't overwrite existing ones)",
 		default=True,
 	)
+	differentiateTempTextures : BoolProperty(
+		name="Differentiate Temp Images",
+		description="Appends the filename to the start of temp texture names (regardless of the more general setting)",
+		default=True,
+	)
 	blueBC5 : BoolProperty(
 		name="Normalize BC5s",
 		description="Assume that BC5-format images are normal maps, and calculate the blue channel accordingly",
@@ -482,6 +487,7 @@ class OBJECT_PT_MonadoForgeViewImportTextureOptionsPanel(Panel):
 		col = layout.column(align=True)
 		col.prop(scn.monado_forge_import, "differentiateTextures")
 		if scn.monado_forge_main.game != "XC1":
+			col.prop(scn.monado_forge_import, "differentiateTempTextures")
 			col.prop(scn.monado_forge_import, "blueBC5")
 			col.prop(scn.monado_forge_import, "splitTemps")
 			col.prop(scn.monado_forge_import, "keepAllResolutions")

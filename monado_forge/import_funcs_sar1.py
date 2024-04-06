@@ -435,6 +435,7 @@ def import_wismt(f, wimdoResults, context):
 		texPath = bpy.path.abspath(context.scene.monado_forge_import.texturePath)
 	mergeSharpEdges = context.scene.monado_forge_import.mergeSharpEdges
 	differentiate = context.scene.monado_forge_import.differentiateTextures
+	differentiateTemp = context.scene.monado_forge_import.differentiateTempTextures
 	splitTemps = context.scene.monado_forge_import.splitTemps
 	listOfCachedTextureNames = [] # only needed for XC3 but no harm in building it regardless
 	# little endian assumed
@@ -839,7 +840,7 @@ def import_wismt(f, wimdoResults, context):
 							listOfCachedTextureNames.append(textureName)
 							dc = splitTemps and textureName.startswith("temp")
 							nameToUse = textureName
-							if differentiate:
+							if differentiate or (differentiateTemp and textureName.startswith("temp")):
 								nameToUse = filename+"_"+nameToUse
 							if context.scene.monado_forge_import.keepAllResolutions:
 								nameToUse = os.path.join("res0",nameToUse)
@@ -880,7 +881,7 @@ def import_wismt(f, wimdoResults, context):
 						if context.scene.monado_forge_import.keepAllResolutions or highResSubfileIndex <= 0: # if there's no highResSubfileIndex, this is the best resolution
 							sf.seek(0)
 							nameToUse = textureName
-							if differentiate:
+							if differentiate or (differentiateTemp and textureName.startswith("temp")):
 								nameToUse = filename+"_"+nameToUse
 							if context.scene.monado_forge_import.keepAllResolutions:
 								nameToUse = os.path.join("res1",nameToUse)
@@ -891,7 +892,7 @@ def import_wismt(f, wimdoResults, context):
 							hdfileHeaderOffset = mainOffset+subfileHeadersOffset+highResSubfileIndex*3*4
 							hdfileName,hdfileData = extract_wismt_subfile(f,hdfileHeaderOffset)
 							nameToUse = textureName
-							if differentiate:
+							if differentiate or (differentiateTemp and textureName.startswith("temp")):
 								nameToUse = filename+"_"+nameToUse
 							if context.scene.monado_forge_import.keepAllResolutions:
 								nameToUse = os.path.join("res2",nameToUse)
@@ -937,7 +938,7 @@ def import_wismt(f, wimdoResults, context):
 					if context.scene.monado_forge_import.keepAllResolutions or not hasH: # if there's no hasH, this is the best resolution
 						sf.seek(0)
 						nameToUse = textureName
-						if differentiate:
+						if differentiate or (differentiateTemp and textureName.startswith("temp")):
 							nameToUse = filename+"_"+nameToUse
 						if context.scene.monado_forge_import.keepAllResolutions:
 							nameToUse = os.path.join("res1",nameToUse)
@@ -948,7 +949,7 @@ def import_wismt(f, wimdoResults, context):
 						with open(hFilename,"rb") as fH:
 							hdfileName,hdfileData = extract_wismt_subfile(fH,0,headless=True)
 							nameToUse = textureName
-							if differentiate:
+							if differentiate or (differentiateTemp and textureName.startswith("temp")):
 								nameToUse = filename+"_"+nameToUse
 							if context.scene.monado_forge_import.keepAllResolutions:
 								nameToUse = os.path.join("res2",nameToUse)
