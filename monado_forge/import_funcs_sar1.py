@@ -168,7 +168,7 @@ def import_sar1_skel_subfile(f, context):
 			print("Read "+str(len(forgeBones))+" bones.")
 		importedSkeletons.append(forgeBones)
 	if not importedSkeletons:
-		print_error("No valid .skl items found in file")
+		print_warning("No valid .skl items found in file")
 		return None
 	# assumption: there can only ever be a single skeleton in a file
 	# so why are we making a list? it'll be easier to pivot in the future if a counterexample is found
@@ -779,10 +779,13 @@ def import_wismt(f, wimdoResults, context):
 							except KeyError:
 								print_warning("unknown passType:",passType)
 								tableID = 0
-						finalTableID = weightTableIndexConversion[meshLod-1][tableID]
-						if finalTableID == -1:
-							print_warning("bad finalTableID")
-							finalTableID = 0
+						if weightTableIndexConversion == []:
+							pass # this is fine, there just aren't any weight tables
+						else:
+							finalTableID = weightTableIndexConversion[meshLod-1][tableID]
+							if finalTableID == -1:
+								print_warning("bad finalTableID: meshLod "+str(meshLod)+", tableID "+str(tableID)+", weightTableIndexConversion "+str(weightTableIndexConversion))
+								finalTableID = 0
 						
 						if vtIndex in unusedVertexTables:
 							unusedVertexTables.remove(vtIndex)
@@ -796,7 +799,8 @@ def import_wismt(f, wimdoResults, context):
 						newMesh = MonadoForgeMesh()
 						newMesh.vertices = vertexData[vtIndex]
 						newMesh.faces = faceData[ftIndex]
-						newMesh.weightSets = splitVertexWeights[finalTableID]
+						if splitVertexWeights != {}:
+							newMesh.weightSets = splitVertexWeights[finalTableID]
 						newMesh.materialIndex = mtIndex
 						if vtIndex in shapesByVertexTableIndex.keys():
 							newMesh.shapes = shapesByVertexTableIndex[vtIndex]
@@ -1000,7 +1004,8 @@ def import_wismt(f, wimdoResults, context):
 	
 	results = MonadoForgeImportedPackage()
 	results.skeleton = wimdoResults.skeleton
-	results.externalSkeleton = wimdoResults.externalSkeleton
+	if wimdoResults.externalSkeleton:
+		results.externalSkeleton = wimdoResults.externalSkeleton
 	results.meshes = meshes
 	results.materials = resultMaterials
 	if printProgress:
