@@ -43,7 +43,7 @@ def flattened_list_recursive(given_list):
 		return flattened_list_recursive(given_list[0]) + flattened_list_recursive(given_list[1:])
 	return given_list[:1] + flattened_list_recursive(given_list[1:])
 def print_colour(s,c):
-	print(c+s+"\033[0m")
+	print(c+str(s)+"\033[0m")
 def print_error(s):
 	print_colour(s,"\033[91m")
 def print_warning(s):

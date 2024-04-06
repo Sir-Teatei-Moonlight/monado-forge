@@ -444,7 +444,9 @@ def realise_results(forgeResults, mainName, self, context):
 			if repeat[0] or repeat[1]: # Blender only supports "all extend" or "all repeat", so will have to make a new node to support mixed cases (probably not common)
 				texNode.extension = "REPEAT"
 			if repeat[0] != repeat[1]:
-				print_warning("Texture "+t.name+" wants to be clamped in one direction but repeat in another, which is not yet supported (setting to repeat in both)")
+				horizontal = "repeated" if repeat[0] else "clamped"
+				vertical = "repeated" if repeat[1] else "clamped"
+				print_warning("Texture "+t.name+" wants to be "+horizontal+" horizontally but "+vertical+" vertically, which is not yet supported (setting to repeat in both)")
 			texNode.interpolation = "Closest"
 			if t.isFiltered:
 				texNode.interpolation = "Linear"
