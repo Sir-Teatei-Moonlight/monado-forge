@@ -216,6 +216,17 @@ class MonadoForgeViewImportNodeLibraryOperator(Operator):
 			return {"CANCELLED"}
 
 class MonadoForgeViewImportProperties(PropertyGroup):
+	def defsPathSelectionCallback(self, context):
+		# set the dataPath to match automatically, if one of the correct filetype exists
+		defsFilename, defsFileExtension = os.path.splitext(self.defsPath)
+		extMatching = {".camdo":".casmt",".wimdo":".wismt"}
+		try:
+			attemptedDataPath = defsFilename+extMatching[defsFileExtension]
+		except KeyError:
+			return
+		if os.path.isfile(attemptedDataPath):
+			self.dataPath = attemptedDataPath
+	
 	skeletonPath : StringProperty(
 		name="Skeleton Path",
 		description="File to import",
@@ -250,6 +261,7 @@ class MonadoForgeViewImportProperties(PropertyGroup):
 		default="",
 		maxlen=1024,
 		subtype="FILE_PATH",
+		update=defsPathSelectionCallback,
 	)
 	dataPath : StringProperty(
 		name="Data Path",
