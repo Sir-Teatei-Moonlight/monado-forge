@@ -235,8 +235,8 @@ def import_wimdo(f, context, externalSkeleton=None):
 					f.seek(f.tell()+2) # skip unknown
 					meshMaterialIndex = readAndParseInt(f,2)
 					f.seek(f.tell()+14) # skip unknown
-					meshLODValue = readAndParseInt(f,2)
-					f.seek(f.tell()+16) # skip unknown
+					meshLODValue = readAndParseInt(f,1)
+					f.seek(f.tell()+17) # skip unknown
 					meshHeaders.append(MonadoForgeMeshHeader(meshID,meshFlags1,meshFlags2,meshVertTableIndex,meshFaceTableIndex,meshMaterialIndex,meshLODValue))
 			if printProgress:
 				print("Found "+str(len(meshHeaders))+" mesh headers.")
