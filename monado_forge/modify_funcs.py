@@ -19,9 +19,9 @@ def resize_all_bones_active_object(self, context):
 		bone.select = True
 	resize_selected_bones(self, context)
 	for bone in editBones:
-			bone.select = False
-			bone.select_head = False
-			bone.select_tail = False
+		bone.select = False
+		bone.select_head = False
+		bone.select_tail = False
 	bpy.ops.object.mode_set(mode="OBJECT")
 	return {"FINISHED"}
 
@@ -47,9 +47,9 @@ def flip_all_r_bones_active_object(self, context):
 			bone.select = False
 	flip_selected_bones(self, context)
 	for bone in editBones:
-			bone.select = False
-			bone.select_head = False
-			bone.select_tail = False
+		bone.select = False
+		bone.select_head = False
+		bone.select_tail = False
 	bpy.ops.object.mode_set(mode="OBJECT")
 	self.report({"INFO"}, "Flipped "+str(flipCount)+" bones.")
 	return {"FINISHED"}
@@ -104,10 +104,44 @@ def mirror_all_r_bones_active_object(self, context):
 			bone.select = False
 	mirror_selected_bones(self, context)
 	for bone in editBones:
-			bone.select = False
-			bone.select_head = False
-			bone.select_tail = False
+		bone.select = False
+		bone.select_head = False
+		bone.select_tail = False
 	bpy.ops.object.mode_set(mode="OBJECT")
+	return {"FINISHED"}
+
+def reaxis_selected_bones(self, context):
+	newX = context.scene.monado_forge_modify.boneReAxisX
+	newY = context.scene.monado_forge_modify.boneReAxisY
+	newZ = context.scene.monado_forge_modify.boneReAxisZ
+	axes = {
+				"+X":[1,0,0,0],
+				"+Y":[0,1,0,0],
+				"+Z":[0,0,1,0],
+				"-X":[-1,0,0,0],
+				"-Y":[0,-1,0,0],
+				"-Z":[0,0,-1,0],
+			}
+	for bone in bpy.context.selected_bones:
+		bone.matrix = bone.matrix @ mathutils.Matrix([axes[newX],axes[newY],axes[newZ],[0,0,0,1]])
+	self.report({"INFO"}, "Re-axised "+str(len(bpy.context.selected_bones))+" bones.")
+	return {"FINISHED"}
+
+def reaxis_all_bones_active_object(self, context):
+	skeleton = bpy.context.view_layer.objects.active.data
+	bpy.ops.object.mode_set(mode="EDIT")
+	editBones = skeleton.edit_bones
+	reaxisCount = 0
+	for bone in editBones:
+		bone.select = True
+		reaxisCount += 1
+	reaxis_selected_bones(self, context)
+	for bone in editBones:
+		bone.select = False
+		bone.select_head = False
+		bone.select_tail = False
+	bpy.ops.object.mode_set(mode="OBJECT")
+	self.report({"INFO"}, "Re-axised "+str(reaxisCount)+" bones.")
 	return {"FINISHED"}
 
 def fix_non_final_lr_selected_bones(self, context):

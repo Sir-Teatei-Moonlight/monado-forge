@@ -4,6 +4,7 @@ import mathutils
 import traceback
 from bpy.props import (
 						BoolProperty,
+						EnumProperty,
 						FloatProperty,
 						PointerProperty,
 						StringProperty,
@@ -17,6 +18,40 @@ from bpy.types import (
 from . classes import *
 from . utils import *
 from . modify_funcs import *
+
+def getCrossAxis(x,y):
+	# no need to be fancy, just precompute it all
+	crossProducts = {
+						"+X+Y":"+Z",
+						"+X+Z":"-Y",
+						"+X-Y":"-Z",
+						"+X-Z":"+Y",
+						"+Y+X":"-Z",
+						"+Y+Z":"+X",
+						"+Y-X":"+Z",
+						"+Y-Z":"-X",
+						"+Z+X":"+Y",
+						"+Z+Y":"-X",
+						"+Z-X":"-Y",
+						"+Z-Y":"+X",
+						"-X+Y":"-Z",
+						"-X+Z":"+Y",
+						"-X-Y":"+Z",
+						"-X-Z":"-Y",
+						"-Y+X":"+Z",
+						"-Y+Z":"-X",
+						"-Y-X":"-Z",
+						"-Y-Z":"+X",
+						"-Z+X":"-Y",
+						"-Z+Y":"+X",
+						"-Z-X":"+Y",
+						"-Z-Y":"-X",
+					}
+	try:
+		return crossProducts[x+y]
+	except KeyError:
+		return ""
+
 
 class MonadoForgeBoneResizeAllOperator(Operator):
 	bl_idname = "object.monado_forge_bone_resize_all_operator"
@@ -159,6 +194,55 @@ class MonadoForgeBoneMirrorSelectedOperator(Operator):
 			return {"CANCELLED"}
 		return {"FINISHED"}
 
+class MonadoForgeBoneReAxisAllOperator(Operator):
+	bl_idname = "object.monado_forge_bone_reaxis_all_operator"
+	bl_label = "Xenoblade Skeleton Bone Re-Axis All Operator"
+	bl_description = "Re-axis all bones, preserving angle"
+	bl_options = {"REGISTER","UNDO"}
+	
+	@classmethod
+	def poll(cls, context):
+		activeObject = context.view_layer.objects.active
+		if not activeObject: return False
+		if activeObject.type != "ARMATURE": return False
+		if activeObject.mode == "POSE": return False
+		if not getCrossAxis(context.scene.monado_forge_modify.boneReAxisX,context.scene.monado_forge_modify.boneReAxisY): return False
+		return True
+	
+	def execute(self, context):
+		try:
+			reaxis_all_bones_active_object(self, context)
+		except Exception:
+			traceback.print_exc()
+			self.report({"ERROR"}, "Unexpected error; see console")
+			return {"CANCELLED"}
+		return {"FINISHED"}
+
+class MonadoForgeBoneReAxisSelectedOperator(Operator):
+	bl_idname = "object.monado_forge_bone_reaxis_selected_operator"
+	bl_label = "Xenoblade Skeleton Bone Re-Axis Selected Operator"
+	bl_description = "Re-axis all selected bones, preserving angle"
+	bl_options = {"REGISTER","UNDO"}
+	
+	@classmethod
+	def poll(cls, context):
+		activeObject = context.view_layer.objects.active
+		if not activeObject: return False
+		if activeObject.type != "ARMATURE": return False
+		if activeObject.mode != "EDIT": return False
+		if not getCrossAxis(context.scene.monado_forge_modify.boneReAxisX,context.scene.monado_forge_modify.boneReAxisY): return False
+		return True
+	
+	def execute(self, context):
+		try:
+			# edit mode is assumed (button is edit mode limited)
+			reaxis_selected_bones(self, context)
+		except Exception:
+			traceback.print_exc()
+			self.report({"ERROR"}, "Unexpected error; see console")
+			return {"CANCELLED"}
+		return {"FINISHED"}
+
 class MonadoForgeNonFinalLRFixAllOperator(Operator):
 	bl_idname = "object.monado_forge_non_final_lr_fix_all_operator"
 	bl_label = "Xenoblade Skeleton Non Final LR Fix All Operator"
@@ -249,6 +333,40 @@ class MonadoForgeViewModifyToolsProperties(PropertyGroup):
 		soft_max=10,
 		unit="LENGTH",
 	)
+	def reaxisSelectCallback(self, context):
+		crossAxis = getCrossAxis(self.boneReAxisX,self.boneReAxisY)
+		if crossAxis:
+			self.boneReAxisZ = crossAxis
+		else:
+			self.boneReAxisZ = "Invalid!"
+	def reAxisListCallback(self, context):
+		return (
+			("+X","+X","+X"),
+			("+Y","+Y","+Y"),
+			("+Z","+Z","+Z"),
+			("-X","-X","-X"),
+			("-Y","-Y","-Y"),
+			("-Z","-Z","-Z"),
+		)
+	boneReAxisX : EnumProperty(
+		name="New +X",
+		items=reAxisListCallback,
+		description="Change the current +X axis to this axis",
+		default=0,
+		update=reaxisSelectCallback,
+	)
+	boneReAxisY : EnumProperty(
+		name="New +Y",
+		items=reAxisListCallback,
+		description="Change the current +Y axis to this axis",
+		default=1,
+		update=reaxisSelectCallback,
+	)
+	boneReAxisZ : StringProperty(
+		name="New +Z",
+		description="Change the current +Z axis to this axis",
+		default="+Z",
+	)
 	safeMerge : BoolProperty(
 		name="Safe Merge",
 		description="Only merges bones of the same name if they have the same position and rotation (false: merge them no matter what)",
@@ -278,6 +396,9 @@ class OBJECT_PT_MonadoForgeViewModifyPanel(Panel):
 			modifyPanel.operator(MonadoForgeBoneFlipSelectedOperator.bl_idname, text="Flip Selected Bones", icon="ARROW_LEFTRIGHT")
 			modifyPanel.operator(MonadoForgeBoneMirrorSelectedOperator.bl_idname, text="Mirror Selected Bones", icon="MOD_MIRROR")
 			modifyPanel.separator()
+			self.reaxisPanel(scn,modifyPanel)
+			modifyPanel.operator(MonadoForgeBoneReAxisSelectedOperator.bl_idname, text="Re-Axis Selected Bones", icon="EMPTY_ARROWS")
+			modifyPanel.separator()
 			modifyPanel.operator(MonadoForgeNonFinalLRFixSelectedOperator.bl_idname, text="Fix Non-Final L/R Names", icon="TRACKING_FORWARDS_SINGLE")
 		else:
 			modifyPanel.operator(MonadoForgeBoneResizeAllOperator.bl_idname, text="Resize Bones", icon="FIXED_SIZE")
@@ -285,10 +406,26 @@ class OBJECT_PT_MonadoForgeViewModifyPanel(Panel):
 			modifyPanel.operator(MonadoForgeBoneFlipAllOperator.bl_idname, text="Flip _R Bones", icon="ARROW_LEFTRIGHT")
 			modifyPanel.operator(MonadoForgeBoneMirrorAutoOperator.bl_idname, text="Mirror _R Bones", icon="MOD_MIRROR")
 			modifyPanel.separator()
+			self.reaxisPanel(scn,modifyPanel)
+			modifyPanel.operator(MonadoForgeBoneReAxisAllOperator.bl_idname, text="Re-Axis Bones", icon="EMPTY_ARROWS")
+			modifyPanel.separator()
 			modifyPanel.operator(MonadoForgeNonFinalLRFixAllOperator.bl_idname, text="Fix Non-Final L/R Names", icon="TRACKING_FORWARDS_SINGLE")
 			modifyPanel.separator()
 			modifyPanel.operator(MonadoForgeMergeSelectedToActiveOperator.bl_idname, text="Merge Selected to Active", icon="AUTOMERGE_ON")
 			modifyPanel.prop(scn.monado_forge_modify, "safeMerge")
+	
+	def reaxisPanel(self,scn,modifyPanel):
+		basePanel = modifyPanel.row(align=True)
+		xPanel = basePanel.column(align=True)
+		xPanel.label(text="+X")
+		xPanel.prop(scn.monado_forge_modify, "boneReAxisX", text="")
+		yPanel = basePanel.column(align=True)
+		yPanel.label(text="+Y")
+		yPanel.prop(scn.monado_forge_modify, "boneReAxisY", text="")
+		zPanel = basePanel.column(align=True)
+		zPanel.label(text="+Z")
+		zPanel.prop(scn.monado_forge_modify, "boneReAxisZ", text="")
+		zPanel.enabled = False
 
 classes = (
 			MonadoForgeBoneResizeAllOperator,
@@ -297,6 +434,8 @@ classes = (
 			MonadoForgeBoneFlipSelectedOperator,
 			MonadoForgeBoneMirrorAutoOperator,
 			MonadoForgeBoneMirrorSelectedOperator,
+			MonadoForgeBoneReAxisAllOperator,
+			MonadoForgeBoneReAxisSelectedOperator,
 			MonadoForgeNonFinalLRFixAllOperator,
 			MonadoForgeNonFinalLRFixSelectedOperator,
 			MonadoForgeMergeSelectedToActiveOperator,
