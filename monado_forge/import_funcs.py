@@ -11,6 +11,7 @@ from . modify_funcs import *
 # yes there's a lot of copy-paste code in here but nodes are a mess no matter what
 def import_library_node(nodeId, self, context):
 	prereqs = {
+				"CombineNormals":["ReorientNormalMap"],
 				"TexInset":["TBNMatrix"],
 				}
 	try:
@@ -146,6 +147,92 @@ def import_library_node(nodeId, self, context):
 		nodeGroup.links.new(emitMixNode.outputs[0],shaderNode.inputs["Emissive Color"])
 		nodeGroup.links.new(shaderNode.outputs["BSDF"],shaderAddNode.inputs[0])
 		nodeGroup.links.new(shaderAddNode.outputs[0],specOutput.inputs["BSDF"])
+	elif nodeId == "CombineNormals":
+		nodeGroup = bpy.data.node_groups.new("CombineNormals","ShaderNodeTree")
+		nodeGroup.inputs.new("NodeSocketColor","Base")
+		nodeGroup.inputs.new("NodeSocketColor","Overlay")
+		nodeGroup.inputs.new("NodeSocketFloat","Factor")
+		nodeGroup.outputs.new("NodeSocketColor","Combined")
+		nodeGroup.inputs["Base"].default_value = (0.5,0.5,1.0,1.0)
+		nodeGroup.inputs["Overlay"].default_value = (0.5,0.5,1.0,1.0)
+		nodeGroup.inputs["Factor"].default_value = 1.0
+		combineN = nodeGroup.nodes
+		combineInput = combineN.new("NodeGroupInput")
+		combineInput.location = [-500,0]
+		combineOutput = combineN.new("NodeGroupOutput")
+		combineOutput.location = [500,0]
+		mixNode = combineN.new("ShaderNodeMixRGB")
+		mixNode.blend_type = "MIX"
+		mixNode.location = [-200,0]
+		mixNode.inputs["Color1"].default_value = [0.5,0.5,1.0,1.0]
+		mixNode.inputs["Color2"].default_value = [0.5,0.5,1.0,1.0]
+		rnmNode = combineN.new("ShaderNodeGroup")
+		rnmNode.node_tree = bpy.data.node_groups["ReorientNormalMap"]
+		rnmNode.location = [200,0]
+		nodeGroup.links.new(combineInput.outputs["Base"],rnmNode.inputs["Base"])
+		nodeGroup.links.new(combineInput.outputs["Overlay"],mixNode.inputs["Color2"])
+		nodeGroup.links.new(combineInput.outputs["Factor"],mixNode.inputs["Fac"])
+		nodeGroup.links.new(mixNode.outputs[0],rnmNode.inputs["Overlay"])
+		nodeGroup.links.new(rnmNode.outputs["Combined"],combineOutput.inputs["Combined"])
+	elif nodeId == "ReorientNormalMap":
+		# https://blog.selfshadow.com/publications/blending-in-detail/
+		nodeGroup = bpy.data.node_groups.new("ReorientNormalMap","ShaderNodeTree")
+		nodeGroup.inputs.new("NodeSocketColor","Base")
+		nodeGroup.inputs.new("NodeSocketColor","Overlay")
+		nodeGroup.outputs.new("NodeSocketColor","Combined")
+		nodeGroup.inputs["Base"].default_value = (0.5,0.5,1.0,1.0)
+		nodeGroup.inputs["Overlay"].default_value = (0.5,0.5,1.0,1.0)
+		combineN = nodeGroup.nodes
+		combineInput = combineN.new("NodeGroupInput")
+		combineInput.location = [-500,0]
+		combineOutput = combineN.new("NodeGroupOutput")
+		combineOutput.location = [500,0]
+		baseTransformNode = combineN.new("ShaderNodeVectorMath")
+		baseTransformNode.operation = "MULTIPLY_ADD"
+		baseTransformNode.location = [-300,275]
+		baseTransformNode.inputs[1].default_value = [2.0,2.0,2.0]
+		baseTransformNode.inputs[2].default_value = [-1.0,-1.0,0.0]
+		overlayTransformNode = combineN.new("ShaderNodeVectorMath")
+		overlayTransformNode.operation = "MULTIPLY_ADD"
+		overlayTransformNode.location = [-300,0]
+		overlayTransformNode.inputs[1].default_value = [-2.0,-2.0,2.0]
+		overlayTransformNode.inputs[2].default_value = [1.0,1.0,-1.0]
+		dotNode = combineN.new("ShaderNodeVectorMath")
+		dotNode.operation = "DOT_PRODUCT"
+		dotNode.location = [-100,175]
+		scaleNode1 = combineN.new("ShaderNodeVectorMath")
+		scaleNode1.operation = "SCALE"
+		scaleNode1.location = [-100,25]
+		splitNode = combineN.new("ShaderNodeSeparateXYZ")
+		splitNode.location = [-100,-125]
+		scaleNode2 = combineN.new("ShaderNodeVectorMath")
+		scaleNode2.operation = "SCALE"
+		scaleNode2.location = [100,-125]
+		subtractNode = combineN.new("ShaderNodeVectorMath")
+		subtractNode.operation = "SUBTRACT"
+		subtractNode.location = [100,175]
+		normalizeNode = combineN.new("ShaderNodeVectorMath")
+		normalizeNode.operation = "NORMALIZE"
+		normalizeNode.location = [100,25]
+		finalTransformNode = combineN.new("ShaderNodeVectorMath")
+		finalTransformNode.operation = "MULTIPLY_ADD"
+		finalTransformNode.location = [300,75]
+		finalTransformNode.inputs[1].default_value = [0.5,0.5,0.5]
+		finalTransformNode.inputs[2].default_value = [0.5,0.5,0.5]
+		nodeGroup.links.new(combineInput.outputs["Base"],baseTransformNode.inputs[0])
+		nodeGroup.links.new(combineInput.outputs["Overlay"],overlayTransformNode.inputs[0])
+		nodeGroup.links.new(baseTransformNode.outputs[0],dotNode.inputs[0])
+		nodeGroup.links.new(overlayTransformNode.outputs[0],dotNode.inputs[1])
+		nodeGroup.links.new(baseTransformNode.outputs[0],scaleNode1.inputs[0])
+		nodeGroup.links.new(dotNode.outputs["Value"],scaleNode1.inputs["Scale"])
+		nodeGroup.links.new(baseTransformNode.outputs[0],splitNode.inputs[0])
+		nodeGroup.links.new(overlayTransformNode.outputs[0],scaleNode2.inputs[0])
+		nodeGroup.links.new(splitNode.outputs["Z"],scaleNode2.inputs["Scale"])
+		nodeGroup.links.new(scaleNode1.outputs[0],subtractNode.inputs[0])
+		nodeGroup.links.new(scaleNode2.outputs[0],subtractNode.inputs[1])
+		nodeGroup.links.new(subtractNode.outputs[0],normalizeNode.inputs[0])
+		nodeGroup.links.new(normalizeNode.outputs[0],finalTransformNode.inputs[0])
+		nodeGroup.links.new(finalTransformNode.outputs[0],combineOutput.inputs["Combined"])
 	elif nodeId == "TBNMatrix":
 		# https://blender.stackexchange.com/questions/291989/how-would-i-get-the-full-tbn-matrix-from-just-a-normal-map
 		nodeGroup = bpy.data.node_groups.new("TBNMatrix","ShaderNodeTree")

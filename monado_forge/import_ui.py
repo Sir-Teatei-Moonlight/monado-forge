@@ -394,6 +394,7 @@ class MonadoForgeViewImportProperties(PropertyGroup):
 		return (
 			("BasicMetallic","Basic Metallic Shader","Metallic-style PBR shader with inputs tailored for the average Xenoblade model"),
 			("BasicSpecular","Basic Specular Shader","Specular-style shader with inputs tailored for the average Xenoblade model"),
+			("CombineNormals","Combine Normals","Combines two normal maps using reoriented normal mapping"),
 			("TBNMatrix","TBN Matrix","Outputs tangent-bitangent-normal triplet, given normal map and mesh tangent"),
 			("TexInset","Texture Inset","Distorts UVs for an inset (parallax) effect, given UVs, mesh tangent, normal map, and depth"),
 			("TexMirrorX","Texture Mirror X","Horizontally mirrors UVs outside bounds"),
