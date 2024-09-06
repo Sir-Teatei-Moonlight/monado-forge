@@ -191,7 +191,7 @@ def merge_selected_to_active_armatures(self, context, force=False):
 		for c in otherObject.children:
 			c.parent = targetObject
 			for m in c.modifiers:
-				if m.object == otherObject:
+				if m.type == "ARMATURE" and m.object == otherObject:
 					m.object = targetObject
 		otherBones = otherObject.data.edit_bones
 		keep = []

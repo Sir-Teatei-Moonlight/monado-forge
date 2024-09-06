@@ -662,13 +662,34 @@ def realise_results(forgeResults, mainName, self, context):
 			for layer,colours in meshColours.items():
 				newColoursLayer = meshData.color_attributes.new("VertexColours"+str(layer+1),"FLOAT_COLOR","CORNER") # BYTE_COLOR *should* be correct, but in practice it isn't
 				for loop in meshData.loops:
-					newColoursLayer.data[loop.index].color = [c/255.0 for c in colours[loop.index]]
+					newColoursLayer.data[loop.index].color = [toBlenderColour_255(c) for c in colours[loop.index]]
 		if mesh.hasUVs():
 			meshUVs = mesh.getLoopUVsList()
 			for layer,uvs in meshUVs.items():
 				newUVsLayer = meshData.uv_layers.new(name="UV"+str(layer+1))
 				for loop in meshData.loops:
 					newUVsLayer.data[loop.index].uv = uvs[loop.index]
+		if mesh.hasOutlines():
+			meshOutlines = mesh.getLoopOutlinesList()
+			# since vertex alpha is not a logical place for Blender to look for outline thickness,
+			# we move it to a new vertex group instead
+			newColoursLayer = meshData.color_attributes.new("OutlineColours","FLOAT_COLOR","CORNER") # BYTE_COLOR *should* be correct, but in practice it isn't
+			thicknessGroup = newMeshObject.vertex_groups.new(name="OutlineThickness")
+			for loop in meshData.loops:
+				thickness = meshOutlines[loop.index][3]/255.0
+				thisColour = [toBlenderColour_255(c) for c in meshOutlines[loop.index]]
+				thisColour[3] = 1.0 # cancel using alpha for thickness
+				newColoursLayer.data[loop.index].color = thisColour
+				thicknessGroup.add([loop.vertex_index],thickness,"REPLACE") # hopefully we don't end up with a vertex that requires multiple different thicknesses...
+			if True:
+				outlineMod = newMeshObject.modifiers.new(name="Outline",type="SOLIDIFY")
+				outlineMod.use_rim = False
+				outlineMod.use_flip_normals = True
+				outlineMod.thickness  = context.scene.monado_forge_import.maxOutlineThickness
+				outlineMod.offset = 1
+				outlineMod.vertex_group = "OutlineThickness"
+				outlineMod.thickness_vertex_group = context.scene.monado_forge_import.minOutlineFactor/100.0 # min value for thickness 0 (percentage in the UI, hence the /100.0)
+				outlineMod.material_offset = 1
 		if mesh.hasShapes():
 			shapes = mesh.shapes
 			if not meshData.shape_keys:

@@ -345,6 +345,30 @@ class MonadoForgeViewImportProperties(PropertyGroup):
 		max=1.0,
 		subtype="COLOR",
 	)
+	importOutlineData : BoolProperty(
+		name="Import Outline Data",
+		description="Import outline data and apply it as a vertex colour layer, a vertex weight group, and a solidify modifier (does not (yet) apply materials or clean up such extra models)",
+		default=True,
+	)
+	maxOutlineThickness : FloatProperty(
+		name="Max Thickness",
+		description="Thickness of outline at maximum",
+		default=0.002,
+		min=0.0,
+		soft_min=0.0,
+		soft_max=0.1,
+		unit="LENGTH",
+	)
+	minOutlineFactor : FloatProperty(
+		name="Min Thickness",
+		description="Thickness of outline at minimum",
+		default=0.02,
+		min=0.0,
+		soft_min=0.0,
+		soft_max=1.0,
+		max=100.0,
+		subtype="PERCENTAGE",
+	)
 	cleanupLooseVertices : BoolProperty(
 		name="Loose Vertices",
 		description="Erase vertices not connected to anything",
@@ -483,6 +507,8 @@ class OBJECT_PT_MonadoForgeViewImportModelOptionsPanel(Panel):
 		col.prop(scn.monado_forge_import, "importToCursor")
 		if scn.monado_forge_main.game != "XC1":
 			col.prop(scn.monado_forge_import, "alsoImportLODs")
+		if scn.monado_forge_main.game != "XC1" and scn.monado_forge_main.game != "XCX":
+			col.prop(scn.monado_forge_import, "importOutlineData")
 		col.prop(scn.monado_forge_import, "mergeSharpEdges")
 		col.prop(scn.monado_forge_import, "doCleanupOnImport")
 		col.operator(MonadoForgeViewImportCleanupModelOperator.bl_idname, text="Clean Up Selected Meshes", icon="BRUSH_DATA")
@@ -504,6 +530,24 @@ class OBJECT_PT_MonadoForgeViewImportTextureOptionsPanel(Panel):
 			col.prop(scn.monado_forge_import, "blueBC5")
 			col.prop(scn.monado_forge_import, "splitTemps")
 			col.prop(scn.monado_forge_import, "keepAllResolutions")
+
+class OBJECT_PT_MonadoForgeViewImportOutlinePanel(Panel):
+	bl_idname = "OBJECT_PT_MonadoForgeViewImportOutlinePanel"
+	bl_label = "Model Outline Options"
+	bl_space_type = "VIEW_3D"
+	bl_region_type = "UI"
+	bl_parent_id = "OBJECT_PT_MonadoForgeViewImportModelOptionsPanel"
+	
+	def draw(self, context):
+		layout = self.layout
+		scn = context.scene
+		col = layout.column(align=True)
+		if scn.monado_forge_main.game == "XC1" or scn.monado_forge_main.game == "XCX":
+			col.label(text="(no options)")
+		else:
+			layout.enabled = scn.monado_forge_import.importOutlineData
+			col.prop(scn.monado_forge_import, "maxOutlineThickness")
+			col.prop(scn.monado_forge_import, "minOutlineFactor")
 
 class OBJECT_PT_MonadoForgeViewImportCleanupPanel(Panel):
 	bl_idname = "OBJECT_PT_MonadoForgeViewImportCleanupPanel"
@@ -546,6 +590,7 @@ classes = (
 			OBJECT_PT_MonadoForgeViewImportSkeletonOptionsPanel,
 			OBJECT_PT_MonadoForgeViewImportModelOptionsPanel,
 			OBJECT_PT_MonadoForgeViewImportTextureOptionsPanel,
+			OBJECT_PT_MonadoForgeViewImportOutlinePanel,
 			OBJECT_PT_MonadoForgeViewImportCleanupPanel,
 			OBJECT_PT_MonadoForgeViewImportNodeLibraryPanel,
 			)

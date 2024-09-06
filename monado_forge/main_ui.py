@@ -58,6 +58,11 @@ class MonadoForgeProperties(PropertyGroup):
 		step=1,
 		unit="ROTATION",
 	)
+	dumpExtracts : BoolProperty(
+		name="DEBUG: Dump Extracts",
+		description="Dump data opened via zlib and zstd to source folder for debugging purposes",
+		default=False,
+	)
 
 class OBJECT_PT_MonadoForgePanel(Panel):
 	bl_idname = "OBJECT_PT_MonadoForgePanel"
@@ -87,6 +92,7 @@ class OBJECT_PT_MonadoForgeSettingsPanel(Panel):
 		col.prop(scn.monado_forge_main, "printProgress")
 		col.prop(scn.monado_forge_main, "positionEpsilon")
 		col.prop(scn.monado_forge_main, "angleEpsilon")
+		col.prop(scn.monado_forge_main, "dumpExtracts")
 
 classes = (
 			MonadoForgeProperties,

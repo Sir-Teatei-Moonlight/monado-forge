@@ -186,6 +186,20 @@ def calculateGlobalBoneMatrixes(boneList):
 
 # Blender helper functions
 
+# any colour put into Blender needs to be converted into its personal pet linear format
+# colours saved to texture instead are fine
+# https://blender.stackexchange.com/questions/260956/convert-rgb-256-to-rgb-float
+def toBlenderColour_255(c):
+	c = min(max(0, c), 255) / 255
+	return c / 12.92 if c < 0.04045 else math.pow((c + 0.055) / 1.055, 2.4)
+def toBlenderColour_Float(c):
+	return c / 12.92 if c < 0.04045 else math.pow((c + 0.055) / 1.055, 2.4)
+def fromBlenderColour_255(c):
+	colour = max(0.0, c * 12.92) if c < 0.0031308 else 1.055 * math.pow(c, 1.0 / 2.4) - 0.055
+	return hex(max(min(int(colour * 255 + 0.5), 255), 0))
+def fromBlenderColour_Float(c):
+	return max(0.0, c * 12.92) if c < 0.0031308 else 1.055 * math.pow(c, 1.0 / 2.4) - 0.055
+
 def flipRoll(roll):
 	return roll % rad360 - rad180
 

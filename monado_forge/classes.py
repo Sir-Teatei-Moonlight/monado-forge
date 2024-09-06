@@ -364,6 +364,7 @@ class MonadoForgeVertex:
 		self._normals = {}
 		self._colours = {} # in 255 format
 		self._uvs = {}
+		self._outlines = {} # same as colours, but split for usefulness
 	
 	@property
 	def index(self):
@@ -458,6 +459,20 @@ class MonadoForgeVertex:
 	def getUVLayerIndexes(self,index):
 		return list(self._uvs[index].keys())
 	
+	@property
+	def outlines(self):
+		return self._outlines
+	# no @setter (requires index)
+	def setOutline(self,index,colour):
+		ensure_length(colour,4) # Blender really pushes alpha for everything
+		self._outlines[index] = colour[:]
+	def clearOutlines(self):
+		self._outlines = {}
+	@property
+	def hasOutlines(self):
+		return self._outlines != {}
+	# no setter
+	
 	def isDouble(self,other,compareNormals=True):
 		if self == other:
 			return True
@@ -488,6 +503,7 @@ class MonadoForgeVertex:
 		self._normals |= other._normals # since indexes cannot be the same, these are "safe" (no collisions)
 		self._colours |= other._colours
 		self._uvs |= other._uvs
+		self._outlines |= other._outlines
 		return True
 
 class MonadoForgeVertexList:
@@ -691,6 +707,10 @@ class MonadoForgeMesh:
 		for i,v in self._vertices:
 			if v.hasUVs: return True
 		return False
+	def hasOutlines(self):
+		for i,v in self._vertices:
+			if v.hasOutlines: return True
+		return False
 	def hasShapes(self):
 		return len(self._shapes) > 0
 	
@@ -749,6 +769,12 @@ class MonadoForgeMesh:
 						uvsList[layer] = []
 					uvsList[layer].append(self._vertices[i].uvs[i][layer])
 		return uvsList
+	def getLoopOutlinesList(self):
+		outlinesList = []
+		for f in self._faces:
+			for i in f.vertexIndexes:
+				outlinesList.append(self._vertices[i].outlines[i])
+		return outlinesList
 
 class MonadoForgeMeshHeader:
 	# intended to be immutable, so no setters

@@ -20,6 +20,7 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 | └ Vertex normals | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Vertex groups | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Shapes/Morphs | :no_entry_sign: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
+| └ Outlines | :no_entry_sign: | :no_entry_sign: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Textures | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | :o: |
 | └ Materials | 50% | :x: | :beginner: | :beginner: | :o: |
 
@@ -41,6 +42,7 @@ Note that this list is of all features, not per-game features. Use the grid abov
 * By using the import-with-skeleton button instead, both the .wimdo's skeleton and the .arc/.chr skeleton will be imported, and then merged into one (giving the .arc/.chr one priority).
 * Optionally also import lower-LOD models. Doesn't currently distinguish them in any way.
 * Choice of whether to import sharp edges as merged vertices or split vertices.
+* Optionally imports outline data as a Solidify modifier, a vertex group (for the thickness factor), and a vertex colour (for...the colour).
 * Optional mesh cleanup, erasing unused vertices, vertex groups, vertex colours, and shapes.
 * Imports textures and saves them to a specified folder. By default, keeps only the biggest of each, but provides the option to keep all resolutions (using subfolders).
 * Optionally differentiates newly-imported textures with same-named existing ones by appending the imported .wismt's filename.
@@ -68,8 +70,10 @@ Roughly in order of badness.
 ### Things with workarounds
 * By default, images import as whatever the default colour setting is. It guesses whether they are non-colour data based on the name, so it can always get it wrong, and you'll have to manually notice and correct them. This will make them _look_ wrong, for whatever dumb reason, but they will _behave_ correctly.
   * .brres image names are not quite standardised enough to be worth doing this for them.
+* Meshes with outlines are imported as two meshes, one with all the data (including the outline) and one with only the outline data. You have to pick whether to remove the outline from the main mesh, or delete the extra outline mesh.
 ### Things with no workarounds
 #### All
+* Blender does not respect raw integer colours. Every time we have to import a colour that isn't being put into an image file, we have to convert it into Blender's personal float colour format and hope that it decides to round correctly. As a result, off-by-one errors are likely and unavoidable without manual intervention.
 * Blender does not support per-shape normals, so that information is lost. In theory it won't matter much.
 #### .brres
 * Some .brres features are not present because I've yet to encounter a XC1 model that uses them (and therefore cannot code or test them). This includes:
@@ -81,11 +85,8 @@ Roughly in order of badness.
 * Many XC3 models for party members (and possibly others) appear to use an unknown parenting mechanism for several bones (believed to be constraint-related), so they end up not being parented at all. You'll have to guess how things need to be attached.
 * Images that aren't power-of-two dimensions are not descrambled/deswizzled correctly. Very rare, but there.
 * Models entirely embedded in the .wimdo are not checked for yet. (Normally, the model itself is in the .wismt and the .wimdo is just definitions, but putting a model in the .wimdo is also legal.) Very rare, so ought not to be a big deal.
-* Outline meshes are not recognised or treated as anything special. If you get two entirely identical meshes, consider that one may be the outline, in which case you can delete one of them (probably the one with no textures in its material). Unclear how to automatically handle this, it's not immediately obvious how the game treats it (and guessing based on the name containing "outline" is not ideal).
-* Outline data is not yet processed. Not quite sure how to be honest, perhaps will leverage a vertex colour layer for it.
 * There's an extra bit of data that we don't know what it does. It shows up as a "29,4" warning in the console. You can ignore it.
 * If a texture needs to be repeating in one direction but clamped in another, it comes in as repeating for both because Blender no longer allows setting the two axes independently. This will eventually be fixed by providing a node library item.
-* Some materials only have a base colour (no textures). These import as the Actual Raw Colour Values, and so might look incorrect when Blender's colour spaces get involved. Don't ask me how to fix this.
 * Everything assumes Eevee for rendering. I have no idea what will happen if you try to use Cycles.
 
 ## Planned features

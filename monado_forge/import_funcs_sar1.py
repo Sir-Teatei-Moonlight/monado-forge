@@ -328,7 +328,7 @@ def import_wimdo(f, context, externalSkeleton=None):
 			matNameOffset = readAndParseInt(f,4)
 			matFlags1 = readAndParseInt(f,4)
 			matFlags2 = readAndParseInt(f,4)
-			matBaseColour = [readAndParseFloat(f),readAndParseFloat(f),readAndParseFloat(f),readAndParseFloat(f)]
+			matBaseColour = [toBlenderColour_Float(readAndParseFloat(f)),toBlenderColour_Float(readAndParseFloat(f)),toBlenderColour_Float(readAndParseFloat(f)),readAndParseFloat(f)]
 			matU0 = readAndParseFloat(f)
 			matTextureTableOffset = readAndParseInt(f,4)
 			matTextureCount = readAndParseInt(f,4)
@@ -405,7 +405,7 @@ def import_wimdo(f, context, externalSkeleton=None):
 		print("Finished parsing .wimdo file.")
 	return results
 
-def extract_wismt_subfile(f, headerOffset, headless=False):
+def extract_wismt_subfile(f, headerOffset, context, headless=False):
 	f.seek(headerOffset)
 	compressedSize = readAndParseInt(f,4)
 	uncompressedSize = readAndParseInt(f,4)
@@ -424,6 +424,10 @@ def extract_wismt_subfile(f, headerOffset, headless=False):
 	content = zlib.decompress(f.read(subfileCompressedSize))
 	if len(content) != subfileSize:
 		raise ValueError("subfile "+subfileName+" did not decompress to its claimed size: "+str(len(content))+" != "+str(subfileSize))
+	if context.scene.monado_forge_main.dumpExtracts:
+		contentStream = io.BytesIO(content)
+		with open(os.path.realpath(f.name)+".dump_"+("hl_" if headless else "")+str(headerOffset),"wb") as d:
+			d.write(contentStream.getbuffer())
 	return subfileName,content
 
 def import_wismt(f, wimdoResults, context):
@@ -433,6 +437,7 @@ def import_wismt(f, wimdoResults, context):
 	texPath = None
 	if context.scene.monado_forge_import.autoSaveTextures:
 		texPath = bpy.path.abspath(context.scene.monado_forge_import.texturePath)
+	doOutlines = context.scene.monado_forge_import.importOutlineData
 	mergeSharpEdges = context.scene.monado_forge_import.mergeSharpEdges
 	differentiate = context.scene.monado_forge_import.differentiateTextures
 	differentiateTemp = context.scene.monado_forge_import.differentiateTempTextures
@@ -517,7 +522,7 @@ def import_wismt(f, wimdoResults, context):
 	hasUncachedTexSubfile = hasContentType[3]
 	if hasRootSubfile:
 		subfileHeaderOffset = mainOffset+subfileHeadersOffset+nextSubfileIndex*3*4
-		subfileName,subfileData = extract_wismt_subfile(f,subfileHeaderOffset)
+		subfileName,subfileData = extract_wismt_subfile(f,subfileHeaderOffset,context)
 		for cp in contentPointers:
 			internalOffset,contentSize,highResSubfileIndex,contentType = cp
 			if contentType == 0: # model
@@ -530,7 +535,10 @@ def import_wismt(f, wimdoResults, context):
 					vertexTableCount = readAndParseInt(sf,4)
 					faceTableOffset = readAndParseInt(sf,4)
 					faceTableCount = readAndParseInt(sf,4)
-					sf.seek(sf.tell()+6*4)
+					sf.seek(sf.tell()+3*4)
+					extraTableOffset = readAndParseInt(sf,4)
+					outlineTableOffset = readAndParseInt(sf,4)
+					outlineTableCount = readAndParseInt(sf,4)
 					shapeDataOffset = readAndParseInt(sf,4)
 					dataSize = readAndParseInt(sf,4)
 					dataOffset = readAndParseInt(sf,4)
@@ -539,6 +547,7 @@ def import_wismt(f, wimdoResults, context):
 					# another 0x14 mystery reads
 					vertexTables = []
 					faceTables = []
+					outlineTables = []
 					weightTables = []
 					weightTableIndexConversion = []
 					shapeHeaders = []
@@ -559,7 +568,13 @@ def import_wismt(f, wimdoResults, context):
 								vdType = readAndParseInt(sf,2)
 								vdSize = readAndParseInt(sf,2)
 								vertexDescriptors.append([vdType,vdSize])
-							vertexTables.append([vtDataOffset,vtDataCount,vtBlockSize,vtDescOffset,vtDescCount,vertexDescriptors])
+							if extraTableOffset > 0:
+								sf.seek(extraTableOffset+i*3*4)
+								vtFlags = readAndParseInt(sf,2)
+								vtOutlineIndex = readAndParseInt(sf,2)
+								vtMorphIndex = readAndParseInt(sf,2)
+								vtMorphCount = readAndParseInt(sf,2)
+							vertexTables.append([vtDataOffset,vtDataCount,vtBlockSize,vtDescOffset,vtDescCount,vertexDescriptors,vtFlags,vtOutlineIndex,vtMorphIndex,vtMorphCount])
 						if printProgress:
 							print("Found "+str(len(vertexTables))+" vertex tables.")
 					if faceTableOffset > 0:
@@ -575,6 +590,31 @@ def import_wismt(f, wimdoResults, context):
 							faceTables.append([ftDataOffset,ftVertCount,ftVertexes])
 						if printProgress:
 							print("Found "+str(len(faceTables))+" face tables.")
+					if outlineTableOffset > 0 and doOutlines:
+						for i in range(outlineTableCount):
+							sf.seek(outlineTableOffset+i*4*4)
+							otDataOffset = readAndParseInt(sf,4)
+							otDataCount = readAndParseInt(sf,4)
+							otBlockSize = readAndParseInt(sf,4)
+							# 1 unknown/null
+							sf.seek(otDataOffset+dataOffset)
+							otNormals = []
+							otColours = []
+							# how this works:
+							# if otBlockSize is 8, it includes a normal and a colour
+							# otherwise (it's 4), it's just a colour
+							for piece in range(otDataCount):
+								if otBlockSize == 8:
+									newNormal = [readAndParseInt(sf,1,signed=True)/128.0,readAndParseInt(sf,1,signed=True)/128.0,readAndParseInt(sf,1,signed=True)/128.0]
+									readAndParseInt(sf,1,signed=True) # dummy
+									otNormals.append(mathutils.Vector(newNormal).normalized()[:])
+								else:
+									otNormals.append([])
+								r,g,b,a = readAndParseInt(sf,1),readAndParseInt(sf,1),readAndParseInt(sf,1),readAndParseInt(sf,1)
+								otColours.append([r,g,b,a])
+							outlineTables.append([otDataOffset,otDataCount,otBlockSize,otNormals,otColours])
+						if printProgress:
+							print("Found "+str(len(outlineTables))+" outline tables.")
 					if weightDataOffset > 0:
 						sf.seek(weightDataOffset)
 						weightTableCount = readAndParseInt(sf,4)
@@ -686,9 +726,10 @@ def import_wismt(f, wimdoResults, context):
 					for i in range(len(vertexTables)):
 						vertexData[i] = MonadoForgeVertexList()
 						vertexWeightData[i] = []
-						vtDataOffset,vtDataCount,vtBlockSize,vtDescOffset,vtDescCount,vertexDescriptors = vertexTables[i]
+						vtDataOffset,vtDataCount,vtBlockSize,vtDescOffset,vtDescCount,vertexDescriptors,vtFlags,vtOutlineIndex,vtMorphIndex,vtMorphCount = vertexTables[i]
 						sf.seek(dataOffset+vtDataOffset)
 						hasShapes = i in baseShapeData.keys()
+						hasOutline = vtFlags % 2 == 1
 						for vIndex in range(vtDataCount):
 							newVertex = MonadoForgeVertex(vIndex)
 							weightVertex = [[],[]]
@@ -723,6 +764,8 @@ def import_wismt(f, wimdoResults, context):
 							if hasShapes:
 								newVertex.position = baseShapeData[i]["v"][vIndex]
 								newVertex.setNormal(vIndex,baseShapeData[i]["n"][vIndex])
+							if hasOutline:
+								newVertex.setOutline(vIndex,outlineTables[vtOutlineIndex][4][vIndex])
 							if weightVertex == [[],[]]: # a "normal" vertex
 								vertexData[i].addVertex(vIndex,newVertex,automerge=True,mergeSharp=mergeSharpEdges)
 							else: # a weight table vertex
@@ -857,7 +900,7 @@ def import_wismt(f, wimdoResults, context):
 	# reminder: XC3 doesn't go in here at all (at least for most models)
 	if hasUncachedTexSubfile and context.scene.monado_forge_import.importUncachedTextures and not context.scene.monado_forge_import.skipMaterialImport:
 		subfileHeaderOffset = mainOffset+subfileHeadersOffset+nextSubfileIndex*3*4
-		subfileName,subfileData = extract_wismt_subfile(f,subfileHeaderOffset)
+		subfileName,subfileData = extract_wismt_subfile(f,subfileHeaderOffset,context)
 		for cpi,cp in enumerate(contentPointers):
 			internalOffset,contentSize,highResSubfileIndex,contentType = cp
 			if contentType == 3: # med-res texture
@@ -894,7 +937,7 @@ def import_wismt(f, wimdoResults, context):
 						# it is at this point where we need the data from the highest-resolution image
 						if highResSubfileIndex > 0:
 							hdfileHeaderOffset = mainOffset+subfileHeadersOffset+highResSubfileIndex*3*4
-							hdfileName,hdfileData = extract_wismt_subfile(f,hdfileHeaderOffset)
+							hdfileName,hdfileData = extract_wismt_subfile(f,hdfileHeaderOffset,context)
 							nameToUse = textureName
 							if differentiate or (differentiateTemp and textureName.startswith("temp")):
 								nameToUse = filename+"_"+nameToUse
@@ -920,7 +963,7 @@ def import_wismt(f, wimdoResults, context):
 			if not os.path.exists(mFilename): continue
 			hasH = os.path.exists(hFilename)
 			with open(mFilename,"rb") as fM:
-				subfileName,subfileData = extract_wismt_subfile(fM,0,headless=True)
+				subfileName,subfileData = extract_wismt_subfile(fM,0,context,headless=True)
 				sf = io.BytesIO(subfileData)
 				try: # no except, just finally (to close sf)
 					sf.seek(len(subfileData)-0x4)
@@ -951,7 +994,7 @@ def import_wismt(f, wimdoResults, context):
 					# it is at this point where we need the data from the highest-resolution image
 					if hasH:
 						with open(hFilename,"rb") as fH:
-							hdfileName,hdfileData = extract_wismt_subfile(fH,0,headless=True)
+							hdfileName,hdfileData = extract_wismt_subfile(fH,0,context,headless=True)
 							nameToUse = textureName
 							if differentiate or (differentiateTemp and textureName.startswith("temp")):
 								nameToUse = filename+"_"+nameToUse
