@@ -259,6 +259,10 @@ def create_armature_from_bones(boneList,name,pos,rot,boneSize,positionEpsilon,an
 	skelObj = bpy.context.view_layer.objects.active
 	skeleton = skelObj.data
 	skeleton.show_names = True
+	# if 4.0+, will need to create named layers
+	if bpy.app.version >= (4,0,0):
+		# there is a "Bones" by default
+		skeleton.collections.new("Endpoints")
 	# delete the default bone to start with
 	bpy.ops.armature.select_all(action="SELECT")
 	bpy.ops.armature.delete()
@@ -275,10 +279,16 @@ def create_armature_from_bones(boneList,name,pos,rot,boneSize,positionEpsilon,an
 		rotMatrix.resize_4x4()
 		newBone.matrix = parentMatrix @ (posMatrix @ rotMatrix)
 		newBone.length = boneSize # have seen odd non-rounding when not doing this
-		# put "normal" bones in layer 1 and endpoints in layer 2
-		# must be done in this order or the [0] set will be dropped because bones must be in at least one layer
-		newBone.layers[1] = b.isEndpoint
-		newBone.layers[0] = not b.isEndpoint
+		if bpy.app.version >= (4,0,0):
+			if b.isEndpoint:
+				skeleton.collections["Endpoints"].assign(newBone)
+			else:
+				skeleton.collections["Bones"].assign(newBone)
+		else:
+			# put "normal" bones in layer 1 and endpoints in layer 2
+			# must be done in this order or the [0] set will be dropped because bones must be in at least one layer
+			newBone.layers[1] = b.isEndpoint
+			newBone.layers[0] = not b.isEndpoint
 	# now that the bones are in, spin them around so they point in a more logical-for-Blender direction
 	for b in editBones:
 		# transform from lying down (+Y up +Z forward) to standing up (+Z up -Y forward)
@@ -358,6 +368,24 @@ def cleanup_mesh(context,meshObj,looseVerts,emptyGroups,emptyColours,emptyShapes
 		for r in keysToRemove:
 			meshObj.shape_key_remove(r)
 	context.view_layer.objects.active = tempActive
+
+# Blender 4.0 did some *things* with node groups
+def getNodeGroupInput(nodeGroup,input):
+	if bpy.app.version >= (4,0,0):
+		return nodeGroup.interface.items_tree[input]
+	return nodeGroup.inputs[input]
+def getNodeGroupOutput(nodeGroup,output):
+	if bpy.app.version >= (4,0,0):
+		return nodeGroup.interface.items_tree[output]
+	return nodeGroup.outputs[output]
+def newNodeGroupInput(nodeGroup,type,name):
+	if bpy.app.version >= (4,0,0):
+		return nodeGroup.interface.new_socket(in_out="INPUT",name=name,socket_type=type)
+	return nodeGroup.inputs.new(type,name)
+def newNodeGroupOutput(nodeGroup,type,name):
+	if bpy.app.version >= (4,0,0):
+		return nodeGroup.interface.new_socket(in_out="OUTPUT",name=name,socket_type=type)
+	return nodeGroup.outputs.new(type,name)
 
 def register():
 	pass

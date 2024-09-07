@@ -22,25 +22,25 @@ def import_library_node(nodeId, self, context):
 		pass
 	if nodeId == "BasicMetallic":
 		nodeGroup = bpy.data.node_groups.new("BasicMetallic","ShaderNodeTree")
-		nodeGroup.inputs.new("NodeSocketColor","Base Colour")
-		nodeGroup.inputs.new("NodeSocketColor","Ambient Colour")
-		nodeGroup.inputs.new("NodeSocketColor","Emit Colour")
-		nodeGroup.inputs.new("NodeSocketColor","Normal Map")
-		nodeGroup.inputs.new("NodeSocketFloat","Alpha")
-		nodeGroup.inputs.new("NodeSocketFloat","AO")
-		nodeGroup.inputs.new("NodeSocketFloat","Metallic")
-		nodeGroup.inputs.new("NodeSocketFloat","Glossiness")
-		nodeGroup.inputs.new("NodeSocketFloat","Emit")
-		nodeGroup.outputs.new("NodeSocketShader","BSDF")
-		nodeGroup.inputs["Base Colour"].default_value = (0.5,0.5,0.5,1.0)
-		nodeGroup.inputs["Ambient Colour"].default_value = (0.0,0.0,0.0,1.0)
-		nodeGroup.inputs["Emit Colour"].default_value = (0.0,0.0,0.0,1.0)
-		nodeGroup.inputs["Normal Map"].default_value = (0.5,0.5,1.0,1.0)
-		nodeGroup.inputs["Alpha"].default_value = 1.0
-		nodeGroup.inputs["AO"].default_value = 1.0
-		nodeGroup.inputs["Metallic"].default_value = 0.0
-		nodeGroup.inputs["Glossiness"].default_value = 0.5
-		nodeGroup.inputs["Emit"].default_value = 0.0
+		newNodeGroupInput(nodeGroup,"NodeSocketColor","Base Colour")
+		newNodeGroupInput(nodeGroup,"NodeSocketColor","Ambient Colour")
+		newNodeGroupInput(nodeGroup,"NodeSocketColor","Emit Colour")
+		newNodeGroupInput(nodeGroup,"NodeSocketColor","Normal Map")
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Alpha")
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","AO")
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Metallic")
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Glossiness")
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Emit")
+		newNodeGroupOutput(nodeGroup,"NodeSocketShader","BSDF")
+		getNodeGroupInput(nodeGroup,"Base Colour").default_value = (0.5,0.5,0.5,1.0)
+		getNodeGroupInput(nodeGroup,"Ambient Colour").default_value = (0.0,0.0,0.0,1.0)
+		getNodeGroupInput(nodeGroup,"Emit Colour").default_value = (0.0,0.0,0.0,1.0)
+		getNodeGroupInput(nodeGroup,"Normal Map").default_value = (0.5,0.5,1.0,1.0)
+		getNodeGroupInput(nodeGroup,"Alpha").default_value = 1.0
+		getNodeGroupInput(nodeGroup,"AO").default_value = 1.0
+		getNodeGroupInput(nodeGroup,"Metallic").default_value = 0.0
+		getNodeGroupInput(nodeGroup,"Glossiness").default_value = 0.5
+		getNodeGroupInput(nodeGroup,"Emit").default_value = 0.0
 		metalN = nodeGroup.nodes
 		metalInput = metalN.new("NodeGroupInput")
 		metalInput.location = [-400,0]
@@ -68,7 +68,10 @@ def import_library_node(nodeId, self, context):
 		nodeGroup.links.new(metalInput.outputs["Ambient Colour"],ambientNode.inputs["Color"])
 		nodeGroup.links.new(metalInput.outputs["Normal Map"],normalMapNode.inputs["Color"])
 		nodeGroup.links.new(metalInput.outputs["Glossiness"],roughToGlossNode.inputs[1])
-		nodeGroup.links.new(metalInput.outputs["Emit Colour"],shaderNode.inputs["Emission"])
+		if bpy.app.version >= (4,0,0):
+			nodeGroup.links.new(metalInput.outputs["Emit Colour"],shaderNode.inputs["Emission Color"])
+		else:
+			nodeGroup.links.new(metalInput.outputs["Emit Colour"],shaderNode.inputs["Emission"])
 		nodeGroup.links.new(metalInput.outputs["Alpha"],shaderNode.inputs["Alpha"])
 		nodeGroup.links.new(metalInput.outputs["Metallic"],shaderNode.inputs["Metallic"])
 		nodeGroup.links.new(metalInput.outputs["Emit"],shaderNode.inputs["Emission Strength"])
@@ -82,24 +85,24 @@ def import_library_node(nodeId, self, context):
 		if context.scene.render.engine != "BLENDER_EEVEE":
 			self.report({"ERROR"}, "Only Eevee supports the specular workflow (as of this plugin version).\nThe node will be added anyway, but it might not work right.")
 		nodeGroup = bpy.data.node_groups.new("BasicSpecular","ShaderNodeTree")
-		nodeGroup.inputs.new("NodeSocketColor","Base Colour")
-		nodeGroup.inputs.new("NodeSocketColor","Specular Colour")
-		nodeGroup.inputs.new("NodeSocketColor","Ambient Colour")
-		nodeGroup.inputs.new("NodeSocketColor","Emit Colour")
-		nodeGroup.inputs.new("NodeSocketColor","Normal Map")
-		nodeGroup.inputs.new("NodeSocketFloat","Alpha")
-		nodeGroup.inputs.new("NodeSocketFloat","AO")
-		nodeGroup.inputs.new("NodeSocketFloat","Glossiness")
-		nodeGroup.inputs.new("NodeSocketFloat","Emit")
-		nodeGroup.outputs.new("NodeSocketShader","BSDF")
-		nodeGroup.inputs["Base Colour"].default_value = (0.5,0.5,0.5,1.0)
-		nodeGroup.inputs["Specular Colour"].default_value = (1.0,1.0,1.0,1.0)
-		nodeGroup.inputs["Emit Colour"].default_value = (0.0,0.0,0.0,1.0)
-		nodeGroup.inputs["Normal Map"].default_value = (0.5,0.5,1.0,1.0)
-		nodeGroup.inputs["Alpha"].default_value = 1.0
-		nodeGroup.inputs["AO"].default_value = 1.0
-		nodeGroup.inputs["Glossiness"].default_value = 0.5
-		nodeGroup.inputs["Emit"].default_value = 0.0
+		newNodeGroupInput(nodeGroup,"NodeSocketColor","Base Colour")
+		newNodeGroupInput(nodeGroup,"NodeSocketColor","Specular Colour")
+		newNodeGroupInput(nodeGroup,"NodeSocketColor","Ambient Colour")
+		newNodeGroupInput(nodeGroup,"NodeSocketColor","Emit Colour")
+		newNodeGroupInput(nodeGroup,"NodeSocketColor","Normal Map")
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Alpha")
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","AO")
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Glossiness")
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Emit")
+		newNodeGroupOutput(nodeGroup,"NodeSocketShader","BSDF")
+		getNodeGroupInput(nodeGroup,"Base Colour").default_value = (0.5,0.5,0.5,1.0)
+		getNodeGroupInput(nodeGroup,"Specular Colour").default_value = (1.0,1.0,1.0,1.0)
+		getNodeGroupInput(nodeGroup,"Emit Colour").default_value = (0.0,0.0,0.0,1.0)
+		getNodeGroupInput(nodeGroup,"Normal Map").default_value = (0.5,0.5,1.0,1.0)
+		getNodeGroupInput(nodeGroup,"Alpha").default_value = 1.0
+		getNodeGroupInput(nodeGroup,"AO").default_value = 1.0
+		getNodeGroupInput(nodeGroup,"Glossiness").default_value = 0.5
+		getNodeGroupInput(nodeGroup,"Emit").default_value = 0.0
 		specN = nodeGroup.nodes
 		specInput = specN.new("NodeGroupInput")
 		specInput.location = [-500,0]
@@ -149,13 +152,13 @@ def import_library_node(nodeId, self, context):
 		nodeGroup.links.new(shaderAddNode.outputs[0],specOutput.inputs["BSDF"])
 	elif nodeId == "CombineNormals":
 		nodeGroup = bpy.data.node_groups.new("CombineNormals","ShaderNodeTree")
-		nodeGroup.inputs.new("NodeSocketColor","Base")
-		nodeGroup.inputs.new("NodeSocketColor","Overlay")
-		nodeGroup.inputs.new("NodeSocketFloat","Factor")
-		nodeGroup.outputs.new("NodeSocketColor","Combined")
-		nodeGroup.inputs["Base"].default_value = (0.5,0.5,1.0,1.0)
-		nodeGroup.inputs["Overlay"].default_value = (0.5,0.5,1.0,1.0)
-		nodeGroup.inputs["Factor"].default_value = 1.0
+		newNodeGroupInput(nodeGroup,"NodeSocketColor","Base")
+		newNodeGroupInput(nodeGroup,"NodeSocketColor","Overlay")
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Factor")
+		newNodeGroupOutput(nodeGroup,"NodeSocketColor","Combined")
+		getNodeGroupInput(nodeGroup,"Base").default_value = (0.5,0.5,1.0,1.0)
+		getNodeGroupInput(nodeGroup,"Overlay").default_value = (0.5,0.5,1.0,1.0)
+		getNodeGroupInput(nodeGroup,"Factor").default_value = 1.0
 		combineN = nodeGroup.nodes
 		combineInput = combineN.new("NodeGroupInput")
 		combineInput.location = [-500,0]
@@ -177,11 +180,11 @@ def import_library_node(nodeId, self, context):
 	elif nodeId == "ReorientNormalMap":
 		# https://blog.selfshadow.com/publications/blending-in-detail/
 		nodeGroup = bpy.data.node_groups.new("ReorientNormalMap","ShaderNodeTree")
-		nodeGroup.inputs.new("NodeSocketColor","Base")
-		nodeGroup.inputs.new("NodeSocketColor","Overlay")
-		nodeGroup.outputs.new("NodeSocketColor","Combined")
-		nodeGroup.inputs["Base"].default_value = (0.5,0.5,1.0,1.0)
-		nodeGroup.inputs["Overlay"].default_value = (0.5,0.5,1.0,1.0)
+		newNodeGroupInput(nodeGroup,"NodeSocketColor","Base")
+		newNodeGroupInput(nodeGroup,"NodeSocketColor","Overlay")
+		newNodeGroupOutput(nodeGroup,"NodeSocketColor","Combined")
+		getNodeGroupInput(nodeGroup,"Base").default_value = (0.5,0.5,1.0,1.0)
+		getNodeGroupInput(nodeGroup,"Overlay").default_value = (0.5,0.5,1.0,1.0)
 		combineN = nodeGroup.nodes
 		combineInput = combineN.new("NodeGroupInput")
 		combineInput.location = [-500,0]
@@ -236,12 +239,12 @@ def import_library_node(nodeId, self, context):
 	elif nodeId == "TBNMatrix":
 		# https://blender.stackexchange.com/questions/291989/how-would-i-get-the-full-tbn-matrix-from-just-a-normal-map
 		nodeGroup = bpy.data.node_groups.new("TBNMatrix","ShaderNodeTree")
-		nodeGroup.inputs.new("NodeSocketColor","Normal Map")
-		nodeGroup.inputs.new("NodeSocketVector","Tangent")
-		nodeGroup.outputs.new("NodeSocketVector","Tangent")
-		nodeGroup.outputs.new("NodeSocketVector","Bitangent")
-		nodeGroup.outputs.new("NodeSocketVector","Normal")
-		nodeGroup.inputs["Normal Map"].default_value = (0.5,0.5,1.0,1.0)
+		newNodeGroupInput(nodeGroup,"NodeSocketColor","Normal Map")
+		newNodeGroupInput(nodeGroup,"NodeSocketVector","Tangent")
+		newNodeGroupOutput(nodeGroup,"NodeSocketVector","Tangent")
+		newNodeGroupOutput(nodeGroup,"NodeSocketVector","Bitangent")
+		newNodeGroupOutput(nodeGroup,"NodeSocketVector","Normal")
+		getNodeGroupInput(nodeGroup,"Normal Map").default_value = (0.5,0.5,1.0,1.0)
 		tbnN = nodeGroup.nodes
 		tbnInput = tbnN.new("NodeGroupInput")
 		tbnInput.location = [-500,0]
@@ -282,12 +285,12 @@ def import_library_node(nodeId, self, context):
 		# https://80.lv/articles/a-simple-way-to-make-a-parallax-effect-in-blender/
 		# https://blender.stackexchange.com/questions/243048/fix-parallax-occlusion-mapping-from-the-side
 		nodeGroup = bpy.data.node_groups.new("TexInset","ShaderNodeTree")
-		nodeGroup.inputs.new("NodeSocketVector","UV")
-		nodeGroup.inputs.new("NodeSocketVector","Tangent")
-		nodeGroup.inputs.new("NodeSocketColor","Normal Map")
-		nodeGroup.inputs.new("NodeSocketFloat","Depth")
-		nodeGroup.outputs.new("NodeSocketVector","UV")
-		nodeGroup.inputs["Normal Map"].default_value = (0.5,0.5,1.0,1.0)
+		newNodeGroupInput(nodeGroup,"NodeSocketVector","UV")
+		newNodeGroupInput(nodeGroup,"NodeSocketVector","Tangent")
+		newNodeGroupInput(nodeGroup,"NodeSocketColor","Normal Map")
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Depth")
+		newNodeGroupOutput(nodeGroup,"NodeSocketVector","UV")
+		getNodeGroupInput(nodeGroup,"Normal Map").default_value = (0.5,0.5,1.0,1.0)
 		insetN = nodeGroup.nodes
 		insetInput = insetN.new("NodeGroupInput")
 		insetInput.location = [-500,100]
@@ -365,8 +368,8 @@ def import_library_node(nodeId, self, context):
 		nodeGroup.links.new(mappingNode.outputs[0],insetOutput.inputs["UV"])
 	elif nodeId == "TexMirrorX":
 		nodeGroup = bpy.data.node_groups.new("TexMirrorX","ShaderNodeTree")
-		nodeGroup.inputs.new("NodeSocketVector","Vector")
-		nodeGroup.outputs.new("NodeSocketVector","Vector")
+		newNodeGroupInput(nodeGroup,"NodeSocketVector","Vector")
+		newNodeGroupOutput(nodeGroup,"NodeSocketVector","Vector")
 		mirN = nodeGroup.nodes
 		mirInput = mirN.new("NodeGroupInput")
 		mirInput.location = [-400,0]
@@ -388,8 +391,8 @@ def import_library_node(nodeId, self, context):
 		nodeGroup.links.new(merNode.outputs[0],mirOutput.inputs[0])
 	elif nodeId == "TexMirrorY":
 		nodeGroup = bpy.data.node_groups.new("TexMirrorY","ShaderNodeTree")
-		nodeGroup.inputs.new("NodeSocketVector","Vector")
-		nodeGroup.outputs.new("NodeSocketVector","Vector")
+		newNodeGroupInput(nodeGroup,"NodeSocketVector","Vector")
+		newNodeGroupOutput(nodeGroup,"NodeSocketVector","Vector")
 		mirN = nodeGroup.nodes
 		mirInput = mirN.new("NodeGroupInput")
 		mirInput.location = [-400,0]
@@ -411,8 +414,8 @@ def import_library_node(nodeId, self, context):
 		nodeGroup.links.new(merNode.outputs[0],mirOutput.inputs[0])
 	elif nodeId == "TexMirrorXY":
 		nodeGroup = bpy.data.node_groups.new("TexMirrorXY","ShaderNodeTree")
-		nodeGroup.inputs.new("NodeSocketVector","Vector")
-		nodeGroup.outputs.new("NodeSocketVector","Vector")
+		newNodeGroupInput(nodeGroup,"NodeSocketVector","Vector")
+		newNodeGroupOutput(nodeGroup,"NodeSocketVector","Vector")
 		mirN = nodeGroup.nodes
 		mirInput = mirN.new("NodeGroupInput")
 		mirInput.location = [-400,0]
@@ -502,8 +505,8 @@ def realise_results(forgeResults, mainName, self, context):
 				dummyShader = bpy.data.node_groups["DummyShader"]
 			except KeyError:
 				dummyShader = bpy.data.node_groups.new("DummyShader","ShaderNodeTree")
-				dummyShader.inputs.new("NodeSocketColor","Base Color")
-				dummyShader.outputs.new("NodeSocketShader","BSDF")
+				newNodeGroupInput(dummyShader,"NodeSocketColor","Base Color")
+				newNodeGroupOutput(dummyShader,"NodeSocketShader","BSDF")
 				dummyN = dummyShader.nodes
 				dummyInput = dummyN.new("NodeGroupInput")
 				dummyInput.location = [-400,0]
@@ -630,7 +633,8 @@ def realise_results(forgeResults, mainName, self, context):
 		meshData.from_pydata(mesh.getVertexPositionsList(),[],mesh.getFaceVertexIndexesList())
 		for f in meshData.polygons:
 			f.use_smooth = True
-		meshData.use_auto_smooth = True
+		if bpy.app.version < (4,1,0): # 4.1 removed this and made it the default (kind of)
+			meshData.use_auto_smooth = True
 		if mesh.hasWeightIndexes() and baseArmature: # try the indexes method first (faster) (and also needs a baseArmature or it makes no sense)
 			weightIndexes = set(mesh.getVertexWeightIndexesList())
 			vertexesInEachGroup = {}
@@ -656,7 +660,8 @@ def realise_results(forgeResults, mainName, self, context):
 		if mesh.hasNormals():
 			normalsList = mesh.getLoopNormalsList()
 			meshData.normals_split_custom_set(normalsList)
-			meshData.calc_normals_split()
+			if bpy.app.version < (4,1,0): # function removed, no longer needed
+				meshData.calc_normals_split()
 		if mesh.hasColours():
 			meshColours = mesh.getLoopColoursList()
 			for layer,colours in meshColours.items():

@@ -3,6 +3,10 @@ An addon for Blender (written with 3.3.1) for working with Xenoblade files. Adds
 
 **General notice:** Keep the system console toggled on so you can see any potential warnings and non-fatal errors.
 
+## Blender support
+* **Blender 3.3.1** is the primary dev version. I do all work with this.
+* **Blender 4.1.0** is the secondary dev version. I will make an effort to ensure everything works in it, but it isn't the main environment.
+
 ## Game support
 * :no_entry_sign: - Believed to be nonexistent or unnecessary.
 * :x: - Not supported, but planned (eventually).
