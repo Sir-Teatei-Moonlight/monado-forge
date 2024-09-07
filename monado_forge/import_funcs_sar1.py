@@ -304,7 +304,8 @@ def import_wimdo(f, context, externalSkeleton=None):
 				f.seek(modelsOffset+shapeNamesOffset+shapeNameOffset)
 				shapeNames.append(readStr(f))
 	
-	if materialsOffset > 0 and not context.scene.monado_forge_import.skipMaterialImport:
+	# we have to do this even if skipMaterialImport, because the material render pass is needed to get the correct weight table
+	if materialsOffset > 0:
 		f.seek(materialsOffset)
 		materialHeadersOffset = readAndParseInt(f,4)
 		materialCount = readAndParseInt(f,4)
@@ -1008,42 +1009,43 @@ def import_wismt(f, wimdoResults, context):
 	# time to ready materials
 	wimdoMaterials = wimdoResults.materials
 	resultMaterials = []
-	for mat in wimdoMaterials:
-		newMat = MonadoForgeMaterial(mat.index)
-		newMat.name = mat.name
-		newMat.baseColour = mat.baseColour
-		newMat.viewportColour = mat.baseColour
-		newMat.extraData = mat.extraData
-		newMat.colourLayerCount = maxColourLayers
-		newMat.uvLayerCount = maxUVLayers
-		matSamplers = mat.samplers
-		# this is done in a way that "duplicates" texture references, but that's fairly harmless at this stage
-		for ti,t in enumerate(mat.textureTable):
-			newTex = MonadoForgeTexture()
-			texIndex = t[0] # ignore the unknowns for now
-			newTex.name = textureAlignment[textureHeaders[texIndex][3]]
-			texSampler = matSamplers[t[1]]
-			samplerFlags = texSampler[0]
-			# the known sampler flags:
-			# 0x01 = u-repeat
-			# 0x02 = v-repeat
-			# 0x04 = u-mirror
-			# 0x08 = v-mirror
-			# 0x10 = no filtering (use nearest instead of linear)
-			# 0x20 = set UVW to clamped (override)
-			# 0x40 = disable mipmaps
-			# 0x80 = set UVW to repeat (override)
-			# the current code skips the mipmaps and UVW overrides (since we don't support 3D textures yet anyways)
-			uRepeat = (samplerFlags & 0x01) != 0
-			vRepeat = (samplerFlags & 0x02) != 0
-			uMirror = (samplerFlags & 0x04) != 0
-			vMirror = (samplerFlags & 0x08) != 0
-			noFiltering = (samplerFlags & 0x10) != 0
-			newTex.repeating = [uRepeat,vRepeat]
-			newTex.mirroring = [uMirror,vMirror]
-			newTex.isFiltered = not noFiltering # yes we're flipping the meaning, "true means don't" is confusing
-			newMat.addTexture(newTex)
-		resultMaterials.append(newMat)
+	if not context.scene.monado_forge_import.skipMaterialImport:
+		for mat in wimdoMaterials:
+			newMat = MonadoForgeMaterial(mat.index)
+			newMat.name = mat.name
+			newMat.baseColour = mat.baseColour
+			newMat.viewportColour = mat.baseColour
+			newMat.extraData = mat.extraData
+			newMat.colourLayerCount = maxColourLayers
+			newMat.uvLayerCount = maxUVLayers
+			matSamplers = mat.samplers
+			# this is done in a way that "duplicates" texture references, but that's fairly harmless at this stage
+			for ti,t in enumerate(mat.textureTable):
+				newTex = MonadoForgeTexture()
+				texIndex = t[0] # ignore the unknowns for now
+				newTex.name = textureAlignment[textureHeaders[texIndex][3]]
+				texSampler = matSamplers[t[1]]
+				samplerFlags = texSampler[0]
+				# the known sampler flags:
+				# 0x01 = u-repeat
+				# 0x02 = v-repeat
+				# 0x04 = u-mirror
+				# 0x08 = v-mirror
+				# 0x10 = no filtering (use nearest instead of linear)
+				# 0x20 = set UVW to clamped (override)
+				# 0x40 = disable mipmaps
+				# 0x80 = set UVW to repeat (override)
+				# the current code skips the mipmaps and UVW overrides (since we don't support 3D textures yet anyways)
+				uRepeat = (samplerFlags & 0x01) != 0
+				vRepeat = (samplerFlags & 0x02) != 0
+				uMirror = (samplerFlags & 0x04) != 0
+				vMirror = (samplerFlags & 0x08) != 0
+				noFiltering = (samplerFlags & 0x10) != 0
+				newTex.repeating = [uRepeat,vRepeat]
+				newTex.mirroring = [uMirror,vMirror]
+				newTex.isFiltered = not noFiltering # yes we're flipping the meaning, "true means don't" is confusing
+				newMat.addTexture(newTex)
+			resultMaterials.append(newMat)
 	
 	results = MonadoForgeImportedPackage()
 	results.skeleton = wimdoResults.skeleton
