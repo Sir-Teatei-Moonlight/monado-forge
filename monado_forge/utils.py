@@ -315,7 +315,7 @@ def create_armature_from_bones(boneList,name,pos,rot,boneSize,positionEpsilon,an
 	bpy.ops.object.mode_set(mode="OBJECT")
 	return skelObj # return the new object
 
-def cleanup_mesh(context,meshObj,looseVerts,emptyGroups,emptyColours,emptyShapes):
+def cleanup_mesh(context,meshObj,looseVerts,emptyGroups,emptyColours,emptyOutlines,emptyShapes):
 	tempActive = context.view_layer.objects.active
 	context.view_layer.objects.active = meshObj
 	meshData = meshObj.data
@@ -353,6 +353,19 @@ def cleanup_mesh(context,meshObj,looseVerts,emptyGroups,emptyColours,emptyShapes
 				coloursToRemove.append(layer)
 		for layer in coloursToRemove:
 			meshData.color_attributes.remove(layer)
+	# remove outline data if all thicknesses are 0
+	if emptyOutlines and "OutlineThickness" in meshObj.vertex_groups:
+		outlineGroup = meshObj.vertex_groups["OutlineThickness"]
+		isLegit = False
+		for v in meshData.vertices:
+			if outlineGroup.weight(v.index) > 0:
+				isLegit = True
+				break
+		if not isLegit:
+			meshObj.vertex_groups.remove(outlineGroup)
+			try:
+				meshData.color_attributes.remove(meshData.color_attributes["OutlineColours"])
+			except KeyError: pass
 	# determine which shapes don't do anything and remove them
 	# seems to be somewhat conservative (some shapes with no visible effect are kept), but that's the safer error to make
 	if emptyShapes:

@@ -47,7 +47,7 @@ Note that this list is of all features, not per-game features. Use the grid abov
 * Optionally also import lower-LOD models. Doesn't currently distinguish them in any way.
 * Choice of whether to import sharp edges as merged vertices or split vertices.
 * Optionally imports outline data as a Solidify modifier, a vertex group (for the thickness factor), and a vertex colour (for...the colour).
-* Optional mesh cleanup, erasing unused vertices, vertex groups, vertex colours, and shapes.
+* Optional mesh cleanup, erasing unused vertices, vertex groups, vertex colours, outline data, and shapes.
 * Imports textures and saves them to a specified folder. By default, keeps only the biggest of each, but provides the option to keep all resolutions (using subfolders).
 * Optionally differentiates newly-imported textures with same-named existing ones by appending the imported .wismt's filename.
 * Optionally assumes that BC5 textures are normal maps, and auto-calculates the blue channel for them.

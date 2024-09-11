@@ -712,6 +712,7 @@ def realise_results(forgeResults, mainName, self, context):
 						context.scene.monado_forge_import.cleanupLooseVertices,
 						context.scene.monado_forge_import.cleanupEmptyGroups,
 						context.scene.monado_forge_import.cleanupEmptyColours,
+						context.scene.monado_forge_import.cleanupEmptyOutlines,
 						context.scene.monado_forge_import.cleanupEmptyShapes)
 		#meshData.validate(verbose=True)
 		meshData.validate()
