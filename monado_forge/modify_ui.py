@@ -318,10 +318,38 @@ class MonadoForgeMergeSelectedToActiveOperator(Operator):
 			return {"CANCELLED"}
 		return {"FINISHED"}
 
+class MonadoForgeLinkShapeKeysOperator(Operator):
+	bl_idname = "object.monado_forge_link_shape_keys_operator"
+	bl_label = "Xenoblade Link Mesh Shape Keys Operator"
+	bl_description = "Establishes drivers on all selected objects so their shape keys are linked to the active object's"
+	bl_options = {"REGISTER","UNDO"}
+	
+	@classmethod
+	def poll(cls, context):
+		activeObject = context.view_layer.objects.active
+		selectedObjects = context.view_layer.objects.selected
+		if not activeObject: return False
+		if activeObject.type != "MESH": return False
+		if activeObject.mode != "OBJECT": return False
+		if len(selectedObjects) < 2: return False
+		for s in selectedObjects:
+			if s.type != "MESH": return False
+			if s.mode != "OBJECT": return False
+		return True
+	
+	def execute(self, context):
+		try:
+			link_shape_keys(self, context)
+		except Exception:
+			traceback.print_exc()
+			self.report({"ERROR"}, "Unexpected error; see console")
+			return {"CANCELLED"}
+		return {"FINISHED"}
+
 class MonadoForgeViewModifyToolsProperties(PropertyGroup):
 	nonFinalMirror : BoolProperty(
 		name="Accept Non-Final L/R",
-		description="Treat non-final _L_ and _R_ in bone names as being mirrored",
+		description="Treat non-final _L_ and _R_ in names as being mirrored",
 		default=True,
 	)
 	boneResizeSize : FloatProperty(
@@ -385,11 +413,23 @@ class OBJECT_PT_MonadoForgeViewModifyPanel(Panel):
 		scn = context.scene
 		col = layout.column(align=True)
 		activeObject = bpy.context.view_layer.objects.active
-		col.label(text="Skeleton")
-		settingsPanel = col.column(align=True) # note to self: remove this later when non-skeleton modifiers exist (and thus there are subpanels)
+		settingsPanel = col.column(align=True)
 		settingsPanel.prop(scn.monado_forge_modify, "nonFinalMirror")
+
+class OBJECT_PT_MonadoForgeViewModifySkeletonPanel(Panel):
+	bl_idname = "OBJECT_PT_MonadoForgeViewModifySkeletonPanel"
+	bl_label = "Skeleton"
+	bl_space_type = "VIEW_3D"
+	bl_region_type = "UI"
+	bl_parent_id = "OBJECT_PT_MonadoForgeViewModifyPanel"
+	
+	def draw(self, context):
+		layout = self.layout
+		scn = context.scene
+		col = layout.column(align=True)
+		activeObject = bpy.context.view_layer.objects.active
 		modifyPanel = col.column(align=True)
-		settingsPanel.prop(scn.monado_forge_modify, "boneResizeSize")
+		modifyPanel.prop(scn.monado_forge_modify, "boneResizeSize")
 		if activeObject and activeObject.mode == "EDIT":
 			modifyPanel.operator(MonadoForgeBoneResizeSelectedOperator.bl_idname, text="Resize Selected Bones", icon="FIXED_SIZE")
 			modifyPanel.separator()
@@ -427,6 +467,19 @@ class OBJECT_PT_MonadoForgeViewModifyPanel(Panel):
 		zPanel.prop(scn.monado_forge_modify, "boneReAxisZ", text="")
 		zPanel.enabled = False
 
+class OBJECT_PT_MonadoForgeViewModifyMeshPanel(Panel):
+	bl_idname = "OBJECT_PT_MonadoForgeViewModifyMeshPanel"
+	bl_label = "Mesh"
+	bl_space_type = "VIEW_3D"
+	bl_region_type = "UI"
+	bl_parent_id = "OBJECT_PT_MonadoForgeViewModifyPanel"
+	
+	def draw(self, context):
+		layout = self.layout
+		scn = context.scene
+		col = layout.column(align=True)
+		col.operator(MonadoForgeLinkShapeKeysOperator.bl_idname, text="Link Shape Keys", icon="LINKED")
+
 classes = (
 			MonadoForgeBoneResizeAllOperator,
 			MonadoForgeBoneResizeSelectedOperator,
@@ -439,8 +492,11 @@ classes = (
 			MonadoForgeNonFinalLRFixAllOperator,
 			MonadoForgeNonFinalLRFixSelectedOperator,
 			MonadoForgeMergeSelectedToActiveOperator,
+			MonadoForgeLinkShapeKeysOperator,
 			MonadoForgeViewModifyToolsProperties,
 			OBJECT_PT_MonadoForgeViewModifyPanel,
+			OBJECT_PT_MonadoForgeViewModifySkeletonPanel,
+			OBJECT_PT_MonadoForgeViewModifyMeshPanel,
 			)
 
 def register():

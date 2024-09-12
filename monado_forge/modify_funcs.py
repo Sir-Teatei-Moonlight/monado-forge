@@ -217,6 +217,31 @@ def merge_selected_to_active_armatures(self, context, force=False):
 		self.report({"WARNING"}, "Kept "+str(outOfRangeCount)+" bones for being out of epsilon tolerance. See console for list.")
 	return {"FINISHED"}
 
+def link_shape_keys(self, context):
+	# based on the UI calling this, we can assume all selected objects are meshes and there's more than one of them
+	baseObject = context.view_layer.objects.active
+	selectedObjects = context.view_layer.objects.selected
+	driverCount = 0
+	for other in selectedObjects:
+		if baseObject == other: continue
+		for key in baseObject.data.shape_keys.key_blocks:
+			try:
+				otherKey = other.data.shape_keys.key_blocks[key.name]
+			except KeyError:
+				continue
+			newDriverFCurve = otherKey.driver_add("value")
+			newDriver = newDriverFCurve.driver
+			newDriver.type = "AVERAGE"
+			newVar = newDriver.variables.new()
+			newVar.type = "SINGLE_PROP"
+			newTarget = newVar.targets[0]
+			newTarget.id_type = "KEY"
+			newTarget.id = baseObject.data.shape_keys
+			newTarget.data_path = f'key_blocks["{key.name}"].value'
+			driverCount += 1
+	self.report({"INFO"}, "Created "+str(driverCount)+" drivers.")
+	return {"FINISHED"}
+
 def register():
 	pass
 

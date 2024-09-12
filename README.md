@@ -62,12 +62,16 @@ Note that this list is of all features, not per-game features. Use the grid abov
   * Node group for combining two normal maps "properly" (https://blog.selfshadow.com/publications/blending-in-detail/)
 
 ### Modify
+#### Skeleton
 * One-click setting all bones to be the same size.
 * One-click flipping and mirroring bones so _L and _R sides match. Auto-mirror skips bones that seem like they might be intentionally uneven.
 * One-click re-axis of bones, swapping their axes in any valid permutation.
 * One-click renaming bones to move the _L/_R to the end, instead of sitting in the middle.
 * All the above operate on the whole armature by default. Going into edit mode allows selecting individual bones to change.
 * Merge two armatures, keeping only one copy of bones with the same name. Supports both "merge all" and "merge only if similar enough".
+
+#### Mesh
+* Link the shape keys of multiple meshes together using drivers.
 
 ## Known issues
 Roughly in order of badness.
