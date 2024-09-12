@@ -1033,15 +1033,16 @@ def import_wismt(f, wimdoResults, context):
 				# 0x08 = v-mirror
 				# 0x10 = no filtering (use nearest instead of linear)
 				# 0x20 = set UVW to clamped (override)
-				# 0x40 = disable mipmaps
+				# 0x40 = disable mipmaps (currently skipped)
 				# 0x80 = set UVW to repeat (override)
-				# the current code skips the mipmaps and UVW overrides (since we don't support 3D textures yet anyways)
 				uRepeat = (samplerFlags & 0x01) != 0
 				vRepeat = (samplerFlags & 0x02) != 0
 				uMirror = (samplerFlags & 0x04) != 0
 				vMirror = (samplerFlags & 0x08) != 0
 				noFiltering = (samplerFlags & 0x10) != 0
-				newTex.repeating = [uRepeat,vRepeat]
+				clampOverride = (samplerFlags & 0x20) != 0
+				repeatOverride = (samplerFlags & 0x80) != 0
+				newTex.repeating = [repeatOverride or (uRepeat and not clampOverride),repeatOverride or (vRepeat and not clampOverride)]
 				newTex.mirroring = [uMirror,vMirror]
 				newTex.isFiltered = not noFiltering # yes we're flipping the meaning, "true means don't" is confusing
 				newMat.addTexture(newTex)

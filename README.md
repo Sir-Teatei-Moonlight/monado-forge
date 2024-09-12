@@ -52,7 +52,7 @@ Note that this list is of all features, not per-game features. Use the grid abov
 * Optionally differentiates newly-imported textures with same-named existing ones by appending the imported .wismt's filename.
 * Optionally assumes that BC5 textures are normal maps, and auto-calculates the blue channel for them.
 * Optionally automatically splits "temp" files into channels.
-* Creates a basic material with all the correct textures and values in it, in which the first texture is assumed to be the base colour, and nothing else is plugged in. Also reads samplers to determine the textures' clamp/repeat, mirroring, and filtering settings, plugging textures into a TexMirrorXY node accordingly (creating it if it doesn't exist already). Anything more will have to wait for deeper shader parsing.
+* Creates a basic material with all the correct textures and values in it, in which the first texture is assumed to be the base colour, and nothing else is plugged in. Also reads samplers to determine the textures' clamp/repeat, mirroring, and filtering settings, plugging textures into a UVPreProcess node accordingly (creating it if it doesn't exist already). Anything more will have to wait for deeper shader parsing.
 
 #### Node Library
 * Imports a couple preset node groups that are useful for many of these models, including:
@@ -94,7 +94,6 @@ Roughly in order of badness.
 * Images that aren't power-of-two dimensions are not descrambled/deswizzled correctly. Very rare, but there.
 * Models entirely embedded in the .wimdo are not checked for yet. (Normally, the model itself is in the .wismt and the .wimdo is just definitions, but putting a model in the .wimdo is also legal.) Very rare, so ought not to be a big deal.
 * There's an extra bit of data that we don't know what it does. It shows up as a "29,4" warning in the console. You can ignore it.
-* If a texture needs to be repeating in one direction but clamped in another, it comes in as repeating for both because Blender no longer allows setting the two axes independently. This will eventually be fixed by providing a node library item.
 * Everything assumes Eevee for rendering. I have no idea what will happen if you try to use Cycles.
 
 ## Planned features

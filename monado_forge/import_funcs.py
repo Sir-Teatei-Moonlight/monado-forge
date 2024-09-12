@@ -515,50 +515,50 @@ def import_library_node(nodeId, self, context):
 		mirVNode.location = [-200,-100]
 		mirVNode.label = "Mirror V"
 		if bpy.app.version < (3,4,0):
-			mixNodeMU = preproN.new("ShaderNodeGroup")
-			mixNodeMU.node_tree = bpy.data.node_groups["MixFloats"]
-			mixNodeMV = preproN.new("ShaderNodeGroup")
-			mixNodeMV.node_tree = bpy.data.node_groups["MixFloats"]
 			mixNodeCU = preproN.new("ShaderNodeGroup")
 			mixNodeCU.node_tree = bpy.data.node_groups["MixFloats"]
 			mixNodeCV = preproN.new("ShaderNodeGroup")
 			mixNodeCV.node_tree = bpy.data.node_groups["MixFloats"]
+			mixNodeMU = preproN.new("ShaderNodeGroup")
+			mixNodeMU.node_tree = bpy.data.node_groups["MixFloats"]
+			mixNodeMV = preproN.new("ShaderNodeGroup")
+			mixNodeMV.node_tree = bpy.data.node_groups["MixFloats"]
 		else:
-			mixNodeMU = preproN.new("ShaderNodeMix")
-			mixNodeMU.data_type = "FLOAT"
-			mixNodeMV = preproN.new("ShaderNodeMix")
-			mixNodeMV.data_type = "FLOAT"
 			mixNodeCU = preproN.new("ShaderNodeMix")
 			mixNodeCU.data_type = "FLOAT"
 			mixNodeCV = preproN.new("ShaderNodeMix")
 			mixNodeCV.data_type = "FLOAT"
-		mixNodeCU.location = [200,100]
+			mixNodeMU = preproN.new("ShaderNodeMix")
+			mixNodeMU.data_type = "FLOAT"
+			mixNodeMV = preproN.new("ShaderNodeMix")
+			mixNodeMV.data_type = "FLOAT"
+		mixNodeCU.location = [0,100]
 		mixNodeCU.label = "Apply U Clamp"
-		mixNodeCV.location = [200,-100]
+		mixNodeCV.location = [0,-100]
 		mixNodeCV.label = "Apply V Clamp"
-		mixNodeMU.location = [0,100]
+		mixNodeMU.location = [200,100]
 		mixNodeMU.label = "Apply U Mirror"
-		mixNodeMV.location = [0,-100]
+		mixNodeMV.location = [200,-100]
 		mixNodeMV.label = "Apply V Mirror"
 		nodeGroup.links.new(preproInput.outputs[0],sepNode.inputs[0])
 		nodeGroup.links.new(sepNode.outputs["X"],clampUNode.inputs["Value"])
 		nodeGroup.links.new(sepNode.outputs["X"],mirUNode.inputs["Value"])
 		nodeGroup.links.new(sepNode.outputs["Y"],clampVNode.inputs["Value"])
 		nodeGroup.links.new(sepNode.outputs["Y"],mirVNode.inputs["Value"])
-		nodeGroup.links.new(preproInput.outputs[3],mixNodeMU.inputs["Factor"])
-		nodeGroup.links.new(preproInput.outputs[4],mixNodeMV.inputs["Factor"])
 		nodeGroup.links.new(preproInput.outputs[1],mixNodeCU.inputs["Factor"])
 		nodeGroup.links.new(preproInput.outputs[2],mixNodeCV.inputs["Factor"])
-		nodeGroup.links.new(sepNode.outputs["X"],mixNodeMU.inputs["A"])
-		nodeGroup.links.new(sepNode.outputs["Y"],mixNodeMV.inputs["A"])
-		nodeGroup.links.new(mixNodeMU.outputs["Result"],mixNodeCU.inputs["A"])
-		nodeGroup.links.new(mixNodeMV.outputs["Result"],mixNodeCV.inputs["A"])
-		nodeGroup.links.new(mirUNode.outputs[0],mixNodeMU.inputs["B"])
-		nodeGroup.links.new(mirVNode.outputs[0],mixNodeMV.inputs["B"])
+		nodeGroup.links.new(preproInput.outputs[3],mixNodeMU.inputs["Factor"])
+		nodeGroup.links.new(preproInput.outputs[4],mixNodeMV.inputs["Factor"])
+		nodeGroup.links.new(sepNode.outputs["X"],mixNodeCU.inputs["A"])
+		nodeGroup.links.new(sepNode.outputs["Y"],mixNodeCV.inputs["A"])
+		nodeGroup.links.new(mixNodeCU.outputs["Result"],mixNodeMU.inputs["A"])
+		nodeGroup.links.new(mixNodeCV.outputs["Result"],mixNodeMV.inputs["A"])
 		nodeGroup.links.new(clampUNode.outputs[0],mixNodeCU.inputs["B"])
 		nodeGroup.links.new(clampVNode.outputs[0],mixNodeCV.inputs["B"])
-		nodeGroup.links.new(mixNodeCU.outputs["Result"],merNode.inputs["X"])
-		nodeGroup.links.new(mixNodeCV.outputs["Result"],merNode.inputs["Y"])
+		nodeGroup.links.new(mirUNode.outputs[0],mixNodeMU.inputs["B"])
+		nodeGroup.links.new(mirVNode.outputs[0],mixNodeMV.inputs["B"])
+		nodeGroup.links.new(mixNodeMU.outputs["Result"],merNode.inputs["X"])
+		nodeGroup.links.new(mixNodeMV.outputs["Result"],merNode.inputs["Y"])
 		nodeGroup.links.new(sepNode.outputs["Z"],merNode.inputs["Z"])
 		nodeGroup.links.new(merNode.outputs[0],preproOutput.inputs[0])
 	else:
@@ -645,19 +645,23 @@ def realise_results(forgeResults, mainName, self, context):
 		baseColourNode.location = [-650,300]
 		n.get("Material Output").location = [950,300]
 		texNodes = []
-		mirroring = {"":[],"x":[],"y":[],"xy":[]}
+		# the setup: these are the "buckets" for what pre-processing must be done to the textures within
+		# covers clamp (cu, cv) and mirror (mu, mv, muv)
+		# some combos don't make logical sense (e.g. both clamp and mirror on U) but we have them anyway since it's just simpler
+		preprocessing = {"":[],"cu":[],"cv":[],"mu":[],"cumu":[],"cvmu":[],"mv":[],"cumv":[],"cvmv":[],"muv":[],"cumuv":[],"cvmuv":[]}
 		if createDummyShader and not mat.textures: # no textures, plug in the base colour directly
 			newMat.node_tree.links.new(baseColourNode.outputs[0],shaderSubnode.inputs["Base Color"])
 		for ti,t in enumerate(mat.textures):
+			currentPreprocess = ""
 			texNode = n.new("ShaderNodeTexImage")
+			# Blender no longer supports mixed cases of extend vs. repeat
+			# so while we can just set the texture if both are the same, we need to preprocess if they aren't
 			texNode.extension = "EXTEND"
 			repeat = t.repeating
-			if repeat[0] or repeat[1]: # Blender only supports "all extend" or "all repeat", so will have to make a new node to support mixed cases (probably not common)
+			if repeat[0] or repeat[1]:
 				texNode.extension = "REPEAT"
 			if repeat[0] != repeat[1]:
-				horizontal = "repeated" if repeat[0] else "clamped"
-				vertical = "repeated" if repeat[1] else "clamped"
-				print_warning("Texture "+t.name+" wants to be "+horizontal+" horizontally but "+vertical+" vertically, which is not yet supported (setting to repeat in both)")
+				currentPreprocess += "cu" if repeat[1] else "cv"
 			texNode.interpolation = "Closest"
 			if t.isFiltered:
 				texNode.interpolation = "Linear"
@@ -683,15 +687,17 @@ def realise_results(forgeResults, mainName, self, context):
 			if ti == 0 and createDummyShader:
 				newMat.node_tree.links.new(texNode.outputs["Color"],shaderSubnode.inputs["Base Color"])
 			mir = t.mirroring
-			mX = "x" if mir[0] else ""
-			mY = "y" if mir[1] else ""
-			mirroring[mX+mY].append(texNode)
+			mU = "u" if mir[0] else ""
+			mV = "v" if mir[1] else ""
+			if mU+mV != "":
+				currentPreprocess += "m"+mU+mV
 			# for temp files, add a colour splitter for convenience
 			if "temp" in t.name:
 				sepNode = n.new("ShaderNodeSeparateColor")
 				sepNode.location = texNode.location + mathutils.Vector([125,-25])
 				sepNode.hide = True
 				newMat.node_tree.links.new(texNode.outputs["Color"],sepNode.inputs[0])
+			preprocessing[currentPreprocess].append(texNode)
 		colourCount = mat.colourLayerCount # this will probably result in overestimation, but that's okay
 		uvCount = mat.uvLayerCount # same
 		pushdownValue = 100 # to keep track of node posititon across multiple for loops
@@ -703,26 +709,40 @@ def realise_results(forgeResults, mainName, self, context):
 			uvInputNode.location = [-650,pushdownValue]
 			uvInputNode.uv_map = "UV"+str(uv+1)
 			pushdownValue -= 40
-			if mirroring[""] or not mat.textures: # no textures means no mirroring defined: assume none
+			if not mat.textures or preprocessing[""]: # no textures means no preprocessing defined: assume none
 				if uv == 0:
-					for mt in mirroring[""]:
-						newMat.node_tree.links.new(uvInputNode.outputs["UV"],mt.inputs["Vector"])
-			for mType in ["x","y","xy"]:
-				if mirroring[mType]:
+					for texNode in preprocessing[""]:
+						newMat.node_tree.links.new(uvInputNode.outputs["UV"],texNode.inputs["Vector"])
+			for ppType in preprocessing.keys():
+				if ppType == "": continue
+				if preprocessing[ppType]: # if not empty, make a node for it, and attach the contained textures to it
 					try:
-						mirrorNodeGroup = bpy.data.node_groups["TexMirror"+mType.upper()]
+						ppNodeGroup = bpy.data.node_groups["UVPreProcess"]
 					except KeyError:
-						import_library_node("TexMirror"+mType.upper(), self, context)
-						mirrorNodeGroup = bpy.data.node_groups["TexMirror"+mType.upper()]
-					mirrorNode = n.new("ShaderNodeGroup")
-					mirrorNode.node_tree = mirrorNodeGroup
-					mirrorNode.location = [-650,pushdownValue]
+						import_library_node("UVPreProcess", self, context)
+						ppNodeGroup = bpy.data.node_groups["UVPreProcess"]
+					ppNode = n.new("ShaderNodeGroup")
+					ppNode.node_tree = ppNodeGroup
+					ppNode.location = [-650,pushdownValue]
 					pushdownValue -= 40
-					mirrorNode.hide = True
-					for mt in mirroring[mType]:
-						newMat.node_tree.links.new(uvInputNode.outputs["UV"],mirrorNode.inputs[0])
+					ppNode.hide = True
+					ppNode.label = ""
+					if "cu" in ppType:
+						ppNode.inputs["Is U Clamp"].default_value = 1.0
+						ppNode.label += "ClampU"
+					if "cv" in ppType:
+						ppNode.inputs["Is V Clamp"].default_value = 1.0
+						ppNode.label += "ClampV"
+					if "mu" in ppType or "muv" in ppType: # sure it's redundant, but to be 100% clear
+						ppNode.inputs["Is U Mirror"].default_value = 1.0
+						ppNode.label += "MirrorU"
+					if "mv" in ppType or "muv" in ppType: # sure it's redundant, but to be 100% clear
+						ppNode.inputs["Is V Mirror"].default_value = 1.0
+						ppNode.label += "MirrorV"
+					for texNode in preprocessing[ppType]:
+						newMat.node_tree.links.new(uvInputNode.outputs["UV"],ppNode.inputs[0])
 						if uv == 0:
-							newMat.node_tree.links.new(mirrorNode.outputs[0],mt.inputs["Vector"])
+							newMat.node_tree.links.new(ppNode.outputs[0],texNode.inputs["Vector"])
 		for colour in range(colourCount):
 			colourInputNode = n.new("ShaderNodeAttribute")
 			colourInputNode.label = "Vertex Colours "+str(colour+1)
