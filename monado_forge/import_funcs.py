@@ -14,6 +14,8 @@ def import_library_node(nodeId, self, context):
 				"CombineNormals":["ReorientNormalMap"],
 				"TexInset":["TBNMatrix"],
 				}
+	if bpy.app.version < (3,4,0):
+		prereqs["UVPreProcess"] = ["MixFloats"]
 	try:
 		for pr in prereqs[nodeId]:
 			if pr not in bpy.data.node_groups:
@@ -177,6 +179,41 @@ def import_library_node(nodeId, self, context):
 		nodeGroup.links.new(combineInput.outputs["Factor"],mixNode.inputs["Fac"])
 		nodeGroup.links.new(mixNode.outputs[0],rnmNode.inputs["Overlay"])
 		nodeGroup.links.new(rnmNode.outputs["Combined"],combineOutput.inputs["Combined"])
+	elif nodeId == "MixFloats": # ShaderNodeMix for floats doesn't exist in 3.3.1, so gotta make a stand-in
+		nodeGroup = bpy.data.node_groups.new("MixFloats","ShaderNodeTree")
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Factor")
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","A")
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","B")
+		newNodeGroupOutput(nodeGroup,"NodeSocketFloat","Result")
+		getNodeGroupInput(nodeGroup,"Factor").default_value = 0.5
+		getNodeGroupInput(nodeGroup,"A").default_value = 0.0
+		getNodeGroupInput(nodeGroup,"B").default_value = 0.0
+		mixN = nodeGroup.nodes
+		mixInput = mixN.new("NodeGroupInput")
+		mixInput.location = [-500,0]
+		mixOutput = mixN.new("NodeGroupOutput")
+		mixOutput.location = [300,0]
+		invertNode = mixN.new("ShaderNodeMath")
+		invertNode.operation = "SUBTRACT"
+		invertNode.inputs[0].default_value = 1.0
+		invertNode.location = [-300,0]
+		facANode = mixN.new("ShaderNodeMath")
+		facANode.operation = "MULTIPLY"
+		facANode.location = [-100,100]
+		facBNode = mixN.new("ShaderNodeMath")
+		facBNode.operation = "MULTIPLY"
+		facBNode.location = [-100,-100]
+		mergeNode = mixN.new("ShaderNodeMath")
+		mergeNode.operation = "ADD"
+		mergeNode.location = [100,0]
+		nodeGroup.links.new(mixInput.outputs["Factor"],invertNode.inputs[1])
+		nodeGroup.links.new(invertNode.outputs["Value"],facANode.inputs[0])
+		nodeGroup.links.new(mixInput.outputs["A"],facANode.inputs[1])
+		nodeGroup.links.new(mixInput.outputs["Factor"],facBNode.inputs[0])
+		nodeGroup.links.new(mixInput.outputs["B"],facBNode.inputs[1])
+		nodeGroup.links.new(facANode.outputs["Value"],mergeNode.inputs[0])
+		nodeGroup.links.new(facBNode.outputs["Value"],mergeNode.inputs[1])
+		nodeGroup.links.new(mergeNode.outputs["Value"],mixOutput.inputs["Result"])
 	elif nodeId == "ReorientNormalMap":
 		# https://blog.selfshadow.com/publications/blending-in-detail/
 		nodeGroup = bpy.data.node_groups.new("ReorientNormalMap","ShaderNodeTree")
@@ -440,6 +477,90 @@ def import_library_node(nodeId, self, context):
 		nodeGroup.links.new(mirYNode.outputs[0],merNode.inputs["Y"])
 		nodeGroup.links.new(sepNode.outputs["Z"],merNode.inputs["Z"])
 		nodeGroup.links.new(merNode.outputs[0],mirOutput.inputs[0])
+	elif nodeId == "UVPreProcess":
+		nodeGroup = bpy.data.node_groups.new("UVPreProcess","ShaderNodeTree")
+		newNodeGroupInput(nodeGroup,"NodeSocketVector","Vector")
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Is U Clamp") # would prefer NodeSocketBool but that doesn't seem to work as expected
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Is V Clamp")
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Is U Mirror")
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Is V Mirror")
+		newNodeGroupOutput(nodeGroup,"NodeSocketVector","Vector")
+		preproN = nodeGroup.nodes
+		preproInput = preproN.new("NodeGroupInput")
+		preproInput.location = [-800,0]
+		preproOutput = preproN.new("NodeGroupOutput")
+		preproOutput.location = [600,0]
+		sepNode = preproN.new("ShaderNodeSeparateXYZ")
+		sepNode.location = [-600,0]
+		merNode = preproN.new("ShaderNodeCombineXYZ")
+		merNode.location = [400,0]
+		clampUNode = preproN.new("ShaderNodeClamp")
+		clampUNode.inputs["Min"].default_value = 0.0
+		clampUNode.inputs["Max"].default_value = 1.0
+		clampUNode.location = [-400,100]
+		clampUNode.label = "Clamp U"
+		clampVNode = preproN.new("ShaderNodeClamp")
+		clampVNode.inputs["Min"].default_value = 0.0
+		clampVNode.inputs["Max"].default_value = 1.0
+		clampVNode.location = [-400,-100]
+		clampVNode.label = "Clamp V"
+		mirUNode = preproN.new("ShaderNodeMath")
+		mirUNode.operation = "PINGPONG"
+		mirUNode.inputs[1].default_value = 1.0 # yay magic numbers (they're all called "Value")
+		mirUNode.location = [-200,100]
+		mirUNode.label = "Mirror U"
+		mirVNode = preproN.new("ShaderNodeMath")
+		mirVNode.operation = "PINGPONG"
+		mirVNode.inputs[1].default_value = 1.0
+		mirVNode.location = [-200,-100]
+		mirVNode.label = "Mirror V"
+		if bpy.app.version < (3,4,0):
+			mixNodeMU = preproN.new("ShaderNodeGroup")
+			mixNodeMU.node_tree = bpy.data.node_groups["MixFloats"]
+			mixNodeMV = preproN.new("ShaderNodeGroup")
+			mixNodeMV.node_tree = bpy.data.node_groups["MixFloats"]
+			mixNodeCU = preproN.new("ShaderNodeGroup")
+			mixNodeCU.node_tree = bpy.data.node_groups["MixFloats"]
+			mixNodeCV = preproN.new("ShaderNodeGroup")
+			mixNodeCV.node_tree = bpy.data.node_groups["MixFloats"]
+		else:
+			mixNodeMU = preproN.new("ShaderNodeMix")
+			mixNodeMU.data_type = "FLOAT"
+			mixNodeMV = preproN.new("ShaderNodeMix")
+			mixNodeMV.data_type = "FLOAT"
+			mixNodeCU = preproN.new("ShaderNodeMix")
+			mixNodeCU.data_type = "FLOAT"
+			mixNodeCV = preproN.new("ShaderNodeMix")
+			mixNodeCV.data_type = "FLOAT"
+		mixNodeCU.location = [200,100]
+		mixNodeCU.label = "Apply U Clamp"
+		mixNodeCV.location = [200,-100]
+		mixNodeCV.label = "Apply V Clamp"
+		mixNodeMU.location = [0,100]
+		mixNodeMU.label = "Apply U Mirror"
+		mixNodeMV.location = [0,-100]
+		mixNodeMV.label = "Apply V Mirror"
+		nodeGroup.links.new(preproInput.outputs[0],sepNode.inputs[0])
+		nodeGroup.links.new(sepNode.outputs["X"],clampUNode.inputs["Value"])
+		nodeGroup.links.new(sepNode.outputs["X"],mirUNode.inputs["Value"])
+		nodeGroup.links.new(sepNode.outputs["Y"],clampVNode.inputs["Value"])
+		nodeGroup.links.new(sepNode.outputs["Y"],mirVNode.inputs["Value"])
+		nodeGroup.links.new(preproInput.outputs[3],mixNodeMU.inputs["Factor"])
+		nodeGroup.links.new(preproInput.outputs[4],mixNodeMV.inputs["Factor"])
+		nodeGroup.links.new(preproInput.outputs[1],mixNodeCU.inputs["Factor"])
+		nodeGroup.links.new(preproInput.outputs[2],mixNodeCV.inputs["Factor"])
+		nodeGroup.links.new(sepNode.outputs["X"],mixNodeMU.inputs["A"])
+		nodeGroup.links.new(sepNode.outputs["Y"],mixNodeMV.inputs["A"])
+		nodeGroup.links.new(mixNodeMU.outputs["Result"],mixNodeCU.inputs["A"])
+		nodeGroup.links.new(mixNodeMV.outputs["Result"],mixNodeCV.inputs["A"])
+		nodeGroup.links.new(mirUNode.outputs[0],mixNodeMU.inputs["B"])
+		nodeGroup.links.new(mirVNode.outputs[0],mixNodeMV.inputs["B"])
+		nodeGroup.links.new(clampUNode.outputs[0],mixNodeCU.inputs["B"])
+		nodeGroup.links.new(clampVNode.outputs[0],mixNodeCV.inputs["B"])
+		nodeGroup.links.new(mixNodeCU.outputs["Result"],merNode.inputs["X"])
+		nodeGroup.links.new(mixNodeCV.outputs["Result"],merNode.inputs["Y"])
+		nodeGroup.links.new(sepNode.outputs["Z"],merNode.inputs["Z"])
+		nodeGroup.links.new(merNode.outputs[0],preproOutput.inputs[0])
 	else:
 		self.report({"ERROR"}, "Node with id "+nodeId+" is not in the Forge library.")
 		return {"CANCELLED"}
@@ -686,15 +807,14 @@ def realise_results(forgeResults, mainName, self, context):
 				thisColour[3] = 1.0 # cancel using alpha for thickness
 				newColoursLayer.data[loop.index].color = thisColour
 				thicknessGroup.add([loop.vertex_index],thickness,"REPLACE") # hopefully we don't end up with a vertex that requires multiple different thicknesses...
-			if True:
-				outlineMod = newMeshObject.modifiers.new(name="Outline",type="SOLIDIFY")
-				outlineMod.use_rim = False
-				outlineMod.use_flip_normals = True
-				outlineMod.thickness  = context.scene.monado_forge_import.maxOutlineThickness
-				outlineMod.offset = 1
-				outlineMod.vertex_group = "OutlineThickness"
-				outlineMod.thickness_vertex_group = context.scene.monado_forge_import.minOutlineFactor/100.0 # min value for thickness 0 (percentage in the UI, hence the /100.0)
-				outlineMod.material_offset = 1
+			outlineMod = newMeshObject.modifiers.new(name="Outline",type="SOLIDIFY")
+			outlineMod.use_rim = False
+			outlineMod.use_flip_normals = True
+			outlineMod.thickness  = context.scene.monado_forge_import.maxOutlineThickness
+			outlineMod.offset = 1
+			outlineMod.vertex_group = "OutlineThickness"
+			outlineMod.thickness_vertex_group = context.scene.monado_forge_import.minOutlineFactor/100.0 # min value for thickness 0 (percentage in the UI, hence the /100.0)
+			outlineMod.material_offset = 1
 		if mesh.hasShapes():
 			shapes = mesh.shapes
 			if not meshData.shape_keys:

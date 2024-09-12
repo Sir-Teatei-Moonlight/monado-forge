@@ -430,6 +430,7 @@ class MonadoForgeViewImportProperties(PropertyGroup):
 			("TexMirrorX","Texture Mirror X","Horizontally mirrors UVs outside bounds"),
 			("TexMirrorY","Texture Mirror Y","Vertically mirrors UVs outside bounds"),
 			("TexMirrorXY","Texture Mirror XY","Mirrors UVs outside bounds"),
+			("UVPreProcess","UV Pre-Process","Clamps and/or mirrors UVs outside bounds"),
 			# dunno if these ones are needed yet, so keep them out for now
 			# ("TexRepeatX","Texture Repeat X","Horizontally repeats UVs outside bounds"),
 			# ("TexRepeatY","Texture Repeat Y","Vertically repeats UVs outside bounds"),
