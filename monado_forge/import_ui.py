@@ -427,14 +427,7 @@ class MonadoForgeViewImportProperties(PropertyGroup):
 			("CombineNormals","Combine Normals","Combines two normal maps using reoriented normal mapping"),
 			("TBNMatrix","TBN Matrix","Outputs tangent-bitangent-normal triplet, given normal map and mesh tangent"),
 			("TexInset","Texture Inset","Distorts UVs for an inset (parallax) effect, given UVs, mesh tangent, normal map, and depth"),
-			("TexMirrorX","Texture Mirror X","Horizontally mirrors UVs outside bounds"),
-			("TexMirrorY","Texture Mirror Y","Vertically mirrors UVs outside bounds"),
-			("TexMirrorXY","Texture Mirror XY","Mirrors UVs outside bounds"),
 			("UVPreProcess","UV Pre-Process","Clamps and/or mirrors UVs outside bounds"),
-			# dunno if these ones are needed yet, so keep them out for now
-			# ("TexRepeatX","Texture Repeat X","Horizontally repeats UVs outside bounds"),
-			# ("TexRepeatY","Texture Repeat Y","Vertically repeats UVs outside bounds"),
-			# ("TexRepeatXY","Texture Repeat XY","Repeats UVs outside bounds"),
 		)
 	nodePicker : EnumProperty(
 		name="Node",
