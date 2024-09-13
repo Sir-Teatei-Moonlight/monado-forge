@@ -55,11 +55,11 @@ def parse_texture_brres(textureName,imgType,imgWidth,imgHeight,rawData,palette,p
 	if doReplace and existingImage:
 		existingImage.user_remap(newImage)
 		bpy.data.images.remove(existingImage)
-	newImage.name = textureName # if the image was a .001 because of ADD, this will re-route it
 	# don't really want to do any of this until the end, but apparently setting the filepath after setting the pixels clears the image for no good reason
 	newImage.file_format = "PNG"
 	if saveTo:
-		newImage.filepath = os.path.join(saveTo,textureName+".png")
+		newImage.filepath = os.path.join(saveTo,newImage.name+".png")
+	newImage.name = textureName # if the image was a .001 because of ADD, this will re-route it (needed because the current brres process won't catch onto it otherwise)
 	
 	# images must be divisible by the block size - extend them as necessary
 	virtImgWidth = imgWidth if imgWidth % blockWidth == 0 else imgWidth + (blockWidth - (imgWidth % blockWidth))
@@ -337,7 +337,7 @@ def parse_texture_wismt(textureName,imgVersion,imgType,imgWidth,imgHeight,rawDat
 	# don't really want to do any of this until the end, but apparently setting the filepath after setting the pixels clears the image for no good reason
 	newImage.file_format = "PNG"
 	if saveTo:
-		newImage.filepath = os.path.join(saveTo,textureName+".png")
+		newImage.filepath = os.path.join(saveTo,newImage.name+".png")
 	
 	textureNamePlusSize = textureName+f" ({imgWidth}x{imgHeight})"
 	blockSize = 4 # in pixels
@@ -709,7 +709,7 @@ def parse_texture_wismt(textureName,imgVersion,imgType,imgWidth,imgHeight,rawDat
 			# don't really want to do any of this until the end, but apparently setting the filepath after setting the pixels clears the image for no good reason
 			newSplitImage.file_format = "PNG"
 			if saveTo:
-				newSplitImage.filepath = os.path.join(saveTo,splitName+".png")
+				newSplitImage.filepath = os.path.join(saveTo,newSplitImage.name+".png")
 			# detect channels that are entirely black or white and don't include them
 			# if a channel is entirely some sort of grey, that's still worth including
 			# todo: make this a config option

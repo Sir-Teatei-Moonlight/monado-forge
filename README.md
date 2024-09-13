@@ -79,6 +79,7 @@ Roughly in order of badness.
 * By default, images import as whatever the default colour setting is. It guesses whether they are non-colour data based on the name, so it can always get it wrong, and you'll have to manually notice and correct them. This will make them _look_ wrong, for whatever dumb reason, but they will _behave_ correctly.
   * .brres image names are not quite standardised enough to be worth doing this for them.
 * Meshes with outlines are imported as two meshes, one with all the data (including the outline) and one with only the outline data. You have to pick whether to remove the outline from the main mesh, or delete the extra outline mesh.
+* When importing .brres in Blender 4.1 with the "Add" duplicate image method, the incoming images are added as expected, but the resulting materials instead reference the originals. This is because Blender 4.1 broke the functionality of being able to nameswap "Thing.001" with an existing "Thing". You just have to switch the texture references manually, and hope the issue gets fixed in a later release.
 ### Things with no workarounds
 #### All
 * Blender does not respect raw integer colours. Every time we have to import a colour that isn't being put into an image file, we have to convert it into Blender's personal float colour format and hope that it decides to round correctly. As a result, off-by-one errors are likely and unavoidable without manual intervention.
