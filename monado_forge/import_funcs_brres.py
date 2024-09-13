@@ -893,7 +893,8 @@ def parse_tex0(f, context, subfileOffset, palettesDict):
 	
 	f.seek(texHeaderSize+subfileOffset)
 	# here is the raw image data
-	imgName = parse_texture_brres(name,imgFormat,imgWidth,imgHeight,f.read(subfileLength-texHeaderSize),palette,printProgress,saveTo=texPath)
+	imgName = parse_texture_brres(name,imgFormat,imgWidth,imgHeight,f.read(subfileLength-texHeaderSize),palette,printProgress,
+		overwrite=context.scene.monado_forge_import.duplicateImageMethod,saveTo=texPath)
 
 def import_brres_root(f, context):
 	printProgress = context.scene.monado_forge_main.printProgress

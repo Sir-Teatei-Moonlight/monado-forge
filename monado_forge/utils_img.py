@@ -27,7 +27,7 @@ brresImageFormats = {
 					}
 
 # much of this was copied from parse_texture_wismt (it seems hard to try and merge the two)
-def parse_texture_brres(textureName,imgType,imgWidth,imgHeight,rawData,palette,printProgress,overwrite=True,saveTo=None,dechannelise=False):
+def parse_texture_brres(textureName,imgType,imgWidth,imgHeight,rawData,palette,printProgress,overwrite="ADD",saveTo=None,dechannelise=False):
 	if imgType > 0xe:
 		print_error(textureName+" is of an unknown/unsupported image type (id "+str(imgType)+")")
 		return
@@ -36,14 +36,26 @@ def parse_texture_brres(textureName,imgType,imgWidth,imgHeight,rawData,palette,p
 		return
 	imgFormat,bitsPerPixel,blockWidth,blockHeight,blockBytesize = brresImageFormats[imgType]
 	
-	# first, check to see if image of the intended name exists already, and how to proceed
+	# first, check to see if an image of the intended name exists already
+	# unlike parse_texture_wismt, there's no multi-resolution stuff to worry about
+	doReplace = False
+	existingImage = None
 	try:
 		existingImage = bpy.data.images[textureName]
-		if overwrite:
-			bpy.data.images.remove(existingImage)
+		if overwrite == "ADD":
+			pass # make a new copy, it all just works
+		elif overwrite == "USE":
+			print_info(textureName+" already exists, using the existing copy")
+			return existingImage.name # pretend you imported it and point to the existing copy
+		elif overwrite == "REPLACE":
+			doReplace = True
 	except KeyError as e: # no existing image of the same name
 		pass # fine, move on
 	newImage = bpy.data.images.new(textureName,imgWidth,imgHeight,alpha=True)
+	if doReplace and existingImage:
+		existingImage.user_remap(newImage)
+		bpy.data.images.remove(existingImage)
+	newImage.name = textureName # if the image was a .001 because of ADD, this will re-route it
 	# don't really want to do any of this until the end, but apparently setting the filepath after setting the pixels clears the image for no good reason
 	newImage.file_format = "PNG"
 	if saveTo:
@@ -291,26 +303,43 @@ bc7AnchorIndexes = {
 # 	https://learn.microsoft.com/en-us/windows/win32/direct3d11/bc7-format
 # 	https://github.com/python-pillow/Pillow/blob/main/src/libImaging/BcnDecode.c
 # 	https://registry.khronos.org/DataFormat/specs/1.3/dataformat.1.3.html#bptc_bc7
-def parse_texture_wismt(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blueBC5,printProgress,overwrite=True,saveTo=None,dechannelise=False):
+def parse_texture_wismt(textureName,imgVersion,imgType,imgWidth,imgHeight,rawData,blueBC5,printProgress,overwrite="ADD",saveTo=None,dechannelise=False,existingImageNames=[]):
 	try:
 		imgFormat,bitsPerPixel = modernImageFormats[imgType]
 	except KeyError:
 		print_error(textureName+" is of an unknown/unsupported image type (id "+str(imgType)+")")
 		return
 	
-	# first, check to see if image of the intended name exists already, and how to proceed
+	# first, check to see if an image of the intended name exists already
+	# if the image is in existingImageNames, then do add/use/overwrite based on the config
+	# otherwise, that means it's a smaller version of the same image done earlier in this same import, and it can be killed for free
+	doReplace = False
+	existingImage = None
 	try:
 		existingImage = bpy.data.images[textureName]
-		if overwrite:
+		if textureName in existingImageNames:
+			if overwrite == "ADD":
+				pass # make a new copy, it all just works
+			elif overwrite == "USE":
+				print_info(textureName+" already exists, using the existing copy")
+				return existingImage.name # pretend you imported it and point to the existing copy
+			elif overwrite == "REPLACE":
+				doReplace = True
+		else: # there's an image by this name, but it wasn't there before this import started - replace
 			bpy.data.images.remove(existingImage)
 	except KeyError as e: # no existing image of the same name
 		pass # fine, move on
 	newImage = bpy.data.images.new(textureName,imgWidth,imgHeight,alpha=True)
+	if doReplace and existingImage:
+		existingImage.user_remap(newImage)
+		bpy.data.images.remove(existingImage)
+		newImage.name = textureName
 	# don't really want to do any of this until the end, but apparently setting the filepath after setting the pixels clears the image for no good reason
 	newImage.file_format = "PNG"
 	if saveTo:
 		newImage.filepath = os.path.join(saveTo,textureName+".png")
 	
+	textureNamePlusSize = textureName+f" ({imgWidth}x{imgHeight})"
 	blockSize = 4 # in pixels
 	unswizzleBufferSize = bitsPerPixel*2 # needs a better name at some point
 	if imgFormat == "R8G8B8A8_UNORM": # blocks are single pixels rather than 4x4
@@ -372,7 +401,7 @@ def parse_texture_wismt(textureName,imgVersion,imgType,imgWidth,imgHeight,rawDat
 			unassignedCount += 1
 			continue
 		if printProgress and t % 64 == 0: # printing for every single t racks up the import time a lot (e.g. 12s to 20s)
-			print_progress_bar(t,tileCount,textureName)
+			print_progress_bar(t,tileCount,textureNamePlusSize)
 		d.seek(swizzlist[t]*(unswizzleBufferSize*tileWidth))
 		for t2 in range(tileWidth):
 			targetTile = t
@@ -645,11 +674,11 @@ def parse_texture_wismt(textureName,imgVersion,imgType,imgWidth,imgHeight,rawDat
 					pi = [12,13,14,15,8,9,10,11,4,5,6,7,0,1,2,3][p]
 					pixels[(blockRootPixelX + pi % 4) + ((blockRootPixelY + pi // 4) * virtImgWidth)] = [r/255.0,g/255.0,b/255.0,a/255.0]
 	if printProgress:
-		print_progress_bar(tileCount,tileCount,textureName)
+		print_progress_bar(tileCount,tileCount,textureNamePlusSize)
 	if unassignedCount > 0:
-		print_error("Texture "+textureName+" didn't complete deswizzling correctly: "+str(unassignedCount)+" / "+str(tileCountY*tileCountX)+" tiles unassigned")
+		print_error("Texture "+textureNamePlusSize+" didn't complete deswizzling correctly: "+str(unassignedCount)+" / "+str(tileCountY*tileCountX)+" tiles unassigned")
 	if bc7Mode8Flag:
-		print_warning("Texture "+textureName+" contained illegal BC7 blocks (rendered as transparent black)")
+		print_warning("Texture "+textureNamePlusSize+" contained illegal BC7 blocks (rendered as transparent black)")
 	d.close()
 	
 	finalImages = [[newImage,pixels]]
@@ -657,13 +686,26 @@ def parse_texture_wismt(textureName,imgVersion,imgType,imgWidth,imgHeight,rawDat
 	if dechannelise:
 		for i,c in enumerate(["r","g","b","a"]):
 			splitName = textureName+"_"+c
+			doReplace = False
+			existingSplitImage = None
 			try:
 				existingSplitImage = bpy.data.images[splitName]
-				if overwrite:
+				if splitName in existingImageNames:
+					if overwrite == "ADD":
+						pass # make a new copy, it all just works
+					elif overwrite == "USE": # shouldn't happen, we wouldn't have got this far
+						print_error("got to unreachable code via "+splitName)
+					elif overwrite == "REPLACE":
+						doReplace = True
+				else: # there's an image by this name, but it wasn't there before this import started - replace
 					bpy.data.images.remove(existingSplitImage)
 			except KeyError as e: # no existing image of the same name
 				pass # fine, move on
 			newSplitImage = bpy.data.images.new(splitName,imgWidth,imgHeight)
+			if doReplace and existingSplitImage:
+				existingSplitImage.user_remap(newSplitImage)
+				bpy.data.images.remove(existingSplitImage)
+				newSplitImage.name = splitName
 			# don't really want to do any of this until the end, but apparently setting the filepath after setting the pixels clears the image for no good reason
 			newSplitImage.file_format = "PNG"
 			if saveTo:

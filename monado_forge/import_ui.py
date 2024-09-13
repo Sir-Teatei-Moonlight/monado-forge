@@ -322,6 +322,18 @@ class MonadoForgeViewImportProperties(PropertyGroup):
 		maxlen=1024,
 		subtype="FILE_PATH",
 	)
+	def duplicateImageMethodCallback(self, context):
+		return (
+			("ADD","Add","Import a new copy of the image (may result in more than expected due to multiple resolutions)"),
+			("USE","Use","Skip import and simply re-use the existing image"),
+			("REPLACE","Replace","Delete the existing image and have all its usages repointed to the new import"),
+		)
+	duplicateImageMethod : EnumProperty(
+		name="Duplicate Image Method",
+		items=duplicateImageMethodCallback,
+		description="If an image of the same name already exists in this file",
+		default=0,
+	)
 	skipMaterialImport : BoolProperty(
 		name="Skip Material Import",
 		description="Skips importing textures and materials entirely",
@@ -465,6 +477,7 @@ class OBJECT_PT_MonadoForgeViewImportPanel(Panel):
 		texturePathRow = col.row()
 		texturePathRow.prop(scn.monado_forge_import, "texturePath", text="...to")
 		texturePathRow.enabled = scn.monado_forge_import.autoSaveTextures
+		col.prop(scn.monado_forge_import, "duplicateImageMethod", text="Duping")
 		col.prop(scn.monado_forge_import, "skipMaterialImport")
 		col.prop(scn.monado_forge_import, "createDummyShader")
 		col.prop(scn.monado_forge_import, "fixedViewportColour")

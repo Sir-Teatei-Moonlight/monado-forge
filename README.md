@@ -89,6 +89,7 @@ Roughly in order of badness.
   * Face drawcodes with embedded data (as opposed to indexed data)
   * All but the most basic normals type (i.e. not anything based on tangent or bitangent)
   * Shapes/morphs
+* When the duplicate image method is "Add", the new image is renamed to have the base name with no .001 distinguisher. This is the opposite of how it works with .wismt, where the existing images keep the base name. It doesn't really matter in practice, but it might trip you up if you're used to one and try the other.
 #### .wimdo/wismt
 * Many XC3 models for party members (and possibly others) appear to use an unknown parenting mechanism for several bones (believed to be constraint-related), so they end up not being parented at all. You'll have to guess how things need to be attached.
 * Images that aren't power-of-two dimensions are not descrambled/deswizzled correctly. Very rare, but there.

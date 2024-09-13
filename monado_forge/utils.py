@@ -48,6 +48,8 @@ def print_error(s):
 	print_colour(s,"\033[91m")
 def print_warning(s):
 	print_colour(s,"\033[93m")
+def print_info(s):
+	print_colour(s,"\033[96m")
 def print_bar(p): # 0.0-1.0
 	barLength = 25
 	barsFilled = int(barLength*p)

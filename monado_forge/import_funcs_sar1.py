@@ -443,6 +443,7 @@ def import_wismt(f, wimdoResults, context):
 	differentiate = context.scene.monado_forge_import.differentiateTextures
 	differentiateTemp = context.scene.monado_forge_import.differentiateTempTextures
 	splitTemps = context.scene.monado_forge_import.splitTemps
+	existingImageNames = bpy.data.images.keys()[:] # the [:] is just to be 100% sure that it doesn't update during import (may need to move to .wimdo package later?)
 	listOfCachedTextureNames = [] # only needed for XC3 but no harm in building it regardless
 	# little endian assumed
 	# renamed some stuff from older programs to make more sense:
@@ -892,7 +893,9 @@ def import_wismt(f, wimdoResults, context):
 								nameToUse = filename+"_"+nameToUse
 							if context.scene.monado_forge_import.keepAllResolutions:
 								nameToUse = os.path.join("res0",nameToUse)
-							finalName = parse_texture_wismt(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(textureFilesize),context.scene.monado_forge_import.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
+							finalName = parse_texture_wismt(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(textureFilesize),
+								context.scene.monado_forge_import.blueBC5,printProgress,
+								overwrite=context.scene.monado_forge_import.duplicateImageMethod,saveTo=texPath,dechannelise=dc,existingImageNames=existingImageNames)
 							textureAlignment[textureName] = finalName
 				finally:
 					sf.close()
@@ -933,7 +936,9 @@ def import_wismt(f, wimdoResults, context):
 								nameToUse = filename+"_"+nameToUse
 							if context.scene.monado_forge_import.keepAllResolutions:
 								nameToUse = os.path.join("res1",nameToUse)
-							finalName = parse_texture_wismt(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(),context.scene.monado_forge_import.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
+							finalName = parse_texture_wismt(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(),
+								context.scene.monado_forge_import.blueBC5,printProgress,
+								overwrite=context.scene.monado_forge_import.duplicateImageMethod,saveTo=texPath,dechannelise=dc,existingImageNames=existingImageNames)
 							textureAlignment[textureName] = finalName
 						# it is at this point where we need the data from the highest-resolution image
 						if highResSubfileIndex > 0:
@@ -944,7 +949,9 @@ def import_wismt(f, wimdoResults, context):
 								nameToUse = filename+"_"+nameToUse
 							if context.scene.monado_forge_import.keepAllResolutions:
 								nameToUse = os.path.join("res2",nameToUse)
-							finalName = parse_texture_wismt(nameToUse,imgVersion,imgType,imgWidth*2,imgHeight*2,hdfileData,context.scene.monado_forge_import.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
+							finalName = parse_texture_wismt(nameToUse,imgVersion,imgType,imgWidth*2,imgHeight*2,hdfileData,
+								context.scene.monado_forge_import.blueBC5,printProgress,
+								overwrite=context.scene.monado_forge_import.duplicateImageMethod,saveTo=texPath,dechannelise=dc,existingImageNames=existingImageNames)
 							textureAlignment[textureName] = finalName
 				finally:
 					sf.close()
@@ -990,7 +997,9 @@ def import_wismt(f, wimdoResults, context):
 							nameToUse = filename+"_"+nameToUse
 						if context.scene.monado_forge_import.keepAllResolutions:
 							nameToUse = os.path.join("res1",nameToUse)
-						finalName = parse_texture_wismt(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(),context.scene.monado_forge_import.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
+						finalName = parse_texture_wismt(nameToUse,imgVersion,imgType,imgWidth,imgHeight,sf.read(),
+							context.scene.monado_forge_import.blueBC5,printProgress,
+							overwrite=context.scene.monado_forge_import.duplicateImageMethod,saveTo=texPath,dechannelise=dc,existingImageNames=existingImageNames)
 						textureAlignment[textureName] = finalName
 					# it is at this point where we need the data from the highest-resolution image
 					if hasH:
@@ -1001,7 +1010,9 @@ def import_wismt(f, wimdoResults, context):
 								nameToUse = filename+"_"+nameToUse
 							if context.scene.monado_forge_import.keepAllResolutions:
 								nameToUse = os.path.join("res2",nameToUse)
-							finalName = parse_texture_wismt(nameToUse,imgVersion,imgType,imgWidth*2,imgHeight*2,hdfileData,context.scene.monado_forge_import.blueBC5,printProgress,saveTo=texPath,dechannelise=dc)
+							finalName = parse_texture_wismt(nameToUse,imgVersion,imgType,imgWidth*2,imgHeight*2,hdfileData,
+								context.scene.monado_forge_import.blueBC5,printProgress,
+								overwrite=context.scene.monado_forge_import.duplicateImageMethod,saveTo=texPath,dechannelise=dc,existingImageNames=existingImageNames)
 							textureAlignment[textureName] = finalName
 				finally:
 					sf.close()
