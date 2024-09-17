@@ -194,25 +194,28 @@ def merge_selected_to_active_armatures(self, context, force=False):
 				if m.type == "ARMATURE" and m.object == otherObject:
 					m.object = targetObject
 		otherBones = otherObject.data.edit_bones
-		keep = []
-		toss = []
 		for otherBone in otherBones:
 			if otherBone.name not in targetNameList:
-				keep.append(otherBone)
 				continue
 			targetBone = targetBones[otherBone.name]
 			areTheSame,message = isBonePairIdentical(targetBone,otherBone,positionEpsilon,angleEpsilon)
 			if areTheSame or not safeMerge or force:
-				toss.append(otherBone)
+				otherBone["mergeInto"] = targetBone.name
 			else:
 				print(targetObject.name+"."+targetBone.name+" != "+otherObject.name+"."+otherBone.name+" ~ "+message)
 				outOfRangeCount += 1
-				keep.append(otherBone)
-		for schmuck in toss:
-			otherBones.remove(schmuck)
-	# at this point, we have removed all the stuff we don't want to keep, so join the rest
+	# decisions made, do the join
 	bpy.ops.object.mode_set(mode="OBJECT")
 	bpy.ops.object.join()
+	# go back for every bone on which we assigned "mergeInto" and actually do said merge
+	bpy.ops.object.mode_set(mode="EDIT")
+	joinedBones = targetObject.data.edit_bones
+	for bone in [j for j in joinedBones if "mergeInto" in j]:
+		targetBone = joinedBones[bone["mergeInto"]]
+		bone.parent = targetBone # so the deletion will automatically pass along parenting
+		joinedBones.remove(bone)
+	# done
+	bpy.ops.object.mode_set(mode="OBJECT")
 	if outOfRangeCount > 0:
 		self.report({"WARNING"}, "Kept "+str(outOfRangeCount)+" bones for being out of epsilon tolerance. See console for list.")
 	return {"FINISHED"}
