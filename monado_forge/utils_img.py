@@ -201,12 +201,13 @@ def parse_texture_brres(textureName,imgType,imgWidth,imgHeight,rawData,palette,p
 # https://learn.microsoft.com/en-us/windows/win32/api/dxgiformat/ne-dxgiformat-dxgi_format
 # uses the "raw" values taken from the code rather than the ones in the MS enum (we aren't calling any MS code so we don't need it)
 # only contains things we know of (rather than future-proofing with extra entries) since how're we supposed to guess what the raw numbers equate to
-# (it's pretty obvious that 67 = BC2 and 76 = BC6, but those formats are rare anyway)
+# (it's pretty obvious that 76 = BC6, but haven't found a use of that yet)
 # [formatName, bitsPerPixel]
 # possible additions: 1:R8Unorm, 41:R16G16B16A16Float, 109:B8G8R8A8Unorm, https://github.com/PredatorCZ/XenoLib/blob/master/include/xenolib/lbim.hpp
 modernImageFormats = {
 						37:["R8G8B8A8_UNORM",32],
 						66:["BC1_UNORM",4], # aka DXT1
+						67:["BC2_UNORM",8], # aka DXT3
 						68:["BC3_UNORM",8], # aka DXT5
 						73:["BC4_UNORM",4],
 						75:["BC5_UNORM",8],
@@ -418,8 +419,14 @@ def parse_texture_wismt(textureName,imgVersion,imgType,imgWidth,imgHeight,rawDat
 				b = readAndParseInt(d,1)
 				a = readAndParseInt(d,1)
 				pixels[blockRootPixelX+blockRootPixelY*virtImgWidth] = [r/255.0,g/255.0,b/255.0,a/255.0]
-			elif imgFormat == "BC1_UNORM" or imgFormat == "BC3_UNORM": # easy enough to treat these the same
-				if imgFormat == "BC3_UNORM":
+			elif imgFormat == "BC1_UNORM" or imgFormat == "BC2_UNORM" or imgFormat == "BC3_UNORM": # easy enough to treat these the same
+				if imgFormat == "BC2_UNORM":
+					alphas = []
+					for a in range(8): # hopefully this is correct, haven't actually found a test case image yet
+						aBlock = readAndParseInt(d,1)
+						alphas.append((aBlock >> 2) & 0b1111)
+						alphas.append(aBlock & 0b1111)
+				elif imgFormat == "BC3_UNORM":
 					a0 = readAndParseInt(d,1)
 					a1 = readAndParseInt(d,1)
 					alphas = [a0,a1]
@@ -439,7 +446,7 @@ def parse_texture_wismt(textureName,imgVersion,imgType,imgWidth,imgHeight,rawDat
 					for a in range(8):
 						alphaIndexesTemp.append((alphaIndexes1 & (0b111 << a*3)) >> a*3)
 					alphaIndexes = [alphaIndexesTemp[i] for i in [12,13,14,15,8,9,10,11,4,5,6,7,0,1,2,3]]
-				# BC1_UNORM doesn't have "separate" alpha - no "else" needed
+				# BC1_UNORM doesn't have "separate" alpha at all - no "else" needed
 				endpoint0 = readAndParseInt(d,2)
 				endpoint1 = readAndParseInt(d,2)
 				row0 = readAndParseInt(d,1)
@@ -454,7 +461,7 @@ def parse_texture_wismt(textureName,imgVersion,imgType,imgWidth,imgHeight,rawDat
 				colours = [[],[],[],[]]
 				colours[0] = [r0/0b11111,g0/0b111111,b0/0b11111,1.0]
 				colours[1] = [r1/0b11111,g1/0b111111,b1/0b11111,1.0]
-				if imgFormat == "BC3_UNORM" or endpoint0 > endpoint1:
+				if imgFormat != "BC1_UNORM" or endpoint0 > endpoint1:
 					colours[2] = [2/3*colours[0][0]+1/3*colours[1][0],2/3*colours[0][1]+1/3*colours[1][1],2/3*colours[0][2]+1/3*colours[1][2],1.0]
 					colours[3] = [1/3*colours[0][0]+2/3*colours[1][0],1/3*colours[0][1]+2/3*colours[1][1],1/3*colours[0][2]+2/3*colours[1][2],1.0]
 				else: # BC1_UNORM and endpoint0 < endpoint1
@@ -466,6 +473,9 @@ def parse_texture_wismt(textureName,imgVersion,imgType,imgWidth,imgHeight,rawDat
 								(row1 & 0b00000011), (row1 & 0b00001100) >> 2, (row1 & 0b00110000) >> 4, (row1 & 0b11000000) >> 6,
 								(row0 & 0b00000011), (row0 & 0b00001100) >> 2, (row0 & 0b00110000) >> 4, (row0 & 0b11000000) >> 6,
 								]
+				if imgFormat == "BC2_UNORM":
+					for p,pi in enumerate(pixelIndexes):
+						pixels[(blockRootPixelX + p % 4) + ((blockRootPixelY + p // 4) * virtImgWidth)] = colours[pi][0:3]+[alphas[pi]/15.0]
 				if imgFormat == "BC3_UNORM":
 					for p,pi in enumerate(pixelIndexes):
 						pixels[(blockRootPixelX + p % 4) + ((blockRootPixelY + p // 4) * virtImgWidth)] = colours[pi][0:3]+[alphas[alphaIndexes[p]]/255.0]
