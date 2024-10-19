@@ -503,6 +503,7 @@ def realise_results(forgeResults, mainName, self, context):
 	positionEpsilon = context.scene.monado_forge_main.positionEpsilon
 	angleEpsilon = context.scene.monado_forge_main.angleEpsilon
 	createDummyShader = context.scene.monado_forge_import.createDummyShader
+	compressEDVs = context.scene.monado_forge_import.compressEDVs
 	armaturesCreated = 0
 	# we create the external armature (if any) first so it gets name priority
 	if context.scene.monado_forge_import.importToCursor:
@@ -680,8 +681,13 @@ def realise_results(forgeResults, mainName, self, context):
 		for xi,x in enumerate(mat.extraData):
 			extraDataNode = n.new("ShaderNodeValue")
 			extraDataNode.outputs["Value"].default_value = x
-			extraDataNode.label = "Extra Data Value "+str(xi+1)
-			extraDataNode.location = [-475,xi*-100+300]
+			if compressEDVs:
+				extraDataNode.label = "EDV["+str(xi)+"] = "+str(x)
+				extraDataNode.location = [-475,xi*-35+300]
+				extraDataNode.hide = True
+			else:
+				extraDataNode.label = "Extra Data Value ["+str(xi)+"]"
+				extraDataNode.location = [-475,xi*-100+300]
 		newMatsByIndex[mat.index] = newMat
 	
 	meshes = forgeResults.meshes

@@ -432,6 +432,11 @@ class MonadoForgeViewImportProperties(PropertyGroup):
 		description="Include all textures, even if there's a larger resolution of the same",
 		default=False,
 	)
+	compressEDVs : BoolProperty(
+		name="Compress EDV nodes",
+		description="Make extra data values take up less space in the material node setup",
+		default=False,
+	)
 	def nodeLibraryCallback(self, context):
 		return (
 			("BasicMetallic","Basic Metallic Shader","Metallic-style PBR shader with inputs tailored for the average Xenoblade model"),
@@ -478,11 +483,6 @@ class OBJECT_PT_MonadoForgeViewImportPanel(Panel):
 		texturePathRow.prop(scn.monado_forge_import, "texturePath", text="...to")
 		texturePathRow.enabled = scn.monado_forge_import.autoSaveTextures
 		col.prop(scn.monado_forge_import, "duplicateImageMethod", text="Duping")
-		col.prop(scn.monado_forge_import, "skipMaterialImport")
-		col.prop(scn.monado_forge_import, "createDummyShader")
-		col.prop(scn.monado_forge_import, "fixedViewportColour")
-		if scn.monado_forge_import.fixedViewportColour:
-			col.prop(scn.monado_forge_import, "viewportColour", text="")
 		col.separator()
 		if scn.monado_forge_main.game == "XC1":
 			col.operator(MonadoForgeViewImportModelWithSkeletonOperator.bl_idname, text="Import BRRES", icon="IMPORT")
@@ -544,6 +544,24 @@ class OBJECT_PT_MonadoForgeViewImportTextureOptionsPanel(Panel):
 			col.prop(scn.monado_forge_import, "splitTemps")
 			col.prop(scn.monado_forge_import, "keepAllResolutions")
 
+class OBJECT_PT_MonadoForgeViewImportMaterialOptionsPanel(Panel):
+	bl_idname = "OBJECT_PT_MonadoForgeViewImportMaterialOptionsPanel"
+	bl_label = "Material Import Options"
+	bl_space_type = "VIEW_3D"
+	bl_region_type = "UI"
+	bl_parent_id = "OBJECT_PT_MonadoForgeViewImportPanel"
+	
+	def draw(self, context):
+		layout = self.layout
+		scn = context.scene
+		col = layout.column(align=True)
+		col.prop(scn.monado_forge_import, "skipMaterialImport")
+		col.prop(scn.monado_forge_import, "createDummyShader")
+		col.prop(scn.monado_forge_import, "fixedViewportColour")
+		if scn.monado_forge_import.fixedViewportColour:
+			col.prop(scn.monado_forge_import, "viewportColour", text="")
+		col.prop(scn.monado_forge_import, "compressEDVs")
+
 class OBJECT_PT_MonadoForgeViewImportOutlinePanel(Panel):
 	bl_idname = "OBJECT_PT_MonadoForgeViewImportOutlinePanel"
 	bl_label = "Model Outline Options"
@@ -604,6 +622,7 @@ classes = (
 			OBJECT_PT_MonadoForgeViewImportSkeletonOptionsPanel,
 			OBJECT_PT_MonadoForgeViewImportModelOptionsPanel,
 			OBJECT_PT_MonadoForgeViewImportTextureOptionsPanel,
+			OBJECT_PT_MonadoForgeViewImportMaterialOptionsPanel,
 			OBJECT_PT_MonadoForgeViewImportOutlinePanel,
 			OBJECT_PT_MonadoForgeViewImportCleanupPanel,
 			OBJECT_PT_MonadoForgeViewImportNodeLibraryPanel,
