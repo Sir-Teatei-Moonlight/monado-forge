@@ -28,8 +28,8 @@ def import_library_node(nodeId, self, context):
 		newNodeGroupInput(nodeGroup,"NodeSocketColor","Ambient Colour")
 		newNodeGroupInput(nodeGroup,"NodeSocketColor","Emit Colour")
 		newNodeGroupInput(nodeGroup,"NodeSocketColor","Normal Map")
+		newNodeGroupInput(nodeGroup,"NodeSocketColor","AO")
 		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Alpha")
-		newNodeGroupInput(nodeGroup,"NodeSocketFloat","AO")
 		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Metallic")
 		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Glossiness")
 		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Emit")
@@ -38,8 +38,8 @@ def import_library_node(nodeId, self, context):
 		getNodeGroupInput(nodeGroup,"Ambient Colour").default_value = (0.0,0.0,0.0,1.0)
 		getNodeGroupInput(nodeGroup,"Emit Colour").default_value = (0.0,0.0,0.0,1.0)
 		getNodeGroupInput(nodeGroup,"Normal Map").default_value = (0.5,0.5,1.0,1.0)
+		getNodeGroupInput(nodeGroup,"AO").default_value = (1.0,1.0,1.0,1.0)
 		getNodeGroupInput(nodeGroup,"Alpha").default_value = 1.0
-		getNodeGroupInput(nodeGroup,"AO").default_value = 1.0
 		getNodeGroupInput(nodeGroup,"Metallic").default_value = 0.0
 		getNodeGroupInput(nodeGroup,"Glossiness").default_value = 0.5
 		getNodeGroupInput(nodeGroup,"Emit").default_value = 0.0
@@ -50,10 +50,10 @@ def import_library_node(nodeId, self, context):
 		metalOutput.location = [500,0]
 		shaderNode = metalN.new("ShaderNodeBsdfPrincipled")
 		shaderNode.location = [0,250]
-		baseMixNode = metalN.new("ShaderNodeMixRGB")
-		baseMixNode.blend_type = "MIX"
-		baseMixNode.location = [-200,200]
-		baseMixNode.inputs["Color1"].default_value = [0.0,0.0,0.0,1.0]
+		baseAONode = metalN.new("ShaderNodeMixRGB")
+		baseAONode.blend_type = "MULTIPLY"
+		baseAONode.location = [-200,200]
+		baseAONode.inputs["Fac"].default_value = 1.0
 		ambientNode = metalN.new("ShaderNodeEmission")
 		ambientNode.location = [-200,0]
 		normalMapNode = metalN.new("ShaderNodeNormalMap")
@@ -65,8 +65,8 @@ def import_library_node(nodeId, self, context):
 		roughToGlossNode.location = [-200,-175]
 		shaderAddNode = metalN.new("ShaderNodeAddShader")
 		shaderAddNode.location = [300,0]
-		nodeGroup.links.new(metalInput.outputs["Base Colour"],baseMixNode.inputs["Color2"])
-		nodeGroup.links.new(metalInput.outputs["AO"],baseMixNode.inputs["Fac"])
+		nodeGroup.links.new(metalInput.outputs["Base Colour"],baseAONode.inputs["Color1"])
+		nodeGroup.links.new(metalInput.outputs["AO"],baseAONode.inputs["Color2"])
 		nodeGroup.links.new(metalInput.outputs["Ambient Colour"],ambientNode.inputs["Color"])
 		nodeGroup.links.new(metalInput.outputs["Normal Map"],normalMapNode.inputs["Color"])
 		nodeGroup.links.new(metalInput.outputs["Glossiness"],roughToGlossNode.inputs[1])
@@ -77,7 +77,7 @@ def import_library_node(nodeId, self, context):
 		nodeGroup.links.new(metalInput.outputs["Alpha"],shaderNode.inputs["Alpha"])
 		nodeGroup.links.new(metalInput.outputs["Metallic"],shaderNode.inputs["Metallic"])
 		nodeGroup.links.new(metalInput.outputs["Emit"],shaderNode.inputs["Emission Strength"])
-		nodeGroup.links.new(baseMixNode.outputs[0],shaderNode.inputs["Base Color"])
+		nodeGroup.links.new(baseAONode.outputs[0],shaderNode.inputs["Base Color"])
 		nodeGroup.links.new(ambientNode.outputs[0],shaderAddNode.inputs[1])
 		nodeGroup.links.new(normalMapNode.outputs[0],shaderNode.inputs["Normal"])
 		nodeGroup.links.new(roughToGlossNode.outputs[0],shaderNode.inputs["Roughness"])
@@ -92,8 +92,8 @@ def import_library_node(nodeId, self, context):
 		newNodeGroupInput(nodeGroup,"NodeSocketColor","Ambient Colour")
 		newNodeGroupInput(nodeGroup,"NodeSocketColor","Emit Colour")
 		newNodeGroupInput(nodeGroup,"NodeSocketColor","Normal Map")
+		newNodeGroupInput(nodeGroup,"NodeSocketColor","AO")
 		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Alpha")
-		newNodeGroupInput(nodeGroup,"NodeSocketFloat","AO")
 		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Glossiness")
 		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Emit")
 		newNodeGroupOutput(nodeGroup,"NodeSocketShader","BSDF")
@@ -101,8 +101,8 @@ def import_library_node(nodeId, self, context):
 		getNodeGroupInput(nodeGroup,"Specular Colour").default_value = (1.0,1.0,1.0,1.0)
 		getNodeGroupInput(nodeGroup,"Emit Colour").default_value = (0.0,0.0,0.0,1.0)
 		getNodeGroupInput(nodeGroup,"Normal Map").default_value = (0.5,0.5,1.0,1.0)
+		getNodeGroupInput(nodeGroup,"AO").default_value = (1.0,1.0,1.0,1.0)
 		getNodeGroupInput(nodeGroup,"Alpha").default_value = 1.0
-		getNodeGroupInput(nodeGroup,"AO").default_value = 1.0
 		getNodeGroupInput(nodeGroup,"Glossiness").default_value = 0.5
 		getNodeGroupInput(nodeGroup,"Emit").default_value = 0.0
 		specN = nodeGroup.nodes
@@ -112,10 +112,10 @@ def import_library_node(nodeId, self, context):
 		specOutput.location = [500,0]
 		shaderNode = specN.new("ShaderNodeEeveeSpecular")
 		shaderNode.location = [100,50]
-		baseMixNode = specN.new("ShaderNodeMixRGB")
-		baseMixNode.blend_type = "MIX"
-		baseMixNode.location = [-300,200]
-		baseMixNode.inputs["Color1"].default_value = [0.0,0.0,0.0,1.0]
+		baseAONode = specN.new("ShaderNodeMixRGB")
+		baseAONode.blend_type = "MULTIPLY"
+		baseAONode.location = [-300,200]
+		baseAONode.inputs["Fac"].default_value = 1.0
 		ambientNode = specN.new("ShaderNodeEmission")
 		ambientNode.location = [-300,0]
 		normalMapNode = specN.new("ShaderNodeNormalMap")
@@ -135,8 +135,8 @@ def import_library_node(nodeId, self, context):
 		emitMixNode.inputs["Color1"].default_value = [0.0,0.0,0.0,1.0]
 		shaderAddNode = specN.new("ShaderNodeAddShader")
 		shaderAddNode.location = [300,0]
-		nodeGroup.links.new(specInput.outputs["Base Colour"],baseMixNode.inputs["Color2"])
-		nodeGroup.links.new(specInput.outputs["AO"],baseMixNode.inputs["Fac"])
+		nodeGroup.links.new(specInput.outputs["Base Colour"],baseAONode.inputs["Color1"])
+		nodeGroup.links.new(specInput.outputs["AO"],baseAONode.inputs["Color2"])
 		nodeGroup.links.new(specInput.outputs["Ambient Colour"],ambientNode.inputs["Color"])
 		nodeGroup.links.new(specInput.outputs["Normal Map"],normalMapNode.inputs["Color"])
 		nodeGroup.links.new(specInput.outputs["Glossiness"],roughToGlossNode.inputs[1])
@@ -144,7 +144,7 @@ def import_library_node(nodeId, self, context):
 		nodeGroup.links.new(specInput.outputs["Specular Colour"],shaderNode.inputs["Specular"])
 		nodeGroup.links.new(specInput.outputs["Emit Colour"],emitMixNode.inputs["Color2"])
 		nodeGroup.links.new(specInput.outputs["Emit"],emitMixNode.inputs["Fac"])
-		nodeGroup.links.new(baseMixNode.outputs[0],shaderNode.inputs["Base Color"])
+		nodeGroup.links.new(baseAONode.outputs[0],shaderNode.inputs["Base Color"])
 		nodeGroup.links.new(ambientNode.outputs[0],shaderAddNode.inputs[1])
 		nodeGroup.links.new(normalMapNode.outputs[0],shaderNode.inputs["Normal"])
 		nodeGroup.links.new(alphaInvertNode.outputs[0],shaderNode.inputs["Transparency"])
