@@ -438,14 +438,18 @@ class MonadoForgeViewImportProperties(PropertyGroup):
 		default=False,
 	)
 	def nodeLibraryCallback(self, context):
-		return (
-			("BasicMetallic","Basic Metallic Shader","Metallic-style PBR shader with inputs tailored for the average Xenoblade model"),
-			("BasicSpecular","Basic Specular Shader","Specular-style shader with inputs tailored for the average Xenoblade model"),
-			("CombineNormals","Combine Normals","Combines two normal maps using reoriented normal mapping"),
-			("TBNMatrix","TBN Matrix","Outputs tangent-bitangent-normal triplet, given normal map and mesh tangent"),
-			("TexInset","Texture Inset","Distorts UVs for an inset (parallax) effect, given UVs, mesh tangent, normal map, and depth"),
-			("UVPreProcess","UV Pre-Process","Clamps and/or mirrors UVs outside bounds"),
-		)
+		nodeList = [
+			("BasicMetallic","Basic Metallic Shader","(S) Metallic-style PBR shader with inputs tailored for the average Xenoblade model"),
+			("BasicSpecular","Basic Specular Shader","(S) Specular-style shader with inputs tailored for the average Xenoblade model"),
+			("CombineNormals","Combine Normals","(S) Combines two normal maps using reoriented normal mapping"),
+			("FurShells","Fur Shells","(G) Expands a mesh outwards to simulate fur"),
+			("TBNMatrix","TBN Matrix","(S) Outputs tangent-bitangent-normal triplet, given normal map and mesh tangent"),
+			("TexInset","Texture Inset","(S) Distorts UVs for an inset (parallax) effect, given UVs, mesh tangent, normal map, and depth"),
+			("UVPreProcess","UV Pre-Process","(S) Clamps and/or mirrors UVs outside bounds"),
+		]
+		if bpy.app.version < (4,0,0):
+			del(nodeList[3]) # repeat zone not supported, can't do fur shell
+		return nodeList
 	nodePicker : EnumProperty(
 		name="Node",
 		items=nodeLibraryCallback,

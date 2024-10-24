@@ -261,7 +261,7 @@ def create_armature_from_bones(boneList,name,pos,rot,boneSize,positionEpsilon,an
 	skelObj = bpy.context.view_layer.objects.active
 	skeleton = skelObj.data
 	skeleton.show_names = True
-	# if 4.0+, will need to create named layers
+	# Blenders older than 4.0 don't have named layers
 	if bpy.app.version >= (4,0,0):
 		# there is a "Bones" by default
 		skeleton.collections.new("Endpoints")
@@ -393,14 +393,44 @@ def getNodeGroupOutput(nodeGroup,output):
 	if bpy.app.version >= (4,0,0):
 		return nodeGroup.interface.items_tree[output]
 	return nodeGroup.outputs[output]
-def newNodeGroupInput(nodeGroup,type,name):
+def newNodeGroupInput(nodeGroup,type,name,singleValue=False):
 	if bpy.app.version >= (4,0,0):
-		return nodeGroup.interface.new_socket(in_out="INPUT",name=name,socket_type=type)
+		newSocket = nodeGroup.interface.new_socket(in_out="INPUT",name=name,socket_type=type)
+		newSocket.force_non_field = singleValue
+		return newSocket
 	return nodeGroup.inputs.new(type,name)
 def newNodeGroupOutput(nodeGroup,type,name):
 	if bpy.app.version >= (4,0,0):
 		return nodeGroup.interface.new_socket(in_out="OUTPUT",name=name,socket_type=type)
 	return nodeGroup.outputs.new(type,name)
+
+def addReroutes(nodeGroup,fromNode,toNode,howMany):
+	reroutes = []
+	for i in range(howMany):
+		newReroute = nodeGroup.nodes.new("NodeReroute")
+		newReroute.location = [
+								toNode.location[0]*((i+1)/(howMany+1))+fromNode.location[0]*(1-((i+1)/(howMany+1))),
+								toNode.location[1]*((i+1)/(howMany+1))+fromNode.location[1]*(1-((i+1)/(howMany+1)))
+								]
+		reroutes.append(newReroute)
+	return reroutes
+def linkWithReroutes(nodeGroup,fromSocket,toSocket,rerouteCount):
+	if rerouteCount < 0:
+		raise ValueError("rerouteCount is negative: "+str(rerouteCount))
+	if rerouteCount == 0:
+		nodeGroup.links.new(fromSocket,toSocket)
+		return
+	fromNode = fromSocket.node
+	toNode = toSocket.node
+	reroutes = addReroutes(nodeGroup,fromNode,toNode,rerouteCount)
+	sockets = [fromSocket]
+	for i in range(rerouteCount):
+		sockets.append(reroutes[i].inputs[0])
+		sockets.append(reroutes[i].outputs[0])
+	sockets.append(toSocket)
+	for i in range(0,len(sockets)-1,2):
+		nodeGroup.links.new(sockets[i],sockets[i+1])
+	return reroutes
 
 def register():
 	pass

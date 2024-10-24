@@ -12,6 +12,7 @@ from . modify_funcs import *
 def import_library_node(nodeId, self, context):
 	prereqs = {
 				"CombineNormals":["ReorientNormalMap"],
+				"FurShells":["FurIterationValues"],
 				"TexInset":["TBNMatrix"],
 				}
 	if bpy.app.version < (3,4,0):
@@ -179,7 +180,238 @@ def import_library_node(nodeId, self, context):
 		nodeGroup.links.new(combineInput.outputs["Factor"],mixNode.inputs["Fac"])
 		nodeGroup.links.new(mixNode.outputs[0],rnmNode.inputs["Overlay"])
 		nodeGroup.links.new(rnmNode.outputs["Combined"],combineOutput.inputs["Combined"])
-	elif nodeId == "MixFloats": # ShaderNodeMix for floats doesn't exist in 3.3.1, so gotta make a stand-in
+	elif nodeId == "FurIterationValues":
+		nodeGroup = bpy.data.node_groups.new("FurIterationValues","GeometryNodeTree")
+		newNodeGroupInput(nodeGroup,"NodeSocketInt","Current")
+		newNodeGroupInput(nodeGroup,"NodeSocketInt","Total").default_value = 3
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Total Thickness").default_value = 0.05
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Outer Alpha").default_value = 0.0
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Outer Droop").default_value = 0.0
+		newNodeGroupOutput(nodeGroup,"NodeSocketFloat","Thickness")
+		newNodeGroupOutput(nodeGroup,"NodeSocketFloat","Alpha")
+		newNodeGroupOutput(nodeGroup,"NodeSocketFloat","Droop")
+		furValuesN = nodeGroup.nodes
+		furValuesInput = furValuesN.new("NodeGroupInput")
+		furValuesInput.location = [-800,0]
+		furValuesOutput = furValuesN.new("NodeGroupOutput")
+		furValuesOutput.location = [600,0]
+		thickFrame = furValuesN.new("NodeFrame")
+		thickFrame.label = "Thickness"
+		alphaFrame = furValuesN.new("NodeFrame")
+		alphaFrame.label = "Alpha"
+		droopFrame = furValuesN.new("NodeFrame")
+		droopFrame.label = "Droop"
+		thickConvertNode = furValuesN.new("ShaderNodeMath")
+		thickConvertNode.operation = "DIVIDE"
+		thickConvertNode.location = [-600,100]
+		thickConvertNode.parent = thickFrame
+		thickMultNode = furValuesN.new("ShaderNodeMath")
+		thickMultNode.operation = "MULTIPLY"
+		thickMultNode.location = [-600,-100]
+		thickMultNode.parent = thickFrame
+		totalPlusOneNode = furValuesN.new("ShaderNodeMath")
+		totalPlusOneNode.operation = "ADD"
+		totalPlusOneNode.location = [-400,0]
+		totalPlusOneNode.inputs[1].default_value = 1.0
+		totalPlusOneNode.parent = alphaFrame
+		mapAlphaNode = furValuesN.new("ShaderNodeMapRange")
+		mapAlphaNode.location = [-200,50]
+		mapAlphaNode.inputs["From Min"].default_value = 0.0
+		mapAlphaNode.inputs["To Min"].default_value = 1.0
+		mapAlphaNode.clamp = False
+		mapAlphaNode.parent = alphaFrame
+		halfDroopNode = furValuesN.new("ShaderNodeMath")
+		halfDroopNode.operation = "DIVIDE"
+		halfDroopNode.location = [0,0]
+		halfDroopNode.inputs[1].default_value = 2.0
+		halfDroopNode.parent = droopFrame
+		mapDroopNode = furValuesN.new("ShaderNodeMapRange")
+		mapDroopNode.location = [200,50]
+		mapDroopNode.inputs["From Min"].default_value = 0.0
+		mapDroopNode.inputs["To Min"].default_value = 0.0
+		mapDroopNode.inputs["To Max"].default_value = 1.0
+		mapDroopNode.clamp = False
+		mapDroopNode.parent = droopFrame
+		droopPowerNode = furValuesN.new("ShaderNodeMath")
+		droopPowerNode.operation = "POWER"
+		droopPowerNode.location = [400,100]
+		droopPowerNode.inputs[1].default_value = 2.0
+		droopPowerNode.parent = droopFrame
+		droopMultNode = furValuesN.new("ShaderNodeMath")
+		droopMultNode.operation = "MULTIPLY"
+		droopMultNode.location = [400,-100]
+		droopMultNode.parent = droopFrame
+		nodeGroup.links.new(furValuesInput.outputs["Total"],totalPlusOneNode.inputs[0])
+		nodeGroup.links.new(furValuesInput.outputs["Total Thickness"],thickConvertNode.inputs[0])
+		nodeGroup.links.new(furValuesInput.outputs["Total"],thickConvertNode.inputs[1])
+		nodeGroup.links.new(thickConvertNode.outputs[0],thickMultNode.inputs[0])
+		nodeGroup.links.new(furValuesInput.outputs["Current"],thickMultNode.inputs[1])
+		nodeGroup.links.new(furValuesInput.outputs["Outer Droop"],halfDroopNode.inputs[0])
+		nodeGroup.links.new(furValuesInput.outputs["Current"],mapAlphaNode.inputs["Value"])
+		nodeGroup.links.new(totalPlusOneNode.outputs[0],mapAlphaNode.inputs["From Max"])
+		nodeGroup.links.new(furValuesInput.outputs["Outer Alpha"],mapAlphaNode.inputs["To Max"])
+		nodeGroup.links.new(furValuesInput.outputs["Current"],mapDroopNode.inputs["Value"])
+		nodeGroup.links.new(furValuesInput.outputs["Total"],mapDroopNode.inputs["From Max"])
+		nodeGroup.links.new(mapDroopNode.outputs[0],droopPowerNode.inputs[0])
+		nodeGroup.links.new(droopPowerNode.outputs[0],droopMultNode.inputs[0])
+		nodeGroup.links.new(halfDroopNode.outputs[0],droopMultNode.inputs[1])
+		nodeGroup.links.new(thickMultNode.outputs[0],furValuesOutput.inputs["Thickness"])
+		nodeGroup.links.new(mapAlphaNode.outputs[0],furValuesOutput.inputs["Alpha"])
+		nodeGroup.links.new(droopMultNode.outputs[0],furValuesOutput.inputs["Droop"])
+	elif nodeId == "FurShells":
+		nodeGroup = bpy.data.node_groups.new("FurShells","GeometryNodeTree")
+		if bpy.app.version >= (4,0,0):
+			nodeGroup.is_modifier = True
+		newNodeGroupInput(nodeGroup,"NodeSocketGeometry","Geometry")
+		newNodeGroupInput(nodeGroup,"NodeSocketInt","Iterations",singleValue=True).default_value = 3
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Total Thickness",singleValue=True).default_value = 0.05
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Outer Alpha",singleValue=True).default_value = 0.0
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Droop",singleValue=True).default_value = 0.0
+		newNodeGroupInput(nodeGroup,"NodeSocketString","Alpha Attribute",singleValue=True).default_value = "FurAlpha"
+		newNodeGroupInput(nodeGroup,"NodeSocketBool","Keep Original",singleValue=True).default_value = True
+		newNodeGroupOutput(nodeGroup,"NodeSocketGeometry","Geometry")
+		furN = nodeGroup.nodes
+		furInput = furN.new("NodeGroupInput")
+		furInput.location = [-900,200]
+		furOutput = furN.new("NodeGroupOutput")
+		furOutput.location = [700,-150]
+		indexInputNode = furN.new("GeometryNodeInputIndex")
+		indexInputNode.location = [-500,-40]
+		indexCompNode = furN.new("FunctionNodeCompare")
+		indexCompNode.data_type = "INT"
+		indexCompNode.operation = "EQUAL"
+		indexCompNode.inputs["B"].default_value = -1 # no instances will match this, but the original geometry will
+		indexCompNode.location = [-500,-100]
+		storeBaseAlphaNode = furN.new("GeometryNodeStoreNamedAttribute")
+		storeBaseAlphaNode.location = [-700,0]
+		storeBaseAlphaNode.inputs["Value"].default_value = 1.0
+		iDecNode = furN.new("ShaderNodeMath")
+		iDecNode.operation = "SUBTRACT"
+		iDecNode.inputs[1].default_value = 1.0
+		iDecNode.location = [-700,200]
+		# repeat zone order: create and populate the output, make an input, and then pair
+		repeatOutputNode = furN.new("GeometryNodeRepeatOutput")
+		repeatOutputNode.location = [500,-100]
+		repeatOutputNode.repeat_items.new("INT","Iteration")
+		repeatInputNode = furN.new("GeometryNodeRepeatInput")
+		repeatInputNode.location = [-500,200]
+		repeatInputNode.pair_with_output(repeatOutputNode)
+		repeatInputNode.inputs["Iteration"].default_value = 1
+		separateNode = furN.new("GeometryNodeSeparateGeometry")
+		separateNode.domain = "INSTANCE"
+		separateNode.location = [-300,200]
+		valuesNode = furN.new("GeometryNodeGroup")
+		valuesNode.node_tree = bpy.data.node_groups["FurIterationValues"]
+		valuesNode.location = [-300,0]
+		normalInputNode = furN.new("GeometryNodeInputNormal")
+		normalInputNode.location = [-100,180]
+		normalScaleNode = furN.new("ShaderNodeVectorMath")
+		normalScaleNode.operation = "SCALE"
+		normalScaleNode.location = [-100,100]
+		expandPosNode = furN.new("GeometryNodeSetPosition")
+		expandPosNode.location = [100,200]
+		combineDroopNode = furN.new("ShaderNodeCombineXYZ")
+		combineDroopNode.location = [-100,-100]
+		offsetPosNode = furN.new("GeometryNodeSetPosition")
+		offsetPosNode.location = [100,50]
+		instanceNode = furN.new("GeometryNodeGeometryToInstance")
+		instanceNode.location = [100,-100]
+		storeLayerAlphaNode = furN.new("GeometryNodeStoreNamedAttribute")
+		storeLayerAlphaNode.location = [300,100]
+		joinNode = furN.new("GeometryNodeJoinGeometry")
+		joinNode.location = [500,0]
+		iIncNode = furN.new("ShaderNodeMath")
+		iIncNode.operation = "ADD"
+		iIncNode.inputs[1].default_value = 1.0
+		iIncNode.location = [300,-100]
+		proxNode = furN.new("GeometryNodeProximity")
+		proxNode.target_element = "POINTS"
+		proxNode.location = [300,275]
+		compNode = furN.new("FunctionNodeCompare")
+		compNode.data_type = "FLOAT"
+		compNode.operation = "EQUAL"
+		compNode.inputs["Epsilon"].default_value = 0.0001
+		compNode.location = [500,200]
+		boolNode = furN.new("FunctionNodeBooleanMath")
+		boolNode.operation = "NIMPLY"
+		boolNode.location = [700,250]
+		realiseNode = furN.new("GeometryNodeRealizeInstances")
+		realiseNode.location = [700,100]
+		deleteNode = furN.new("GeometryNodeDeleteGeometry")
+		deleteNode.location = [700,0]
+		nodeGroup.links.new(furInput.outputs["Geometry"],storeBaseAlphaNode.inputs["Geometry"])
+		nodeGroup.links.new(furInput.outputs["Alpha Attribute"],storeBaseAlphaNode.inputs["Name"])
+		nodeGroup.links.new(furInput.outputs["Iterations"],iDecNode.inputs[0])
+		nodeGroup.links.new(indexInputNode.outputs["Index"],indexCompNode.inputs["A"])
+		nodeGroup.links.new(iDecNode.outputs[0],repeatInputNode.inputs["Iterations"])
+		nodeGroup.links.new(storeBaseAlphaNode.outputs["Geometry"],repeatInputNode.inputs["Geometry"])
+		nodeGroup.links.new(repeatInputNode.outputs["Geometry"],separateNode.inputs["Geometry"])
+		nodeGroup.links.new(indexCompNode.outputs[0],separateNode.inputs["Selection"])
+		nodeGroup.links.new(repeatInputNode.outputs["Iteration"],valuesNode.inputs["Current"])
+		rr = linkWithReroutes(nodeGroup,iDecNode.outputs[0],valuesNode.inputs["Total"],2)
+		rr[0].location = [-500,0]
+		rr[1].location = [-360,0]
+		rr = linkWithReroutes(nodeGroup,furInput.outputs["Total Thickness"],valuesNode.inputs["Total Thickness"],4)
+		rr[0].location = [-700,45]
+		rr[1].location = [-560,45]
+		rr[2].location = [-500,-10]
+		rr[3].location = [-360,-10]
+		rr = linkWithReroutes(nodeGroup,furInput.outputs["Outer Alpha"],valuesNode.inputs["Outer Alpha"],4)
+		rr[0].location = [-700,35]
+		rr[1].location = [-560,35]
+		rr[2].location = [-500,-20]
+		rr[3].location = [-360,-20]
+		rr = linkWithReroutes(nodeGroup,furInput.outputs["Droop"],valuesNode.inputs["Outer Droop"],4)
+		rr[0].location = [-700,25]
+		rr[1].location = [-560,25]
+		rr[2].location = [-500,-30]
+		rr[3].location = [-360,-30]
+		nodeGroup.links.new(normalInputNode.outputs["Normal"],normalScaleNode.inputs["Vector"])
+		nodeGroup.links.new(valuesNode.outputs["Thickness"],normalScaleNode.inputs["Scale"])
+		rr = linkWithReroutes(nodeGroup,separateNode.outputs["Selection"],expandPosNode.inputs["Geometry"],2)
+		rr[0].location = [-100,200]
+		rr[1].location = [40,200]
+		nodeGroup.links.new(normalScaleNode.outputs[0],expandPosNode.inputs["Offset"])
+		nodeGroup.links.new(expandPosNode.outputs["Geometry"],offsetPosNode.inputs["Geometry"])
+		nodeGroup.links.new(offsetPosNode.outputs["Geometry"],instanceNode.inputs["Geometry"])
+		nodeGroup.links.new(instanceNode.outputs[0],storeLayerAlphaNode.inputs["Geometry"])
+		rr = linkWithReroutes(nodeGroup,furInput.outputs["Alpha Attribute"],storeLayerAlphaNode.inputs["Name"],2)
+		rr[0].location = [-700,-260]
+		rr[1].location = [240,-260]
+		rr = linkWithReroutes(nodeGroup,valuesNode.outputs["Alpha"],storeLayerAlphaNode.inputs["Value"],4)
+		rr[0].location = [-100,-70]
+		rr[1].location = [40,-70]
+		rr[2].location = [100,-95]
+		rr[3].location = [260,-95]
+		nodeGroup.links.new(valuesNode.outputs["Droop"],combineDroopNode.inputs["Z"])
+		nodeGroup.links.new(combineDroopNode.outputs[0],offsetPosNode.inputs["Offset"])
+		nodeGroup.links.new(storeLayerAlphaNode.outputs["Geometry"],joinNode.inputs["Geometry"])
+		rr = linkWithReroutes(nodeGroup,repeatInputNode.outputs["Geometry"],joinNode.inputs["Geometry"],4)
+		rr[0].location = [-300,220]
+		rr[1].location = [240,220]
+		rr[2].location = [300,125]
+		rr[3].location = [440,125]
+		nodeGroup.links.new(joinNode.outputs["Geometry"],repeatOutputNode.inputs["Geometry"])
+		rr = linkWithReroutes(nodeGroup,repeatInputNode.outputs["Iteration"],iIncNode.inputs[0],5)
+		rr[0].location = [-300,25]
+		rr[1].location = [-160,25]
+		rr[2].location = [-100,-50]
+		rr[3].location = [40,-50]
+		rr[4].location = [100,-210]
+		nodeGroup.links.new(iIncNode.outputs[0],repeatOutputNode.inputs["Iteration"])
+		nodeGroup.links.new(repeatOutputNode.outputs["Geometry"],realiseNode.inputs[0])
+		rr = linkWithReroutes(nodeGroup,furInput.outputs["Geometry"],proxNode.inputs["Geometry"],2)
+		rr[0].location = [-700,240]
+		rr[1].location = [240,240]
+		nodeGroup.links.new(proxNode.outputs["Distance"],compNode.inputs["A"])
+		nodeGroup.links.new(compNode.outputs[0],boolNode.inputs[0])
+		rr = linkWithReroutes(nodeGroup,furInput.outputs["Keep Original"],boolNode.inputs[1],2)
+		rr[0].location = [-700,260]
+		rr[1].location = [640,260]
+		nodeGroup.links.new(realiseNode.outputs[0],deleteNode.inputs["Geometry"])
+		nodeGroup.links.new(boolNode.outputs[0],deleteNode.inputs["Selection"])
+		nodeGroup.links.new(deleteNode.outputs[0],furOutput.inputs["Geometry"])
+	elif nodeId == "MixFloats": # ShaderNodeMix for floats doesn't exist pre-3.4, so gotta make a stand-in
 		nodeGroup = bpy.data.node_groups.new("MixFloats","ShaderNodeTree")
 		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Factor")
 		newNodeGroupInput(nodeGroup,"NodeSocketFloat","A")
