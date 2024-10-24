@@ -4,8 +4,8 @@ An addon for Blender for working with Xenoblade files. Adds a tab in the 3D view
 **General notice:** Keep the system console toggled on so you can see any potential warnings and non-fatal errors.
 
 ## Blender support
-* **Blender 3.3.1** is the primary dev version. I do all work with this.
-* **Blender 4.1.0** is the secondary dev version. I will make an effort to ensure everything works in it, but it isn't the main environment.
+* **Blender 4.1.0** is the primary dev version. I do all work with this.
+* **Blender 3.3.1** is the secondary dev version. I try to ensure everything works in it, but nothing is guaranteed, and some things are unsupportable.
 
 ## Game support
 * :no_entry_sign: - Believed to be nonexistent or unnecessary.
