@@ -97,11 +97,12 @@ class MonadoForgeWimdoMaterial:
 		self._index = i
 		self._name = "Material"
 		self._baseColour = [1.0,1.0,1.0,1.0]
-		self._textureTable = [] # [[texture id,sampler id,???,???]]
-		self._samplers = [] # [[flags,float]]
+		self._textureTable = [] # [[texture id, sampler id, ???, ???]]
+		self._samplers = [] # [[flags, float]]
 		self._extraData = []
 		self._extraDataIndex = 0 # needed because of how extra data needs to be read separately
 		self._renderPassType = 0
+		self._furData = [] # just the raw array, no reordering or cutting
 	
 	@property
 	def index(self):
@@ -181,6 +182,14 @@ class MonadoForgeWimdoMaterial:
 	def renderPassType(self,value):
 		ensure_type(value,int)
 		self._renderPassType = value
+	
+	@property
+	def furData(self):
+		return self._furData
+	@furData.setter
+	def furData(self,value):
+		ensure_length(value,5)
+		self._furData = value[:]
 
 class MonadoForgeTexture: # 2D only, no 3D texture support (for now?)
 	def __init__(self):
@@ -233,6 +242,7 @@ class MonadoForgeMaterial:
 		self._extraData = []
 		self._colourLayerCount = 0 # not actually part of the material, but the material needs to know
 		self._uvLayerCount = 0 # same
+		self._furData = [0,0,0,0] # shell count (0 = no fur), fur total thickness, outer alpha, droop
 	
 	@property
 	def index(self):
@@ -353,6 +363,42 @@ class MonadoForgeMaterial:
 	def uvLayerCount(self,value):
 		ensure_type(value,int)
 		self._uvLayerCount = value
+	
+	@property
+	def furData(self):
+		return self._furData
+	@furData.setter
+	def furData(self,value):
+		ensure_length(value,4)
+		self._furData = value[:]
+	@property
+	def furShells(self):
+		return self._furData[0]
+	@furShells.setter
+	def furShells(self,value):
+		ensure_type(value,int)
+		self._furData[0] = value
+	@property
+	def furThickness(self):
+		return self._furData[1]
+	@furThickness.setter
+	def furThickness(self,value):
+		ensure_type(value,float)
+		self._furData[1] = value
+	@property
+	def furAlpha(self):
+		return self._furData[2]
+	@furAlpha.setter
+	def furAlpha(self,value):
+		ensure_type(value,float)
+		self._furData[2] = value
+	@property
+	def furDroop(self):
+		return self._furData[3]
+	@furDroop.setter
+	def furDroop(self,value):
+		ensure_type(value,float)
+		self._furData[3] = value
 
 class MonadoForgeVertex:
 	def __init__(self,i):

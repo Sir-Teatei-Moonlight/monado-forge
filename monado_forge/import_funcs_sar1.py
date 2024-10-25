@@ -314,7 +314,26 @@ def import_wimdo(f, context, externalSkeleton=None):
 		materialExtraDataOffset = readAndParseInt(f,4)
 		materialExtraDataCount = readAndParseInt(f,4)
 		# a bunch of unknowns follow (looks likely to be offset+count pairs), skipping entirely for the moment
-		f.seek(materialsOffset+92) # a magic number unfortunately
+		f.seek(materialsOffset+76) # a magic number unfortunately
+		furShellOffset = readAndParseInt(f,4)
+		furMaterialIndexes = []
+		furShellData = []
+		if furShellOffset > 0:
+			if bpy.app.version < (4,0,0):
+				print_warning("The geometry nodes required to render fur do not exist in Blenders older than 4.0.")
+				print_warning("Fur data will not be imported.")
+			else:
+				# find the fur
+				f.seek(materialsOffset+furShellOffset)
+				furEntries = readAndParseInt(f,4)
+				furEntryOffset = readAndParseInt(f,4)
+				f.seek(materialsOffset+furEntryOffset)
+				for fur in range(furEntries):
+					furMaterialIndexes.append([readAndParseInt(f,4),readAndParseInt(f,4),readAndParseInt(f,4)])
+				f.seek(f.tell()+28) # this is a magic number and that's bad, but whatryagunado
+				for fur in range(furEntries):
+					furShellData.append([readAndParseInt(f,4),readAndParseFloat(f),readAndParseFloat(f),readAndParseFloat(f),readAndParseFloat(f)])
+		f.seek(materialsOffset+92) # another magic number
 		samplerTableOffset = readAndParseInt(f,4)
 		# get the samplers now so we can put them in the materials
 		f.seek(materialsOffset+samplerTableOffset)
@@ -371,6 +390,8 @@ def import_wimdo(f, context, externalSkeleton=None):
 			mat.extraDataIndex = matExtraDataIndex
 			mat.renderPassType = renderPassType
 			materials.append(mat)
+		for furI,fur in enumerate(furMaterialIndexes):
+			materials[fur[1]].furData = furShellData[furI]
 		f.seek(materialsOffset+materialExtraDataOffset)
 		materialExtraData = []
 		for mx in range(materialExtraDataCount):
@@ -1029,6 +1050,8 @@ def import_wismt(f, wimdoResults, context):
 			newMat.extraData = mat.extraData
 			newMat.colourLayerCount = maxColourLayers
 			newMat.uvLayerCount = maxUVLayers
+			if mat.furData:
+				newMat.furData = [mat.furData[0],mat.furData[2],mat.furData[4],mat.furData[3]] # reordering inputs and cutting the view distance
 			matSamplers = mat.samplers
 			# this is done in a way that "duplicates" texture references, but that's fairly harmless at this stage
 			for ti,t in enumerate(mat.textureTable):

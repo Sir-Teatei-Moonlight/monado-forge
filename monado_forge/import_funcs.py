@@ -278,11 +278,10 @@ def import_library_node(nodeId, self, context):
 		mapAlphaNode.inputs["To Min"].default_value = 1.0
 		mapAlphaNode.clamp = False
 		mapAlphaNode.parent = alphaFrame
-		halfDroopNode = furValuesN.new("ShaderNodeMath")
-		halfDroopNode.operation = "DIVIDE"
-		halfDroopNode.location = [0,0]
-		halfDroopNode.inputs[1].default_value = 2.0
-		halfDroopNode.parent = droopFrame
+		droopModNode = furValuesN.new("ShaderNodeMath")
+		droopModNode.operation = "MULTIPLY"
+		droopModNode.location = [0,0]
+		droopModNode.parent = droopFrame
 		mapDroopNode = furValuesN.new("ShaderNodeMapRange")
 		mapDroopNode.location = [200,50]
 		mapDroopNode.inputs["From Min"].default_value = 0.0
@@ -322,7 +321,12 @@ def import_library_node(nodeId, self, context):
 		nodeGroup.links.new(furValuesInput.outputs["Total"],thickConvertNode.inputs[1])
 		nodeGroup.links.new(thickConvertNode.outputs[0],thickMultNode.inputs[0])
 		nodeGroup.links.new(furValuesInput.outputs["Current"],thickMultNode.inputs[1])
-		rr = linkWithReroutes(nodeGroup,furValuesInput.outputs["Outer Droop"],halfDroopNode.inputs[0],4)
+		rr = linkWithReroutes(nodeGroup,furValuesInput.outputs["Total Thickness"],droopModNode.inputs[0],4)
+		rr[0].location = [-600,-70]
+		rr[1].location = [-460,-70]
+		rr[2].location = [-400,-210]
+		rr[3].location = [-60,-210]
+		rr = linkWithReroutes(nodeGroup,furValuesInput.outputs["Outer Droop"],droopModNode.inputs[1],4)
 		rr[0].location = [-600,-80]
 		rr[1].location = [-460,-80]
 		rr[2].location = [-400,-220]
@@ -338,7 +342,7 @@ def import_library_node(nodeId, self, context):
 		nodeGroup.links.new(totalBackbone3.outputs[0],mapDroopNode.inputs["From Max"])
 		nodeGroup.links.new(mapDroopNode.outputs[0],droopPowerNode.inputs[0])
 		nodeGroup.links.new(droopPowerNode.outputs[0],droopMultNode.inputs[0])
-		nodeGroup.links.new(halfDroopNode.outputs[0],droopMultNode.inputs[1])
+		nodeGroup.links.new(droopModNode.outputs[0],droopMultNode.inputs[1])
 		rr = linkWithReroutes(nodeGroup,thickMultNode.outputs[0],furValuesOutput.inputs["Thickness"],4)
 		rr[0].location = [-400,-240]
 		rr[1].location = [340,-240]
@@ -936,6 +940,7 @@ def realise_results(forgeResults, mainName, self, context):
 			except KeyError:
 				dummyShader = bpy.data.node_groups.new("DummyShader","ShaderNodeTree")
 				newNodeGroupInput(dummyShader,"NodeSocketColor","Base Color")
+				newNodeGroupInput(dummyShader,"NodeSocketFloat","Alpha")
 				newNodeGroupOutput(dummyShader,"NodeSocketShader","BSDF")
 				dummyN = dummyShader.nodes
 				dummyInput = dummyN.new("NodeGroupInput")
@@ -943,8 +948,14 @@ def realise_results(forgeResults, mainName, self, context):
 				dummyOutput = dummyN.new("NodeGroupOutput")
 				dummyOutput.location = [400,0]
 				dummyBSDF = dummyN.new("ShaderNodeBsdfPrincipled")
-				dummyBSDF.location = [0,300]
-				dummyShader.links.new(dummyInput.outputs[0],dummyBSDF.inputs["Base Color"])
+				if bpy.app.version >= (4,0,0): # more compact, can be moved
+					dummyBSDF.location = [0,150]
+				else:
+					dummyBSDF.location = [0,300]
+				getNodeGroupInput(dummyShader,"Base Color").default_value = (1.0,1.0,1.0,1.0)
+				getNodeGroupInput(dummyShader,"Alpha").default_value = 1.0
+				dummyShader.links.new(dummyInput.outputs["Base Color"],dummyBSDF.inputs["Base Color"])
+				dummyShader.links.new(dummyInput.outputs["Alpha"],dummyBSDF.inputs["Alpha"])
 				dummyShader.links.new(dummyBSDF.outputs["BSDF"],dummyOutput.inputs[0])
 			shaderSubnode.node_tree = dummyShader
 			newMat.node_tree.links.new(shaderSubnode.outputs[0],n.get("Material Output").inputs[0])
@@ -1060,6 +1071,14 @@ def realise_results(forgeResults, mainName, self, context):
 			colourInputNode.attribute_name = "VertexColours"+str(colour+1)
 			colourInputNode.hide = True
 			pushdownValue -= 40
+		if mat.furShells > 0:
+			furInputNode = n.new("ShaderNodeAttribute")
+			furInputNode.label = "Fur Alpha"
+			furInputNode.location = [-650,pushdownValue]
+			furInputNode.attribute_type = "GEOMETRY"
+			furInputNode.attribute_name = "FurAlpha"
+			furInputNode.hide = True
+			pushdownValue -= 40
 		for xi,x in enumerate(mat.extraData):
 			extraDataNode = n.new("ShaderNodeValue")
 			extraDataNode.outputs["Value"].default_value = x
@@ -1160,6 +1179,23 @@ def realise_results(forgeResults, mainName, self, context):
 					newShape.data[vertexIndex].co += mathutils.Vector(vertex.position)
 		if materials and not context.scene.monado_forge_import.skipMaterialImport and mesh.materialIndex != -1:
 			meshData.materials.append(newMatsByIndex[mesh.materialIndex])
+			# only now can we apply fur if necessary - time for geometry nodes
+			# as a reminder, fur data was only read in the first place if the Blender can support it (i.e. >= 4.0.0)
+			originalMatData = materials[mesh.materialIndex]
+			if originalMatData.furShells > 0:
+				geoMod = newMeshObject.modifiers.new(name="Fur",type="NODES")
+				try:
+					furNodeGroup = bpy.data.node_groups["FurShells"]
+				except KeyError:
+					import_library_node("FurShells", self, context)
+					furNodeGroup = bpy.data.node_groups["FurShells"]
+				geoMod.node_group = furNodeGroup
+				# https://blender.stackexchange.com/questions/313627/accessing-geometry-nodes-socket-names
+				socketNames = {item.name: item.identifier for item in geoMod.node_group.interface.items_tree if item.in_out == "INPUT"}
+				geoMod[socketNames["Iterations"]] = originalMatData.furShells
+				geoMod[socketNames["Total Thickness"]] = originalMatData.furThickness
+				geoMod[socketNames["Outer Alpha"]] = originalMatData.furAlpha
+				geoMod[socketNames["Droop"]] = originalMatData.furDroop
 		
 		# import complete, cleanup time
 		cleanup_mesh(context,newMeshObject,
@@ -1174,6 +1210,8 @@ def realise_results(forgeResults, mainName, self, context):
 		# attach mesh to base armature
 		armatureMod = newMeshObject.modifiers.new("Armature","ARMATURE")
 		armatureMod.object = baseArmature
+		# if there is a fur modifier, the armature modifier needs to be raised above it
+		bpy.ops.object.modifier_move_to_index(modifier="Armature",index=0)
 		newMeshObject.parent = baseArmature
 		# end of per-mesh loop
 	if printProgress:
