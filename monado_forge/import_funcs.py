@@ -46,42 +46,73 @@ def import_library_node(nodeId, self, context):
 		getNodeGroupInput(nodeGroup,"Emit").default_value = 0.0
 		metalN = nodeGroup.nodes
 		metalInput = metalN.new("NodeGroupInput")
-		metalInput.location = [-400,0]
+		metalInput.location = [-600,50]
 		metalOutput = metalN.new("NodeGroupOutput")
 		metalOutput.location = [500,0]
 		shaderNode = metalN.new("ShaderNodeBsdfPrincipled")
-		shaderNode.location = [0,250]
+		if bpy.app.version >= (4,0,0): # more compact, can be moved
+			shaderNode.location = [0,100]
+		else:
+			shaderNode.location = [0,250]
 		baseAONode = metalN.new("ShaderNodeMixRGB")
 		baseAONode.blend_type = "MULTIPLY"
-		baseAONode.location = [-200,200]
+		baseAONode.location = [-400,125]
 		baseAONode.inputs["Fac"].default_value = 1.0
-		ambientNode = metalN.new("ShaderNodeEmission")
-		ambientNode.location = [-200,0]
+		baseAONode.label = "Base + AO"
 		normalMapNode = metalN.new("ShaderNodeNormalMap")
-		normalMapNode.location = [-200,-125]
-		normalMapNode.hide = True
+		normalMapNode.location = [-200,0]
 		roughToGlossNode = metalN.new("ShaderNodeMath")
 		roughToGlossNode.operation = "SUBTRACT"
 		roughToGlossNode.inputs[0].default_value = 1.0
-		roughToGlossNode.location = [-200,-175]
+		roughToGlossNode.location = [-400,-100]
+		roughToGlossNode.label = "Rough to Gloss"
+		ambientNode = metalN.new("ShaderNodeEmission")
+		ambientNode.location = [300,75]
+		ambientNode.label = "Ambient Emission"
 		shaderAddNode = metalN.new("ShaderNodeAddShader")
-		shaderAddNode.location = [300,0]
+		shaderAddNode.location = [300,-75]
 		nodeGroup.links.new(metalInput.outputs["Base Colour"],baseAONode.inputs["Color1"])
 		nodeGroup.links.new(metalInput.outputs["AO"],baseAONode.inputs["Color2"])
-		nodeGroup.links.new(metalInput.outputs["Ambient Colour"],ambientNode.inputs["Color"])
-		nodeGroup.links.new(metalInput.outputs["Normal Map"],normalMapNode.inputs["Color"])
+		rr = linkWithReroutes(nodeGroup,metalInput.outputs["Ambient Colour"],ambientNode.inputs["Color"],2)
+		if bpy.app.version >= (4,0,0):
+			rr[0].location = [-400,140]
+			rr[1].location = [240,140]
+		else:
+			rr[0].location = [-400,260]
+			rr[1].location = [240,260]
+		rr = linkWithReroutes(nodeGroup,metalInput.outputs["Normal Map"],normalMapNode.inputs["Color"],2)
+		rr[0].location = [-400,-55]
+		rr[1].location = [-260,-55]
 		nodeGroup.links.new(metalInput.outputs["Glossiness"],roughToGlossNode.inputs[1])
 		if bpy.app.version >= (4,0,0):
-			nodeGroup.links.new(metalInput.outputs["Emit Colour"],shaderNode.inputs["Emission Color"])
+			emitInputName = "Emission Color"
 		else:
-			nodeGroup.links.new(metalInput.outputs["Emit Colour"],shaderNode.inputs["Emission"])
-		nodeGroup.links.new(metalInput.outputs["Alpha"],shaderNode.inputs["Alpha"])
-		nodeGroup.links.new(metalInput.outputs["Metallic"],shaderNode.inputs["Metallic"])
-		nodeGroup.links.new(metalInput.outputs["Emit"],shaderNode.inputs["Emission Strength"])
-		nodeGroup.links.new(baseAONode.outputs[0],shaderNode.inputs["Base Color"])
+			emitInputName = "Emission"
+		rr = linkWithReroutes(nodeGroup,metalInput.outputs["Emit Colour"],shaderNode.inputs[emitInputName],4)
+		rr[0].location = [-400,-65]
+		rr[1].location = [-260,-65]
+		rr[2].location = [-200,-160]
+		rr[3].location = [-50,-160]
+		rr = linkWithReroutes(nodeGroup,metalInput.outputs["Alpha"],shaderNode.inputs["Alpha"],4)
+		rr[0].location = [-400,-75]
+		rr[1].location = [-260,-75]
+		rr[2].location = [-200,-180]
+		rr[3].location = [-50,-180]
+		rr = linkWithReroutes(nodeGroup,metalInput.outputs["Metallic"],shaderNode.inputs["Metallic"],4)
+		rr[0].location = [-400,-85]
+		rr[1].location = [-260,-85]
+		rr[2].location = [-200,40]
+		rr[3].location = [-50,40]
+		rr = linkWithReroutes(nodeGroup,metalInput.outputs["Emit"],shaderNode.inputs["Emission Strength"],2)
+		rr[0].location = [-400,-260]
+		rr[1].location = [-50,-260]
+		rr = linkWithReroutes(nodeGroup,baseAONode.outputs[0],shaderNode.inputs["Base Color"],1)
+		rr[0].location = [-50,90]
 		nodeGroup.links.new(ambientNode.outputs[0],shaderAddNode.inputs[1])
 		nodeGroup.links.new(normalMapNode.outputs[0],shaderNode.inputs["Normal"])
-		nodeGroup.links.new(roughToGlossNode.outputs[0],shaderNode.inputs["Roughness"])
+		rr = linkWithReroutes(nodeGroup,roughToGlossNode.outputs[0],shaderNode.inputs["Roughness"],2)
+		rr[0].location = [-200,20]
+		rr[1].location = [-50,20]
 		nodeGroup.links.new(shaderNode.outputs["BSDF"],shaderAddNode.inputs[0])
 		nodeGroup.links.new(shaderAddNode.outputs[0],metalOutput.inputs["BSDF"])
 	elif nodeId == "BasicSpecular":
@@ -108,48 +139,73 @@ def import_library_node(nodeId, self, context):
 		getNodeGroupInput(nodeGroup,"Emit").default_value = 0.0
 		specN = nodeGroup.nodes
 		specInput = specN.new("NodeGroupInput")
-		specInput.location = [-500,0]
+		specInput.location = [-700,50]
 		specOutput = specN.new("NodeGroupOutput")
 		specOutput.location = [500,0]
 		shaderNode = specN.new("ShaderNodeEeveeSpecular")
-		shaderNode.location = [100,50]
+		shaderNode.location = [100,100]
 		baseAONode = specN.new("ShaderNodeMixRGB")
 		baseAONode.blend_type = "MULTIPLY"
-		baseAONode.location = [-300,200]
+		baseAONode.location = [-500,125]
 		baseAONode.inputs["Fac"].default_value = 1.0
-		ambientNode = specN.new("ShaderNodeEmission")
-		ambientNode.location = [-300,0]
+		baseAONode.label = "Base + AO"
 		normalMapNode = specN.new("ShaderNodeNormalMap")
-		normalMapNode.location = [-300,-125]
-		normalMapNode.hide = True
+		normalMapNode.location = [-300,-100]
 		roughToGlossNode = specN.new("ShaderNodeMath")
 		roughToGlossNode.operation = "SUBTRACT"
 		roughToGlossNode.inputs[0].default_value = 1.0
-		roughToGlossNode.location = [-300,-175]
+		roughToGlossNode.location = [-500,-100]
 		alphaInvertNode = specN.new("ShaderNodeMath")
 		alphaInvertNode.operation = "SUBTRACT"
 		alphaInvertNode.inputs[0].default_value = 1.0
-		alphaInvertNode.location = [-100,50]
+		alphaInvertNode.location = [-300,100]
 		emitMixNode = specN.new("ShaderNodeMixRGB")
 		emitMixNode.blend_type = "MIX"
-		emitMixNode.location = [-100,-150]
+		emitMixNode.location = [-100,25]
 		emitMixNode.inputs["Color1"].default_value = [0.0,0.0,0.0,1.0]
+		ambientNode = specN.new("ShaderNodeEmission")
+		ambientNode.location = [300,75]
+		ambientNode.label = "Ambient Emission"
 		shaderAddNode = specN.new("ShaderNodeAddShader")
-		shaderAddNode.location = [300,0]
+		shaderAddNode.location = [300,-75]
 		nodeGroup.links.new(specInput.outputs["Base Colour"],baseAONode.inputs["Color1"])
 		nodeGroup.links.new(specInput.outputs["AO"],baseAONode.inputs["Color2"])
-		nodeGroup.links.new(specInput.outputs["Ambient Colour"],ambientNode.inputs["Color"])
-		nodeGroup.links.new(specInput.outputs["Normal Map"],normalMapNode.inputs["Color"])
+		rr = linkWithReroutes(nodeGroup,specInput.outputs["Ambient Colour"],ambientNode.inputs["Color"],2)
+		rr[0].location = [-500,140]
+		rr[1].location = [240,140]
+		rr = linkWithReroutes(nodeGroup,specInput.outputs["Normal Map"],normalMapNode.inputs["Color"],2)
+		rr[0].location = [-500,-80]
+		rr[1].location = [-360,-80]
 		nodeGroup.links.new(specInput.outputs["Glossiness"],roughToGlossNode.inputs[1])
-		nodeGroup.links.new(specInput.outputs["Alpha"],alphaInvertNode.inputs[1])
-		nodeGroup.links.new(specInput.outputs["Specular Colour"],shaderNode.inputs["Specular"])
-		nodeGroup.links.new(specInput.outputs["Emit Colour"],emitMixNode.inputs["Color2"])
-		nodeGroup.links.new(specInput.outputs["Emit"],emitMixNode.inputs["Fac"])
-		nodeGroup.links.new(baseAONode.outputs[0],shaderNode.inputs["Base Color"])
+		rr = linkWithReroutes(nodeGroup,specInput.outputs["Alpha"],alphaInvertNode.inputs[1],2)
+		rr[0].location = [-500,-60]
+		rr[1].location = [-360,-60]
+		rr = linkWithReroutes(nodeGroup,specInput.outputs["Specular Colour"],shaderNode.inputs["Specular"],4)
+		rr[0].location = [-500,-50]
+		rr[1].location = [-150,-50]
+		rr[2].location = [-100,60]
+		rr[3].location = [40,60]
+		rr = linkWithReroutes(nodeGroup,specInput.outputs["Emit Colour"],emitMixNode.inputs["Color2"],2)
+		rr[0].location = [-500,-70]
+		rr[1].location = [-150,-70]
+		rr = linkWithReroutes(nodeGroup,specInput.outputs["Emit"],emitMixNode.inputs["Fac"],2)
+		rr[0].location = [-500,-90]
+		rr[1].location = [-150,-90]
+		rr = linkWithReroutes(nodeGroup,baseAONode.outputs[0],shaderNode.inputs["Base Color"],2)
+		rr[0].location = [-300,120]
+		rr[1].location = [40,120]
 		nodeGroup.links.new(ambientNode.outputs[0],shaderAddNode.inputs[1])
-		nodeGroup.links.new(normalMapNode.outputs[0],shaderNode.inputs["Normal"])
-		nodeGroup.links.new(alphaInvertNode.outputs[0],shaderNode.inputs["Transparency"])
-		nodeGroup.links.new(roughToGlossNode.outputs[0],shaderNode.inputs["Roughness"])
+		rr = linkWithReroutes(nodeGroup,normalMapNode.outputs[0],shaderNode.inputs["Normal"],2)
+		rr[0].location = [-100,-160]
+		rr[1].location = [40,-160]
+		rr = linkWithReroutes(nodeGroup,alphaInvertNode.outputs[0],shaderNode.inputs["Transparency"],2)
+		rr[0].location = [-100,80]
+		rr[1].location = [40,80]
+		rr = linkWithReroutes(nodeGroup,roughToGlossNode.outputs[0],shaderNode.inputs["Roughness"],4)
+		rr[0].location = [-300,-60]
+		rr[1].location = [-150,-60]
+		rr[2].location = [-100,40]
+		rr[3].location = [40,40]
 		nodeGroup.links.new(emitMixNode.outputs[0],shaderNode.inputs["Emissive Color"])
 		nodeGroup.links.new(shaderNode.outputs["BSDF"],shaderAddNode.inputs[0])
 		nodeGroup.links.new(shaderAddNode.outputs[0],specOutput.inputs["BSDF"])
@@ -164,18 +220,20 @@ def import_library_node(nodeId, self, context):
 		getNodeGroupInput(nodeGroup,"Factor").default_value = 1.0
 		combineN = nodeGroup.nodes
 		combineInput = combineN.new("NodeGroupInput")
-		combineInput.location = [-500,0]
+		combineInput.location = [-400,0]
 		combineOutput = combineN.new("NodeGroupOutput")
-		combineOutput.location = [500,0]
+		combineOutput.location = [200,0]
 		mixNode = combineN.new("ShaderNodeMixRGB")
 		mixNode.blend_type = "MIX"
-		mixNode.location = [-200,0]
+		mixNode.location = [-200,25]
 		mixNode.inputs["Color1"].default_value = [0.5,0.5,1.0,1.0]
 		mixNode.inputs["Color2"].default_value = [0.5,0.5,1.0,1.0]
 		rnmNode = combineN.new("ShaderNodeGroup")
 		rnmNode.node_tree = bpy.data.node_groups["ReorientNormalMap"]
-		rnmNode.location = [200,0]
-		nodeGroup.links.new(combineInput.outputs["Base"],rnmNode.inputs["Base"])
+		rnmNode.location = [0,0]
+		rr = linkWithReroutes(nodeGroup,combineInput.outputs["Base"],rnmNode.inputs["Base"],2)
+		rr[0].location = [-200,40]
+		rr[1].location = [-60,40]
 		nodeGroup.links.new(combineInput.outputs["Overlay"],mixNode.inputs["Color2"])
 		nodeGroup.links.new(combineInput.outputs["Factor"],mixNode.inputs["Fac"])
 		nodeGroup.links.new(mixNode.outputs[0],rnmNode.inputs["Overlay"])
@@ -241,22 +299,56 @@ def import_library_node(nodeId, self, context):
 		droopMultNode.operation = "MULTIPLY"
 		droopMultNode.location = [400,-100]
 		droopMultNode.parent = droopFrame
-		nodeGroup.links.new(furValuesInput.outputs["Total"],totalPlusOneNode.inputs[0])
+		currentBackbone1 = furValuesN.new("NodeReroute")
+		currentBackbone1.location = [-600,160]
+		currentBackbone2 = furValuesN.new("NodeReroute")
+		currentBackbone2.location = [-260,160]
+		currentBackbone3 = furValuesN.new("NodeReroute")
+		currentBackbone3.location = [140,160]
+		totalBackbone1 = furValuesN.new("NodeReroute")
+		totalBackbone1.location = [-600,140]
+		totalBackbone2 = furValuesN.new("NodeReroute")
+		totalBackbone2.location = [-460,140]
+		totalBackbone3 = furValuesN.new("NodeReroute")
+		totalBackbone3.location = [140,140]
+		nodeGroup.links.new(furValuesInput.outputs["Current"],currentBackbone1.inputs[0])
+		nodeGroup.links.new(currentBackbone1.outputs[0],currentBackbone2.inputs[0])
+		nodeGroup.links.new(currentBackbone2.outputs[0],currentBackbone3.inputs[0])
+		nodeGroup.links.new(furValuesInput.outputs["Total"],totalBackbone1.inputs[0])
+		nodeGroup.links.new(totalBackbone1.outputs[0],totalBackbone2.inputs[0])
+		nodeGroup.links.new(totalBackbone2.outputs[0],totalBackbone3.inputs[0])
+		nodeGroup.links.new(totalBackbone2.outputs[0],totalPlusOneNode.inputs[0])
 		nodeGroup.links.new(furValuesInput.outputs["Total Thickness"],thickConvertNode.inputs[0])
 		nodeGroup.links.new(furValuesInput.outputs["Total"],thickConvertNode.inputs[1])
 		nodeGroup.links.new(thickConvertNode.outputs[0],thickMultNode.inputs[0])
 		nodeGroup.links.new(furValuesInput.outputs["Current"],thickMultNode.inputs[1])
-		nodeGroup.links.new(furValuesInput.outputs["Outer Droop"],halfDroopNode.inputs[0])
-		nodeGroup.links.new(furValuesInput.outputs["Current"],mapAlphaNode.inputs["Value"])
+		rr = linkWithReroutes(nodeGroup,furValuesInput.outputs["Outer Droop"],halfDroopNode.inputs[0],4)
+		rr[0].location = [-600,-80]
+		rr[1].location = [-460,-80]
+		rr[2].location = [-400,-220]
+		rr[3].location = [-60,-220]
+		nodeGroup.links.new(currentBackbone2.outputs[0],mapAlphaNode.inputs["Value"])
 		nodeGroup.links.new(totalPlusOneNode.outputs[0],mapAlphaNode.inputs["From Max"])
-		nodeGroup.links.new(furValuesInput.outputs["Outer Alpha"],mapAlphaNode.inputs["To Max"])
-		nodeGroup.links.new(furValuesInput.outputs["Current"],mapDroopNode.inputs["Value"])
-		nodeGroup.links.new(furValuesInput.outputs["Total"],mapDroopNode.inputs["From Max"])
+		rr = linkWithReroutes(nodeGroup,furValuesInput.outputs["Outer Alpha"],mapAlphaNode.inputs["To Max"],4)
+		rr[0].location = [-600,-60]
+		rr[1].location = [-460,-60]
+		rr[2].location = [-400,-200]
+		rr[3].location = [-260,-200]
+		nodeGroup.links.new(currentBackbone3.outputs[0],mapDroopNode.inputs["Value"])
+		nodeGroup.links.new(totalBackbone3.outputs[0],mapDroopNode.inputs["From Max"])
 		nodeGroup.links.new(mapDroopNode.outputs[0],droopPowerNode.inputs[0])
 		nodeGroup.links.new(droopPowerNode.outputs[0],droopMultNode.inputs[0])
 		nodeGroup.links.new(halfDroopNode.outputs[0],droopMultNode.inputs[1])
-		nodeGroup.links.new(thickMultNode.outputs[0],furValuesOutput.inputs["Thickness"])
-		nodeGroup.links.new(mapAlphaNode.outputs[0],furValuesOutput.inputs["Alpha"])
+		rr = linkWithReroutes(nodeGroup,thickMultNode.outputs[0],furValuesOutput.inputs["Thickness"],4)
+		rr[0].location = [-400,-240]
+		rr[1].location = [340,-240]
+		rr[2].location = [400,-60]
+		rr[3].location = [540,-60]
+		rr = linkWithReroutes(nodeGroup,mapAlphaNode.outputs[0],furValuesOutput.inputs["Alpha"],4)
+		rr[0].location = [0,80]
+		rr[1].location = [340,80]
+		rr[2].location = [400,-80]
+		rr[3].location = [540,-80]
 		nodeGroup.links.new(droopMultNode.outputs[0],furValuesOutput.inputs["Droop"])
 	elif nodeId == "FurShells":
 		nodeGroup = bpy.data.node_groups.new("FurShells","GeometryNodeTree")
@@ -440,9 +532,13 @@ def import_library_node(nodeId, self, context):
 		mergeNode.location = [100,0]
 		nodeGroup.links.new(mixInput.outputs["Factor"],invertNode.inputs[1])
 		nodeGroup.links.new(invertNode.outputs["Value"],facANode.inputs[0])
-		nodeGroup.links.new(mixInput.outputs["A"],facANode.inputs[1])
-		nodeGroup.links.new(mixInput.outputs["Factor"],facBNode.inputs[0])
-		nodeGroup.links.new(mixInput.outputs["B"],facBNode.inputs[1])
+		rr = linkWithReroutes(nodeGroup,mixInput.outputs["A"],facANode.inputs[1],2)
+		rr[0].location = [-300,20]
+		rr[1].location = [-160,20]
+		rr = linkWithReroutes(nodeGroup,mixInput.outputs["Factor"],facBNode.inputs[0],1)
+		rr[0].location = [-300,-210]
+		rr = linkWithReroutes(nodeGroup,mixInput.outputs["B"],facBNode.inputs[1],1)
+		rr[0].location = [-300,-230]
 		nodeGroup.links.new(facANode.outputs["Value"],mergeNode.inputs[0])
 		nodeGroup.links.new(facBNode.outputs["Value"],mergeNode.inputs[1])
 		nodeGroup.links.new(mergeNode.outputs["Value"],mixOutput.inputs["Result"])
@@ -456,51 +552,68 @@ def import_library_node(nodeId, self, context):
 		getNodeGroupInput(nodeGroup,"Overlay").default_value = (0.5,0.5,1.0,1.0)
 		combineN = nodeGroup.nodes
 		combineInput = combineN.new("NodeGroupInput")
-		combineInput.location = [-500,0]
+		combineInput.location = [-800,0]
 		combineOutput = combineN.new("NodeGroupOutput")
-		combineOutput.location = [500,0]
+		combineOutput.location = [600,0]
 		baseTransformNode = combineN.new("ShaderNodeVectorMath")
 		baseTransformNode.operation = "MULTIPLY_ADD"
-		baseTransformNode.location = [-300,275]
+		baseTransformNode.location = [-600,75]
 		baseTransformNode.inputs[1].default_value = [2.0,2.0,2.0]
 		baseTransformNode.inputs[2].default_value = [-1.0,-1.0,0.0]
+		baseTransformNode.label = "Base Transform"
 		overlayTransformNode = combineN.new("ShaderNodeVectorMath")
 		overlayTransformNode.operation = "MULTIPLY_ADD"
-		overlayTransformNode.location = [-300,0]
+		overlayTransformNode.location = [-400,75]
 		overlayTransformNode.inputs[1].default_value = [-2.0,-2.0,2.0]
 		overlayTransformNode.inputs[2].default_value = [1.0,1.0,-1.0]
+		overlayTransformNode.label = "Overlay Transform"
 		dotNode = combineN.new("ShaderNodeVectorMath")
 		dotNode.operation = "DOT_PRODUCT"
-		dotNode.location = [-100,175]
+		dotNode.location = [-200,75]
 		scaleNode1 = combineN.new("ShaderNodeVectorMath")
 		scaleNode1.operation = "SCALE"
-		scaleNode1.location = [-100,25]
+		scaleNode1.location = [-200,-75]
 		splitNode = combineN.new("ShaderNodeSeparateXYZ")
-		splitNode.location = [-100,-125]
+		splitNode.location = [0,75]
 		scaleNode2 = combineN.new("ShaderNodeVectorMath")
 		scaleNode2.operation = "SCALE"
-		scaleNode2.location = [100,-125]
+		scaleNode2.location = [0,-75]
 		subtractNode = combineN.new("ShaderNodeVectorMath")
 		subtractNode.operation = "SUBTRACT"
-		subtractNode.location = [100,175]
+		subtractNode.location = [200,75]
 		normalizeNode = combineN.new("ShaderNodeVectorMath")
 		normalizeNode.operation = "NORMALIZE"
-		normalizeNode.location = [100,25]
+		normalizeNode.location = [200,-75]
 		finalTransformNode = combineN.new("ShaderNodeVectorMath")
 		finalTransformNode.operation = "MULTIPLY_ADD"
-		finalTransformNode.location = [300,75]
+		finalTransformNode.location = [400,75]
 		finalTransformNode.inputs[1].default_value = [0.5,0.5,0.5]
 		finalTransformNode.inputs[2].default_value = [0.5,0.5,0.5]
+		baseTransformBackbone1 = combineN.new("NodeReroute")
+		baseTransformBackbone1.location = [-400,100]
+		baseTransformBackbone2 = combineN.new("NodeReroute")
+		baseTransformBackbone2.location = [-260,100]
+		baseTransformBackbone3 = combineN.new("NodeReroute")
+		baseTransformBackbone3.location = [-60,100]
+		nodeGroup.links.new(baseTransformNode.outputs[0],baseTransformBackbone1.inputs[0])
+		nodeGroup.links.new(baseTransformBackbone1.outputs[0],baseTransformBackbone2.inputs[0])
+		nodeGroup.links.new(baseTransformBackbone2.outputs[0],baseTransformBackbone3.inputs[0])
 		nodeGroup.links.new(combineInput.outputs["Base"],baseTransformNode.inputs[0])
-		nodeGroup.links.new(combineInput.outputs["Overlay"],overlayTransformNode.inputs[0])
-		nodeGroup.links.new(baseTransformNode.outputs[0],dotNode.inputs[0])
+		rr = linkWithReroutes(nodeGroup,combineInput.outputs["Overlay"],overlayTransformNode.inputs[0],2)
+		rr[0].location = [-600,-210]
+		rr[1].location = [-460,-210]
+		nodeGroup.links.new(baseTransformBackbone2.outputs[0],dotNode.inputs[0])
 		nodeGroup.links.new(overlayTransformNode.outputs[0],dotNode.inputs[1])
-		nodeGroup.links.new(baseTransformNode.outputs[0],scaleNode1.inputs[0])
+		nodeGroup.links.new(baseTransformBackbone2.outputs[0],scaleNode1.inputs[0])
 		nodeGroup.links.new(dotNode.outputs["Value"],scaleNode1.inputs["Scale"])
-		nodeGroup.links.new(baseTransformNode.outputs[0],splitNode.inputs[0])
-		nodeGroup.links.new(overlayTransformNode.outputs[0],scaleNode2.inputs[0])
+		nodeGroup.links.new(baseTransformBackbone3.outputs[0],splitNode.inputs[0])
+		rr = linkWithReroutes(nodeGroup,overlayTransformNode.outputs[0],scaleNode2.inputs[0],2)
+		rr[0].location = [-200,-60]
+		rr[1].location = [-60,-60]
 		nodeGroup.links.new(splitNode.outputs["Z"],scaleNode2.inputs["Scale"])
-		nodeGroup.links.new(scaleNode1.outputs[0],subtractNode.inputs[0])
+		rr = linkWithReroutes(nodeGroup,scaleNode1.outputs[0],subtractNode.inputs[0],2)
+		rr[0].location = [0,-60]
+		rr[1].location = [140,-60]
 		nodeGroup.links.new(scaleNode2.outputs[0],subtractNode.inputs[1])
 		nodeGroup.links.new(subtractNode.outputs[0],normalizeNode.inputs[0])
 		nodeGroup.links.new(normalizeNode.outputs[0],finalTransformNode.inputs[0])
@@ -516,36 +629,44 @@ def import_library_node(nodeId, self, context):
 		getNodeGroupInput(nodeGroup,"Normal Map").default_value = (0.5,0.5,1.0,1.0)
 		tbnN = nodeGroup.nodes
 		tbnInput = tbnN.new("NodeGroupInput")
-		tbnInput.location = [-500,0]
+		tbnInput.location = [-600,0]
 		tbnOutput = tbnN.new("NodeGroupOutput")
-		tbnOutput.location = [500,0]
+		tbnOutput.location = [400,0]
 		normalMapNode = tbnN.new("ShaderNodeNormalMap")
-		normalMapNode.location = [-300,0]
+		normalMapNode.location = [-400,0]
 		crossNode1 = tbnN.new("ShaderNodeVectorMath")
 		crossNode1.operation = "CROSS_PRODUCT"
-		crossNode1.location = [-100,0]
+		crossNode1.location = [-200,0]
 		crossNode2 = tbnN.new("ShaderNodeVectorMath")
 		crossNode2.operation = "CROSS_PRODUCT"
-		crossNode2.location = [100,0]
+		crossNode2.location = [0,0]
 		normalizeNode1 = tbnN.new("ShaderNodeVectorMath")
 		normalizeNode1.operation = "NORMALIZE"
-		normalizeNode1.location = [300,0]
-		normalizeNode1.hide = True
+		normalizeNode1.location = [200,150]
+		normalizeNode1.label = "Normalise Tangent"
 		normalizeNode2 = tbnN.new("ShaderNodeVectorMath")
 		normalizeNode2.operation = "NORMALIZE"
-		normalizeNode2.location = [300,-50]
-		normalizeNode2.hide = True
+		normalizeNode2.location = [200,0]
+		normalizeNode2.label = "Normalise Bitangent"
 		normalizeNode3 = tbnN.new("ShaderNodeVectorMath")
 		normalizeNode3.operation = "NORMALIZE"
-		normalizeNode3.location = [300,-100]
-		normalizeNode3.hide = True
+		normalizeNode3.location = [200,-150]
+		normalizeNode3.label = "Normalise Normal"
 		nodeGroup.links.new(tbnInput.outputs["Normal Map"],normalMapNode.inputs["Color"])
-		nodeGroup.links.new(tbnInput.outputs["Tangent"],crossNode1.inputs[1])
+		rr = linkWithReroutes(nodeGroup,tbnInput.outputs["Tangent"],crossNode1.inputs[1],2)
+		rr[0].location = [-400,-160]
+		rr[1].location = [-250,-160]
 		nodeGroup.links.new(normalMapNode.outputs[0],crossNode1.inputs[0])
-		nodeGroup.links.new(normalMapNode.outputs[0],crossNode2.inputs[1])
-		nodeGroup.links.new(normalMapNode.outputs[0],normalizeNode3.inputs[0])
+		rr = linkWithReroutes(nodeGroup,normalMapNode.outputs[0],crossNode2.inputs[1],2)
+		rr[0].location = [-200,-140]
+		rr[1].location = [-60,-140]
+		rr = linkWithReroutes(nodeGroup,normalMapNode.outputs[0],normalizeNode3.inputs[0],2)
+		rr[0].location = [-200,-160]
+		rr[1].location = [140,-160]
 		nodeGroup.links.new(crossNode1.outputs[0],crossNode2.inputs[0])
-		nodeGroup.links.new(crossNode1.outputs[0],normalizeNode2.inputs[0])
+		rr = linkWithReroutes(nodeGroup,crossNode1.outputs[0],normalizeNode2.inputs[0],2)
+		rr[0].location = [0,-140]
+		rr[1].location = [140,-140]
 		nodeGroup.links.new(crossNode2.outputs[0],normalizeNode1.inputs[0])
 		nodeGroup.links.new(normalizeNode1.outputs[0],tbnOutput.inputs["Tangent"])
 		nodeGroup.links.new(normalizeNode2.outputs[0],tbnOutput.inputs["Bitangent"])
@@ -562,55 +683,49 @@ def import_library_node(nodeId, self, context):
 		getNodeGroupInput(nodeGroup,"Normal Map").default_value = (0.5,0.5,1.0,1.0)
 		insetN = nodeGroup.nodes
 		insetInput = insetN.new("NodeGroupInput")
-		insetInput.location = [-500,100]
+		insetInput.location = [-600,150]
 		insetOutput = insetN.new("NodeGroupOutput")
-		insetOutput.location = [500,0]
+		insetOutput.location = [600,0]
 		geometryInput = insetN.new("ShaderNodeNewGeometry") # New! Geometry Advance 64 & Knuckles
-		geometryInput.location = [-500,-100]
+		geometryInput.location = [-600,0]
 		normalizeNode = insetN.new("ShaderNodeVectorMath")
 		normalizeNode.operation = "NORMALIZE"
-		normalizeNode.location = [-300,-200]
-		normalizeNode.hide = True
+		normalizeNode.location = [-400,-150]
 		depthTripleNode = insetN.new("ShaderNodeCombineXYZ")
-		depthTripleNode.location = [-300,50]
-		depthTripleNode.hide = True
+		depthTripleNode.location = [-400,200]
 		tbnNode = insetN.new("ShaderNodeGroup")
 		tbnNode.node_tree = bpy.data.node_groups["TBNMatrix"]
-		tbnNode.location = [-300,0]
+		tbnNode.location = [-400,50]
 		dotTangentNode = insetN.new("ShaderNodeVectorMath")
 		dotTangentNode.operation = "DOT_PRODUCT"
-		dotTangentNode.location = [-100,0]
-		dotTangentNode.hide = True
+		dotTangentNode.location = [-200,150]
+		dotTangentNode.label = "Dot Tangent"
 		dotBitangentNode = insetN.new("ShaderNodeVectorMath")
 		dotBitangentNode.operation = "DOT_PRODUCT"
-		dotBitangentNode.location = [-100,-50]
-		dotBitangentNode.hide = True
+		dotBitangentNode.location = [-200,0]
+		dotBitangentNode.label = "Dot Bitangent"
 		dotNormalNode = insetN.new("ShaderNodeVectorMath")
 		dotNormalNode.operation = "DOT_PRODUCT"
-		dotNormalNode.location = [-100,-100]
-		dotNormalNode.hide = True
+		dotNormalNode.location = [-200,-150]
+		dotNormalNode.label = "Dot Normal"
 		dotMergeNode = insetN.new("ShaderNodeCombineXYZ")
-		dotMergeNode.location = [100,100]
-		dotMergeNode.hide = True
+		dotMergeNode.location = [0,100]
 		dotTransformNode = insetN.new("ShaderNodeVectorTransform")
 		dotTransformNode.vector_type = "VECTOR"
 		dotTransformNode.convert_from = "WORLD"
 		dotTransformNode.convert_to = "OBJECT"
-		dotTransformNode.location = [100,50]
+		dotTransformNode.location = [0,-50]
 		zSplitNode = insetN.new("ShaderNodeSeparateXYZ")
-		zSplitNode.location = [100,-150]
-		zSplitNode.hide = True
+		zSplitNode.location = [200,150]
 		divideNode = insetN.new("ShaderNodeVectorMath")
 		divideNode.operation = "DIVIDE"
-		divideNode.location = [100,-200]
-		divideNode.hide = True
+		divideNode.location = [200,0]
 		multiplyNode = insetN.new("ShaderNodeVectorMath")
 		multiplyNode.operation = "MULTIPLY"
-		multiplyNode.location = [100,-250]
-		multiplyNode.hide = True
+		multiplyNode.location = [200,-150]
 		mappingNode = insetN.new("ShaderNodeMapping")
 		mappingNode.vector_type = "TEXTURE"
-		mappingNode.location = [300,50]
+		mappingNode.location = [400,100]
 		nodeGroup.links.new(geometryInput.outputs["Incoming"],normalizeNode.inputs[0])
 		nodeGroup.links.new(insetInput.outputs["Depth"],depthTripleNode.inputs[0])
 		nodeGroup.links.new(insetInput.outputs["Depth"],depthTripleNode.inputs[1])
@@ -631,9 +746,12 @@ def import_library_node(nodeId, self, context):
 		nodeGroup.links.new(dotTransformNode.outputs[0],divideNode.inputs[0])
 		nodeGroup.links.new(zSplitNode.outputs["Z"],divideNode.inputs[1])
 		nodeGroup.links.new(divideNode.outputs[0],multiplyNode.inputs[1])
-		nodeGroup.links.new(depthTripleNode.outputs[0],multiplyNode.inputs[0])
+		rr = linkWithReroutes(nodeGroup,depthTripleNode.outputs[0],multiplyNode.inputs[0],1)
+		rr[0].location = [140,165]
 		nodeGroup.links.new(multiplyNode.outputs[0],mappingNode.inputs["Location"])
-		nodeGroup.links.new(insetInput.outputs["UV"],mappingNode.inputs["Vector"])
+		rr = linkWithReroutes(nodeGroup,insetInput.outputs["UV"],mappingNode.inputs["Vector"],2)
+		rr[0].location = [-400,220]
+		rr[1].location = [340,220]
 		nodeGroup.links.new(mappingNode.outputs[0],insetOutput.inputs["UV"])
 	elif nodeId == "UVPreProcess":
 		nodeGroup = bpy.data.node_groups.new("UVPreProcess","ShaderNodeTree")
@@ -645,32 +763,32 @@ def import_library_node(nodeId, self, context):
 		newNodeGroupOutput(nodeGroup,"NodeSocketVector","Vector")
 		preproN = nodeGroup.nodes
 		preproInput = preproN.new("NodeGroupInput")
-		preproInput.location = [-800,0]
+		preproInput.location = [-800,50]
 		preproOutput = preproN.new("NodeGroupOutput")
-		preproOutput.location = [600,0]
+		preproOutput.location = [600,50]
 		sepNode = preproN.new("ShaderNodeSeparateXYZ")
-		sepNode.location = [-600,0]
+		sepNode.location = [-600,50]
 		merNode = preproN.new("ShaderNodeCombineXYZ")
-		merNode.location = [400,0]
+		merNode.location = [400,50]
 		clampUNode = preproN.new("ShaderNodeClamp")
 		clampUNode.inputs["Min"].default_value = 0.0
 		clampUNode.inputs["Max"].default_value = 1.0
-		clampUNode.location = [-400,100]
+		clampUNode.location = [-400,150]
 		clampUNode.label = "Clamp U"
 		clampVNode = preproN.new("ShaderNodeClamp")
 		clampVNode.inputs["Min"].default_value = 0.0
 		clampVNode.inputs["Max"].default_value = 1.0
-		clampVNode.location = [-400,-100]
+		clampVNode.location = [-400,-50]
 		clampVNode.label = "Clamp V"
 		mirUNode = preproN.new("ShaderNodeMath")
 		mirUNode.operation = "PINGPONG"
 		mirUNode.inputs[1].default_value = 1.0 # yay magic numbers (they're all called "Value")
-		mirUNode.location = [-200,100]
+		mirUNode.location = [0,155]
 		mirUNode.label = "Mirror U"
 		mirVNode = preproN.new("ShaderNodeMath")
 		mirVNode.operation = "PINGPONG"
 		mirVNode.inputs[1].default_value = 1.0
-		mirVNode.location = [-200,-100]
+		mirVNode.location = [0,-50]
 		mirVNode.label = "Mirror V"
 		if bpy.app.version < (3,4,0):
 			mixNodeCU = preproN.new("ShaderNodeGroup")
@@ -690,34 +808,66 @@ def import_library_node(nodeId, self, context):
 			mixNodeMU.data_type = "FLOAT"
 			mixNodeMV = preproN.new("ShaderNodeMix")
 			mixNodeMV.data_type = "FLOAT"
-		mixNodeCU.location = [0,100]
+		mixNodeCU.location = [-200,180]
 		mixNodeCU.label = "Apply U Clamp"
-		mixNodeCV.location = [0,-100]
+		mixNodeCV.location = [-200,-50]
 		mixNodeCV.label = "Apply V Clamp"
-		mixNodeMU.location = [200,100]
+		mixNodeMU.location = [200,180]
 		mixNodeMU.label = "Apply U Mirror"
-		mixNodeMV.location = [200,-100]
+		mixNodeMV.location = [200,-50]
 		mixNodeMV.label = "Apply V Mirror"
+		backboneX1 = preproN.new("NodeReroute")
+		backboneX1.location = [-400,0]
+		backboneX2 = preproN.new("NodeReroute")
+		backboneX2.location = [-260,0]
+		backboneX3 = preproN.new("NodeReroute")
+		backboneX3.location = [-60,0]
+		backboneY1 = preproN.new("NodeReroute")
+		backboneY1.location = [-400,-20]
+		backboneY2 = preproN.new("NodeReroute")
+		backboneY2.location = [-260,-20]
+		backboneY3 = preproN.new("NodeReroute")
+		backboneY3.location = [-60,-20]
+		nodeGroup.links.new(sepNode.outputs["X"],backboneX1.inputs[0])
+		nodeGroup.links.new(sepNode.outputs["Y"],backboneY1.inputs[0])
+		nodeGroup.links.new(backboneX1.outputs[0],backboneX2.inputs[0])
+		nodeGroup.links.new(backboneX2.outputs[0],backboneX3.inputs[0])
+		nodeGroup.links.new(backboneY1.outputs[0],backboneY2.inputs[0])
+		nodeGroup.links.new(backboneY2.outputs[0],backboneY3.inputs[0])
 		nodeGroup.links.new(preproInput.outputs[0],sepNode.inputs[0])
 		nodeGroup.links.new(sepNode.outputs["X"],clampUNode.inputs["Value"])
-		nodeGroup.links.new(sepNode.outputs["X"],mirUNode.inputs["Value"])
+		nodeGroup.links.new(backboneX2.outputs[0],mixNodeCU.inputs["A"])
 		nodeGroup.links.new(sepNode.outputs["Y"],clampVNode.inputs["Value"])
-		nodeGroup.links.new(sepNode.outputs["Y"],mirVNode.inputs["Value"])
-		nodeGroup.links.new(preproInput.outputs[1],mixNodeCU.inputs["Factor"])
-		nodeGroup.links.new(preproInput.outputs[2],mixNodeCV.inputs["Factor"])
-		nodeGroup.links.new(preproInput.outputs[3],mixNodeMU.inputs["Factor"])
-		nodeGroup.links.new(preproInput.outputs[4],mixNodeMV.inputs["Factor"])
-		nodeGroup.links.new(sepNode.outputs["X"],mixNodeCU.inputs["A"])
-		nodeGroup.links.new(sepNode.outputs["Y"],mixNodeCV.inputs["A"])
-		nodeGroup.links.new(mixNodeCU.outputs["Result"],mixNodeMU.inputs["A"])
-		nodeGroup.links.new(mixNodeCV.outputs["Result"],mixNodeMV.inputs["A"])
+		nodeGroup.links.new(backboneY2.outputs[0],mixNodeCV.inputs["A"])
+		rr = linkWithReroutes(nodeGroup,preproInput.outputs[1],mixNodeCU.inputs["Factor"],2)
+		rr[0].location = [-600,170]
+		rr[1].location = [-260,170]
+		rr = linkWithReroutes(nodeGroup,preproInput.outputs[2],mixNodeCV.inputs["Factor"],2)
+		rr[0].location = [-600,-210]
+		rr[1].location = [-260,-210]
+		rr = linkWithReroutes(nodeGroup,preproInput.outputs[3],mixNodeMU.inputs["Factor"],2)
+		rr[0].location = [-600,190]
+		rr[1].location = [140,190]
+		rr = linkWithReroutes(nodeGroup,preproInput.outputs[4],mixNodeMV.inputs["Factor"],2)
+		rr[0].location = [-600,-230]
+		rr[1].location = [140,-230]
+		nodeGroup.links.new(backboneX3.outputs[0],mirUNode.inputs["Value"])
+		nodeGroup.links.new(backboneY3.outputs[0],mirVNode.inputs["Value"])
+		rr = linkWithReroutes(nodeGroup,mixNodeCU.outputs["Result"],mixNodeMU.inputs["A"],2)
+		rr[0].location = [0,170]
+		rr[1].location = [140,170]
+		rr = linkWithReroutes(nodeGroup,mixNodeCV.outputs["Result"],mixNodeMV.inputs["A"],2)
+		rr[0].location = [0,-210]
+		rr[1].location = [140,-210]
 		nodeGroup.links.new(clampUNode.outputs[0],mixNodeCU.inputs["B"])
 		nodeGroup.links.new(clampVNode.outputs[0],mixNodeCV.inputs["B"])
 		nodeGroup.links.new(mirUNode.outputs[0],mixNodeMU.inputs["B"])
 		nodeGroup.links.new(mirVNode.outputs[0],mixNodeMV.inputs["B"])
 		nodeGroup.links.new(mixNodeMU.outputs["Result"],merNode.inputs["X"])
 		nodeGroup.links.new(mixNodeMV.outputs["Result"],merNode.inputs["Y"])
-		nodeGroup.links.new(sepNode.outputs["Z"],merNode.inputs["Z"])
+		rr = linkWithReroutes(nodeGroup,sepNode.outputs["Z"],merNode.inputs["Z"],2)
+		rr[0].location = [-400,-40]
+		rr[1].location = [340,-40]
 		nodeGroup.links.new(merNode.outputs[0],preproOutput.inputs[0])
 	else:
 		self.report({"ERROR"}, "Node with id "+nodeId+" is not in the Forge library.")

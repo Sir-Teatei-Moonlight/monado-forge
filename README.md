@@ -60,6 +60,7 @@ Note that this list is of all features, not per-game features. Use the grid abov
   * Basic shader for specular workflow
   * Shader for inset parallax effect (e.g. Core Crystals)
   * Node group for combining two normal maps "properly" (https://blog.selfshadow.com/publications/blending-in-detail/)
+  * Geometry node group for fur shell effect
 
 ### Modify
 #### Skeleton
