@@ -29,8 +29,8 @@ def import_library_node(nodeId, self, context):
 		newNodeGroupInput(nodeGroup,"NodeSocketColor","Ambient Colour")
 		newNodeGroupInput(nodeGroup,"NodeSocketColor","Emit Colour")
 		newNodeGroupInput(nodeGroup,"NodeSocketColor","Normal Map")
-		newNodeGroupInput(nodeGroup,"NodeSocketColor","AO")
 		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Alpha")
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","AO")
 		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Metallic")
 		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Glossiness")
 		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Emit")
@@ -39,8 +39,8 @@ def import_library_node(nodeId, self, context):
 		getNodeGroupInput(nodeGroup,"Ambient Colour").default_value = (0.0,0.0,0.0,1.0)
 		getNodeGroupInput(nodeGroup,"Emit Colour").default_value = (0.0,0.0,0.0,1.0)
 		getNodeGroupInput(nodeGroup,"Normal Map").default_value = (0.5,0.5,1.0,1.0)
-		getNodeGroupInput(nodeGroup,"AO").default_value = (1.0,1.0,1.0,1.0)
 		getNodeGroupInput(nodeGroup,"Alpha").default_value = 1.0
+		getNodeGroupInput(nodeGroup,"AO").default_value = 1.0
 		getNodeGroupInput(nodeGroup,"Metallic").default_value = 0.0
 		getNodeGroupInput(nodeGroup,"Glossiness").default_value = 0.5
 		getNodeGroupInput(nodeGroup,"Emit").default_value = 0.0
@@ -124,8 +124,8 @@ def import_library_node(nodeId, self, context):
 		newNodeGroupInput(nodeGroup,"NodeSocketColor","Ambient Colour")
 		newNodeGroupInput(nodeGroup,"NodeSocketColor","Emit Colour")
 		newNodeGroupInput(nodeGroup,"NodeSocketColor","Normal Map")
-		newNodeGroupInput(nodeGroup,"NodeSocketColor","AO")
 		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Alpha")
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","AO")
 		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Glossiness")
 		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Emit")
 		newNodeGroupOutput(nodeGroup,"NodeSocketShader","BSDF")
@@ -133,8 +133,8 @@ def import_library_node(nodeId, self, context):
 		getNodeGroupInput(nodeGroup,"Specular Colour").default_value = (1.0,1.0,1.0,1.0)
 		getNodeGroupInput(nodeGroup,"Emit Colour").default_value = (0.0,0.0,0.0,1.0)
 		getNodeGroupInput(nodeGroup,"Normal Map").default_value = (0.5,0.5,1.0,1.0)
-		getNodeGroupInput(nodeGroup,"AO").default_value = (1.0,1.0,1.0,1.0)
 		getNodeGroupInput(nodeGroup,"Alpha").default_value = 1.0
+		getNodeGroupInput(nodeGroup,"AO").default_value = 1.0
 		getNodeGroupInput(nodeGroup,"Glossiness").default_value = 0.5
 		getNodeGroupInput(nodeGroup,"Emit").default_value = 0.0
 		specN = nodeGroup.nodes
