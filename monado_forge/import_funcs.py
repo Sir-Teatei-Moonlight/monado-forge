@@ -46,73 +46,99 @@ def import_library_node(nodeId, self, context):
 		getNodeGroupInput(nodeGroup,"Emit").default_value = 0.0
 		metalN = nodeGroup.nodes
 		metalInput = metalN.new("NodeGroupInput")
-		metalInput.location = [-600,50]
+		metalInput.location = [-700,50]
 		metalOutput = metalN.new("NodeGroupOutput")
-		metalOutput.location = [500,0]
+		metalOutput.location = [600,0]
 		shaderNode = metalN.new("ShaderNodeBsdfPrincipled")
 		if bpy.app.version >= (4,0,0): # more compact, can be moved
-			shaderNode.location = [0,100]
+			shaderNode.location = [100,100]
 		else:
-			shaderNode.location = [0,250]
+			shaderNode.location = [100,250]
+		clampAlphaNode = metalN.new("ShaderNodeClamp")
+		clampAlphaNode.location = [-500,-40]
+		clampAlphaNode.label = "Clamp (0.0, 1.0)"
+		clampAlphaNode.hide = True
+		clampAONode = metalN.new("ShaderNodeClamp")
+		clampAONode.location = [-500,-80]
+		clampAONode.label = "Clamp (0.0, 1.0)"
+		clampAONode.hide = True
+		clampMetalNode = metalN.new("ShaderNodeClamp")
+		clampMetalNode.location = [-500,-120]
+		clampMetalNode.label = "Clamp (0.0, 1.0)"
+		clampMetalNode.hide = True
+		clampGlossNode = metalN.new("ShaderNodeClamp")
+		clampGlossNode.location = [-500,-160]
+		clampGlossNode.label = "Clamp (0.0, 1.0)"
+		clampGlossNode.hide = True
 		baseAONode = metalN.new("ShaderNodeMixRGB")
 		baseAONode.blend_type = "MULTIPLY"
-		baseAONode.location = [-400,125]
+		baseAONode.location = [-300,125]
 		baseAONode.inputs["Fac"].default_value = 1.0
 		baseAONode.label = "Base + AO"
 		normalMapNode = metalN.new("ShaderNodeNormalMap")
-		normalMapNode.location = [-200,0]
+		normalMapNode.location = [-100,0]
 		roughToGlossNode = metalN.new("ShaderNodeMath")
 		roughToGlossNode.operation = "SUBTRACT"
 		roughToGlossNode.inputs[0].default_value = 1.0
-		roughToGlossNode.location = [-400,-100]
+		roughToGlossNode.location = [-300,-100]
 		roughToGlossNode.label = "Rough to Gloss"
 		ambientNode = metalN.new("ShaderNodeEmission")
-		ambientNode.location = [300,75]
+		ambientNode.location = [400,75]
 		ambientNode.label = "Ambient Emission"
 		shaderAddNode = metalN.new("ShaderNodeAddShader")
-		shaderAddNode.location = [300,-75]
-		nodeGroup.links.new(metalInput.outputs["Base Colour"],baseAONode.inputs["Color1"])
-		nodeGroup.links.new(metalInput.outputs["AO"],baseAONode.inputs["Color2"])
+		shaderAddNode.location = [400,-75]
+		
+		rr = linkWithReroutes(nodeGroup,metalInput.outputs["Base Colour"],baseAONode.inputs["Color1"],1)
+		rr[0].location = [-360,15]
+		nodeGroup.links.new(metalInput.outputs["AO"],clampAONode.inputs["Value"])
+		nodeGroup.links.new(clampAONode.outputs["Result"],baseAONode.inputs["Color2"])
 		rr = linkWithReroutes(nodeGroup,metalInput.outputs["Ambient Colour"],ambientNode.inputs["Color"],2)
 		if bpy.app.version >= (4,0,0):
-			rr[0].location = [-400,140]
-			rr[1].location = [240,140]
+			rr[0].location = [-500,140]
+			rr[1].location = [340,140]
 		else:
-			rr[0].location = [-400,260]
-			rr[1].location = [240,260]
-		rr = linkWithReroutes(nodeGroup,metalInput.outputs["Normal Map"],normalMapNode.inputs["Color"],2)
-		rr[0].location = [-400,-55]
-		rr[1].location = [-260,-55]
-		nodeGroup.links.new(metalInput.outputs["Glossiness"],roughToGlossNode.inputs[1])
+			rr[0].location = [-300,260]
+			rr[1].location = [340,260]
+		rr = linkWithReroutes(nodeGroup,metalInput.outputs["Normal Map"],normalMapNode.inputs["Color"],4)
+		rr[0].location = [-500,0]
+		rr[1].location = [-360,0]
+		rr[2].location = [-300,-55]
+		rr[3].location = [-160,-55]
+		nodeGroup.links.new(metalInput.outputs["Glossiness"],clampGlossNode.inputs["Value"])
+		nodeGroup.links.new(clampGlossNode.outputs["Result"],roughToGlossNode.inputs[1])
 		if bpy.app.version >= (4,0,0):
 			emitInputName = "Emission Color"
 		else:
 			emitInputName = "Emission"
-		rr = linkWithReroutes(nodeGroup,metalInput.outputs["Emit Colour"],shaderNode.inputs[emitInputName],4)
-		rr[0].location = [-400,-65]
-		rr[1].location = [-260,-65]
-		rr[2].location = [-200,-160]
-		rr[3].location = [-50,-160]
-		rr = linkWithReroutes(nodeGroup,metalInput.outputs["Alpha"],shaderNode.inputs["Alpha"],4)
-		rr[0].location = [-400,-75]
-		rr[1].location = [-260,-75]
-		rr[2].location = [-200,-180]
-		rr[3].location = [-50,-180]
-		rr = linkWithReroutes(nodeGroup,metalInput.outputs["Metallic"],shaderNode.inputs["Metallic"],4)
-		rr[0].location = [-400,-85]
-		rr[1].location = [-260,-85]
-		rr[2].location = [-200,40]
-		rr[3].location = [-50,40]
+		rr = linkWithReroutes(nodeGroup,metalInput.outputs["Emit Colour"],shaderNode.inputs[emitInputName],6)
+		rr[0].location = [-500,-20]
+		rr[1].location = [-360,-20]
+		rr[2].location = [-300,-65]
+		rr[3].location = [-160,-65]
+		rr[4].location = [-100,-160]
+		rr[5].location = [50,-160]
+		nodeGroup.links.new(metalInput.outputs["Alpha"],clampAlphaNode.inputs["Value"])
+		rr = linkWithReroutes(nodeGroup,clampAlphaNode.outputs["Result"],shaderNode.inputs["Alpha"],4)
+		rr[0].location = [-300,-75]
+		rr[1].location = [-160,-75]
+		rr[2].location = [-100,-180]
+		rr[3].location = [50,-180]
+		nodeGroup.links.new(metalInput.outputs["Metallic"],clampMetalNode.inputs["Value"])
+		rr = linkWithReroutes(nodeGroup,clampMetalNode.outputs["Result"],shaderNode.inputs["Metallic"],4)
+		rr[0].location = [-300,-85]
+		rr[1].location = [-160,-85]
+		rr[2].location = [-100,40]
+		rr[3].location = [50,40]
 		rr = linkWithReroutes(nodeGroup,metalInput.outputs["Emit"],shaderNode.inputs["Emission Strength"],2)
-		rr[0].location = [-400,-260]
-		rr[1].location = [-50,-260]
+		rr[0].location = [-500,-260]
+		rr[1].location = [50,-260]
 		rr = linkWithReroutes(nodeGroup,baseAONode.outputs[0],shaderNode.inputs["Base Color"],1)
-		rr[0].location = [-50,90]
+		rr[0].location = [50,90]
 		nodeGroup.links.new(ambientNode.outputs[0],shaderAddNode.inputs[1])
 		nodeGroup.links.new(normalMapNode.outputs[0],shaderNode.inputs["Normal"])
 		rr = linkWithReroutes(nodeGroup,roughToGlossNode.outputs[0],shaderNode.inputs["Roughness"],2)
-		rr[0].location = [-200,20]
-		rr[1].location = [-50,20]
+		rr[0].location = [-100,20]
+		rr[1].location = [50,20]
 		nodeGroup.links.new(shaderNode.outputs["BSDF"],shaderAddNode.inputs[0])
 		nodeGroup.links.new(shaderAddNode.outputs[0],metalOutput.inputs["BSDF"])
 	elif nodeId == "BasicSpecular":
@@ -139,73 +165,101 @@ def import_library_node(nodeId, self, context):
 		getNodeGroupInput(nodeGroup,"Emit").default_value = 0.0
 		specN = nodeGroup.nodes
 		specInput = specN.new("NodeGroupInput")
-		specInput.location = [-700,50]
+		specInput.location = [-800,50]
 		specOutput = specN.new("NodeGroupOutput")
-		specOutput.location = [500,0]
+		specOutput.location = [600,0]
 		shaderNode = specN.new("ShaderNodeEeveeSpecular")
-		shaderNode.location = [100,100]
+		shaderNode.location = [200,100]
+		clampAlphaNode = specN.new("ShaderNodeClamp")
+		clampAlphaNode.location = [-600,-20]
+		clampAlphaNode.label = "Clamp (0.0, 1.0)"
+		clampAlphaNode.hide = True
+		clampAONode = specN.new("ShaderNodeClamp")
+		clampAONode.location = [-600,-60]
+		clampAONode.label = "Clamp (0.0, 1.0)"
+		clampAONode.hide = True
+		clampGlossNode = specN.new("ShaderNodeClamp")
+		clampGlossNode.location = [-600,-100]
+		clampGlossNode.label = "Clamp (0.0, 1.0)"
+		clampGlossNode.hide = True
 		baseAONode = specN.new("ShaderNodeMixRGB")
 		baseAONode.blend_type = "MULTIPLY"
-		baseAONode.location = [-500,125]
+		baseAONode.location = [-400,125]
 		baseAONode.inputs["Fac"].default_value = 1.0
 		baseAONode.label = "Base + AO"
 		normalMapNode = specN.new("ShaderNodeNormalMap")
-		normalMapNode.location = [-300,-100]
+		normalMapNode.location = [-200,-100]
 		roughToGlossNode = specN.new("ShaderNodeMath")
 		roughToGlossNode.operation = "SUBTRACT"
 		roughToGlossNode.inputs[0].default_value = 1.0
-		roughToGlossNode.location = [-500,-100]
+		roughToGlossNode.location = [-400,-100]
+		roughToGlossNode.label = "Rough to Gloss"
 		alphaInvertNode = specN.new("ShaderNodeMath")
 		alphaInvertNode.operation = "SUBTRACT"
 		alphaInvertNode.inputs[0].default_value = 1.0
-		alphaInvertNode.location = [-300,100]
+		alphaInvertNode.location = [-200,100]
+		alphaInvertNode.label = "Alpha to Transp."
 		emitMixNode = specN.new("ShaderNodeMixRGB")
 		emitMixNode.blend_type = "MIX"
-		emitMixNode.location = [-100,25]
+		emitMixNode.location = [0,25]
 		emitMixNode.inputs["Color1"].default_value = [0.0,0.0,0.0,1.0]
 		ambientNode = specN.new("ShaderNodeEmission")
-		ambientNode.location = [300,75]
+		ambientNode.location = [400,75]
 		ambientNode.label = "Ambient Emission"
 		shaderAddNode = specN.new("ShaderNodeAddShader")
-		shaderAddNode.location = [300,-75]
-		nodeGroup.links.new(specInput.outputs["Base Colour"],baseAONode.inputs["Color1"])
-		nodeGroup.links.new(specInput.outputs["AO"],baseAONode.inputs["Color2"])
+		shaderAddNode.location = [400,-75]
+		
+		rr = linkWithReroutes(nodeGroup,specInput.outputs["Base Colour"],baseAONode.inputs["Color1"],2)
+		rr[0].location = [-600,40]
+		rr[1].location = [-460,40]
+		nodeGroup.links.new(specInput.outputs["AO"],clampAONode.inputs["Value"])
+		nodeGroup.links.new(clampAONode.outputs["Result"],baseAONode.inputs["Color2"])
 		rr = linkWithReroutes(nodeGroup,specInput.outputs["Ambient Colour"],ambientNode.inputs["Color"],2)
-		rr[0].location = [-500,140]
-		rr[1].location = [240,140]
-		rr = linkWithReroutes(nodeGroup,specInput.outputs["Normal Map"],normalMapNode.inputs["Color"],2)
-		rr[0].location = [-500,-80]
-		rr[1].location = [-360,-80]
-		nodeGroup.links.new(specInput.outputs["Glossiness"],roughToGlossNode.inputs[1])
-		rr = linkWithReroutes(nodeGroup,specInput.outputs["Alpha"],alphaInvertNode.inputs[1],2)
-		rr[0].location = [-500,-60]
-		rr[1].location = [-360,-60]
-		rr = linkWithReroutes(nodeGroup,specInput.outputs["Specular Colour"],shaderNode.inputs["Specular"],4)
-		rr[0].location = [-500,-50]
-		rr[1].location = [-150,-50]
-		rr[2].location = [-100,60]
-		rr[3].location = [40,60]
-		rr = linkWithReroutes(nodeGroup,specInput.outputs["Emit Colour"],emitMixNode.inputs["Color2"],2)
-		rr[0].location = [-500,-70]
-		rr[1].location = [-150,-70]
-		rr = linkWithReroutes(nodeGroup,specInput.outputs["Emit"],emitMixNode.inputs["Fac"],2)
-		rr[0].location = [-500,-90]
-		rr[1].location = [-150,-90]
+		rr[0].location = [-600,140]
+		rr[1].location = [340,140]
+		rr = linkWithReroutes(nodeGroup,specInput.outputs["Normal Map"],normalMapNode.inputs["Color"],4)
+		rr[0].location = [-600,-140]
+		rr[1].location = [-460,-140]
+		rr[2].location = [-400,-80]
+		rr[3].location = [-260,-80]
+		nodeGroup.links.new(specInput.outputs["Glossiness"],clampGlossNode.inputs["Value"])
+		nodeGroup.links.new(clampGlossNode.outputs["Result"],roughToGlossNode.inputs[1])
+		nodeGroup.links.new(specInput.outputs["Alpha"],clampAlphaNode.inputs["Value"])
+		rr = linkWithReroutes(nodeGroup,clampAlphaNode.outputs["Result"],alphaInvertNode.inputs[1],2)
+		rr[0].location = [-400,-60]
+		rr[1].location = [-260,-60]
+		rr = linkWithReroutes(nodeGroup,specInput.outputs["Specular Colour"],shaderNode.inputs["Specular"],6)
+		rr[0].location = [-600,20]
+		rr[1].location = [-460,20]
+		rr[2].location = [-400,-50]
+		rr[3].location = [-50,-50]
+		rr[4].location = [0,60]
+		rr[5].location = [140,60]
+		rr = linkWithReroutes(nodeGroup,specInput.outputs["Emit Colour"],emitMixNode.inputs["Color2"],4)
+		rr[0].location = [-600,0]
+		rr[1].location = [-460,0]
+		rr[2].location = [-400,-70]
+		rr[3].location = [-50,-70]
+		rr = linkWithReroutes(nodeGroup,specInput.outputs["Emit"],emitMixNode.inputs["Fac"],4)
+		rr[0].location = [-600,-160]
+		rr[1].location = [-460,-160]
+		rr[2].location = [-400,-90]
+		rr[3].location = [-50,-90]
 		rr = linkWithReroutes(nodeGroup,baseAONode.outputs[0],shaderNode.inputs["Base Color"],2)
-		rr[0].location = [-300,120]
-		rr[1].location = [40,120]
+		rr[0].location = [-200,120]
+		rr[1].location = [140,120]
 		nodeGroup.links.new(ambientNode.outputs[0],shaderAddNode.inputs[1])
 		rr = linkWithReroutes(nodeGroup,normalMapNode.outputs[0],shaderNode.inputs["Normal"],2)
-		rr[0].location = [-100,-160]
-		rr[1].location = [40,-160]
+		rr[0].location = [0,-160]
+		rr[1].location = [140,-160]
 		rr = linkWithReroutes(nodeGroup,alphaInvertNode.outputs[0],shaderNode.inputs["Transparency"],2)
-		rr[0].location = [-100,80]
-		rr[1].location = [40,80]
+		rr[0].location = [0,80]
+		rr[1].location = [140,80]
 		rr = linkWithReroutes(nodeGroup,roughToGlossNode.outputs[0],shaderNode.inputs["Roughness"],4)
-		rr[0].location = [-300,-60]
-		rr[1].location = [-150,-60]
-		rr[2].location = [-100,40]
-		rr[3].location = [40,40]
+		rr[0].location = [-200,-60]
+		rr[1].location = [-50,-60]
+		rr[2].location = [0,40]
+		rr[3].location = [140,40]
 		nodeGroup.links.new(emitMixNode.outputs[0],shaderNode.inputs["Emissive Color"])
 		nodeGroup.links.new(shaderNode.outputs["BSDF"],shaderAddNode.inputs[0])
 		nodeGroup.links.new(shaderAddNode.outputs[0],specOutput.inputs["BSDF"])
