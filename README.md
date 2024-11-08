@@ -45,6 +45,7 @@ Note that this list is of all features, not per-game features. Use the grid abov
 * Supports normals, UVs, vertex colours, rigging (vertex groups), and shapes (morphs). Models are automatically parented to the skeleton found in the .wimdo; if there is no skeleton, they are parented to a blank one.
 * By using the import-with-skeleton button instead, both the .wimdo's skeleton and the .arc/.chr skeleton will be imported, and then merged into one (giving the .arc/.chr one priority).
 * Optionally also import lower-LOD models. Doesn't currently distinguish them in any way.
+* Optionally import tangent data, as a tangent vector and a bitangent polarity float. Don't really need this, since the "TBN Matrix" node does the same job, but hey it's there.
 * Choice of whether to import sharp edges as merged vertices or split vertices.
 * Optionally imports outline data as a Solidify modifier, a vertex group (for the thickness factor), and a vertex colour (for...the colour).
 * Optional mesh cleanup, erasing unused vertices, vertex groups, vertex colours, outline data, and shapes.
@@ -75,8 +76,9 @@ Note that this list is of all features, not per-game features. Use the grid abov
 * Link the shape keys of multiple meshes together using drivers.
 
 ## Known issues
-Roughly in order of badness.
+Roughly in order of badness, with worst at the top.
 ### Things with workarounds
+* Merge Sharp Edges may result in coincident faces being lost (because Blender will refuse to make a face if those vertices already have a face). This can be okay if the faces are identical, but if they aren't (e.g. two backface-culled faces pointing opposite directions), faces will be lost in an arbitrary pattern. Check meshes for unusual amounts of sharp edges to see if you need to re-import some pieces without Merge Sharp Edges enabled. (It's not currently feasible to detect and fix this during import.)
 * By default, images import as whatever the default colour setting is. It guesses whether they are non-colour data based on the name, so it can always get it wrong, and you'll have to manually notice and correct them. (This will make them _look_ wrong, for whatever dumb reason, but they will _behave_ correctly.)
   * .brres image names are not quite standardised enough to be worth doing this for them.
 * Meshes with outlines are imported as two meshes, one with all the data (including the outline) and one with only the outline data. You have to pick whether to remove the outline from the main mesh, or delete the extra outline mesh.
@@ -96,7 +98,6 @@ Roughly in order of badness.
 * Many XC3 models for party members (and possibly others) appear to use an unknown parenting mechanism for several bones (believed to be constraint-related), so they end up not being parented at all. You'll have to guess how things need to be attached.
 * Images that aren't power-of-two dimensions are not descrambled/deswizzled correctly. Very rare, but there.
 * Models entirely embedded in the .wimdo are not checked for yet. (Normally, the model itself is in the .wismt and the .wimdo is just definitions, but putting a model in the .wimdo is also legal.) Very rare, so ought not to be a big deal.
-* There's an extra bit of data that we don't know what it does. It shows up as a "29,4" warning in the console. You can ignore it.
 * Everything assumes Eevee for rendering. I have no idea what will happen if you try to use Cycles.
 
 ## Planned features

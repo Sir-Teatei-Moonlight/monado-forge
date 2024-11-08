@@ -459,6 +459,7 @@ def import_wismt(f, wimdoResults, context):
 	texPath = None
 	if context.scene.monado_forge_import.autoSaveTextures:
 		texPath = bpy.path.abspath(context.scene.monado_forge_import.texturePath)
+	doTangents = context.scene.monado_forge_import.importTangentData
 	doOutlines = context.scene.monado_forge_import.importOutlineData
 	mergeSharpEdges = context.scene.monado_forge_import.mergeSharpEdges
 	differentiate = context.scene.monado_forge_import.differentiateTextures
@@ -773,10 +774,15 @@ def import_wismt(f, wimdoResults, context):
 									newVertex.setColour(vIndex,0,[r,g,b,a])
 									hasColourLayers[0] = True
 								elif vdType == 28: # normals
-									newNormal = [readAndParseInt(sf,1,signed=True)/128.0,readAndParseInt(sf,1,signed=True)/128.0,readAndParseInt(sf,1,signed=True)/128.0]
+									newNormal = [readAndParseInt(sf,1,signed=True),readAndParseInt(sf,1,signed=True),readAndParseInt(sf,1,signed=True)]
 									readAndParseInt(sf,1,signed=True) # dummy
-									# doesn't necessarily read as normalized
 									newVertex.setNormal(vIndex,mathutils.Vector(newNormal).normalized()[:])
+								elif vdType == 29: # tangents
+									newTangent = [readAndParseInt(sf,1,signed=True),readAndParseInt(sf,1,signed=True),readAndParseInt(sf,1,signed=True)]
+									tanW = readAndParseInt(sf,1,signed=True)/127.0 # it's either 127 or -127, which is supposed to mean 1.0 or -1.0
+									if doTangents: # we still need to advance the read, so that's why this check wasn't earlier
+										newTangent = mathutils.Vector(newTangent).normalized()[:]
+										newVertex.setTangent(vIndex,newTangent+(tanW,))
 								elif vdType == 41: # weight values (weightTable verts only)
 									weightVertex[1] = [readAndParseInt(sf,2)/65535.0,readAndParseInt(sf,2)/65535.0,readAndParseInt(sf,2)/65535.0,readAndParseInt(sf,2)/65535.0]
 								elif vdType == 42: # weight IDs (weightTable verts only)

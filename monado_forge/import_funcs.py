@@ -16,6 +16,7 @@ def import_library_node(nodeId, self, context):
 				"TexInset":["TBNMatrix"],
 				}
 	if bpy.app.version < (3,4,0):
+		prereqs["TBNMatrix"] = ["MixVectors"]
 		prereqs["UVPreProcess"] = ["MixFloats"]
 	try:
 		for pr in prereqs[nodeId]:
@@ -600,6 +601,45 @@ def import_library_node(nodeId, self, context):
 		nodeGroup.links.new(facANode.outputs["Value"],mergeNode.inputs[0])
 		nodeGroup.links.new(facBNode.outputs["Value"],mergeNode.inputs[1])
 		nodeGroup.links.new(mergeNode.outputs["Value"],mixOutput.inputs["Result"])
+	elif nodeId == "MixVectors": # same as MixFloats
+		nodeGroup = bpy.data.node_groups.new("MixVectors","ShaderNodeTree")
+		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Factor")
+		newNodeGroupInput(nodeGroup,"NodeSocketVector","A")
+		newNodeGroupInput(nodeGroup,"NodeSocketVector","B")
+		newNodeGroupOutput(nodeGroup,"NodeSocketVector","Result")
+		getNodeGroupInput(nodeGroup,"Factor").default_value = 0.5
+		getNodeGroupInput(nodeGroup,"A").default_value = [0.0,0.0,0.0]
+		getNodeGroupInput(nodeGroup,"B").default_value = [0.0,0.0,0.0]
+		mixN = nodeGroup.nodes
+		mixInput = mixN.new("NodeGroupInput")
+		mixInput.location = [-500,0]
+		mixOutput = mixN.new("NodeGroupOutput")
+		mixOutput.location = [300,0]
+		invertNode = mixN.new("ShaderNodeMath")
+		invertNode.operation = "SUBTRACT"
+		invertNode.inputs[0].default_value = 1.0
+		invertNode.location = [-300,0]
+		facANode = mixN.new("ShaderNodeVectorMath")
+		facANode.operation = "MULTIPLY"
+		facANode.location = [-100,100]
+		facBNode = mixN.new("ShaderNodeVectorMath")
+		facBNode.operation = "MULTIPLY"
+		facBNode.location = [-100,-100]
+		mergeNode = mixN.new("ShaderNodeVectorMath")
+		mergeNode.operation = "ADD"
+		mergeNode.location = [100,0]
+		nodeGroup.links.new(mixInput.outputs["Factor"],invertNode.inputs[1])
+		nodeGroup.links.new(invertNode.outputs["Value"],facANode.inputs[0])
+		rr = linkWithReroutes(nodeGroup,mixInput.outputs["A"],facANode.inputs[1],2)
+		rr[0].location = [-300,20]
+		rr[1].location = [-160,20]
+		rr = linkWithReroutes(nodeGroup,mixInput.outputs["Factor"],facBNode.inputs[0],1)
+		rr[0].location = [-300,-210]
+		rr = linkWithReroutes(nodeGroup,mixInput.outputs["B"],facBNode.inputs[1],1)
+		rr[0].location = [-300,-230]
+		nodeGroup.links.new(facANode.outputs["Vector"],mergeNode.inputs[0])
+		nodeGroup.links.new(facBNode.outputs["Vector"],mergeNode.inputs[1])
+		nodeGroup.links.new(mergeNode.outputs["Vector"],mixOutput.inputs["Result"])
 	elif nodeId == "ReorientNormalMap":
 		# https://blog.selfshadow.com/publications/blending-in-detail/
 		nodeGroup = bpy.data.node_groups.new("ReorientNormalMap","ShaderNodeTree")
@@ -678,54 +718,91 @@ def import_library_node(nodeId, self, context):
 		nodeGroup.links.new(finalTransformNode.outputs[0],combineOutput.inputs["Combined"])
 	elif nodeId == "TBNMatrix":
 		# https://blender.stackexchange.com/questions/291989/how-would-i-get-the-full-tbn-matrix-from-just-a-normal-map
+		# https://blenderartists.org/t/how-do-i-have-a-shader-detect-mirrored-uvs/1557016/2
 		nodeGroup = bpy.data.node_groups.new("TBNMatrix","ShaderNodeTree")
 		newNodeGroupInput(nodeGroup,"NodeSocketColor","Normal Map")
-		newNodeGroupInput(nodeGroup,"NodeSocketVector","Tangent")
 		newNodeGroupOutput(nodeGroup,"NodeSocketVector","Tangent")
 		newNodeGroupOutput(nodeGroup,"NodeSocketVector","Bitangent")
 		newNodeGroupOutput(nodeGroup,"NodeSocketVector","Normal")
 		getNodeGroupInput(nodeGroup,"Normal Map").default_value = (0.5,0.5,1.0,1.0)
 		tbnN = nodeGroup.nodes
 		tbnInput = tbnN.new("NodeGroupInput")
-		tbnInput.location = [-600,0]
+		tbnInput.location = [-800,0]
 		tbnOutput = tbnN.new("NodeGroupOutput")
-		tbnOutput.location = [400,0]
+		tbnOutput.location = [600,0]
+		tangentMapNode = tbnN.new("ShaderNodeNormalMap")
+		tangentMapNode.location = [-600,100]
+		tangentMapNode.inputs["Color"].default_value = [1.0,0.5,0.5,1.0]
+		tangentMapNode.label = "Raw Tangent"
 		normalMapNode = tbnN.new("ShaderNodeNormalMap")
-		normalMapNode.location = [-400,0]
+		normalMapNode.location = [-600,-100]
+		normalMapNode.label = "Create Normal"
 		crossNode1 = tbnN.new("ShaderNodeVectorMath")
 		crossNode1.operation = "CROSS_PRODUCT"
-		crossNode1.location = [-200,0]
+		crossNode1.location = [-400,0]
+		crossNode1.label = "Create Bitangent"
 		crossNode2 = tbnN.new("ShaderNodeVectorMath")
 		crossNode2.operation = "CROSS_PRODUCT"
-		crossNode2.location = [0,0]
+		crossNode2.location = [-200,0]
+		crossNode2.label = "Create Tangent"
+		bitangentMapNode = tbnN.new("ShaderNodeNormalMap")
+		bitangentMapNode.location = [-200,200]
+		bitangentMapNode.inputs["Color"].default_value = [0.5,1.0,0.5,1.0]
+		bitangentMapNode.label = "Raw Bitangent"
+		dotNode = tbnN.new("ShaderNodeVectorMath")
+		dotNode.operation = "DOT_PRODUCT"
+		dotNode.location = [0,200]
+		dotNode.label = "Test Direction"
+		scaleNode = tbnN.new("ShaderNodeVectorMath")
+		scaleNode.operation = "SCALE"
+		scaleNode.location = [0,0]
+		scaleNode.inputs["Scale"].default_value = -1.0
+		if bpy.app.version < (3,4,0):
+			mixNode = tbnN.new("ShaderNodeGroup")
+			mixNode.node_tree = bpy.data.node_groups["MixVectors"]
+		else:
+			mixNode = tbnN.new("ShaderNodeMix")
+			mixNode.data_type = "VECTOR"
+			mixNode.clamp_factor = False
+		mixNode.location = [200,0]
+		mixNode.label = "Flip Bitangent"
 		normalizeNode1 = tbnN.new("ShaderNodeVectorMath")
 		normalizeNode1.operation = "NORMALIZE"
-		normalizeNode1.location = [200,150]
+		normalizeNode1.location = [400,150]
 		normalizeNode1.label = "Normalise Tangent"
 		normalizeNode2 = tbnN.new("ShaderNodeVectorMath")
 		normalizeNode2.operation = "NORMALIZE"
-		normalizeNode2.location = [200,0]
+		normalizeNode2.location = [400,0]
 		normalizeNode2.label = "Normalise Bitangent"
 		normalizeNode3 = tbnN.new("ShaderNodeVectorMath")
 		normalizeNode3.operation = "NORMALIZE"
-		normalizeNode3.location = [200,-150]
+		normalizeNode3.location = [400,-150]
 		normalizeNode3.label = "Normalise Normal"
 		nodeGroup.links.new(tbnInput.outputs["Normal Map"],normalMapNode.inputs["Color"])
-		rr = linkWithReroutes(nodeGroup,tbnInput.outputs["Tangent"],crossNode1.inputs[1],2)
-		rr[0].location = [-400,-160]
-		rr[1].location = [-250,-160]
+		nodeGroup.links.new(tangentMapNode.outputs[0],crossNode1.inputs[1])
 		nodeGroup.links.new(normalMapNode.outputs[0],crossNode1.inputs[0])
 		rr = linkWithReroutes(nodeGroup,normalMapNode.outputs[0],crossNode2.inputs[1],2)
-		rr[0].location = [-200,-140]
-		rr[1].location = [-60,-140]
-		rr = linkWithReroutes(nodeGroup,normalMapNode.outputs[0],normalizeNode3.inputs[0],2)
-		rr[0].location = [-200,-160]
-		rr[1].location = [140,-160]
+		rr[0].location = [-400,-160]
+		rr[1].location = [-260,-160]
+		normalBackbone = rr[1]
+		nodeGroup.links.new(bitangentMapNode.outputs[0],dotNode.inputs[0])
+		rr = linkWithReroutes(nodeGroup,crossNode1.outputs[0],dotNode.inputs[1],2)
+		rr[0].location = [-200,30]
+		rr[1].location = [-60,30]
+		bitangentBackbone = rr[1]
+		nodeGroup.links.new(bitangentBackbone.outputs[0],scaleNode.inputs[0])
+		nodeGroup.links.new(dotNode.outputs["Value"],mixNode.inputs["Factor"])
+		rr = linkWithReroutes(nodeGroup,bitangentBackbone.outputs[0],mixNode.inputs["B"],1)
+		rr[0].location = [0,-180]
+		nodeGroup.links.new(scaleNode.outputs[0],mixNode.inputs["A"])
+		rr = linkWithReroutes(nodeGroup,normalBackbone.outputs[0],normalizeNode3.inputs[0],2)
+		rr[0].location = [-200,-210]
+		rr[1].location = [340,-210]
 		nodeGroup.links.new(crossNode1.outputs[0],crossNode2.inputs[0])
-		rr = linkWithReroutes(nodeGroup,crossNode1.outputs[0],normalizeNode2.inputs[0],2)
-		rr[0].location = [0,-140]
-		rr[1].location = [140,-140]
-		nodeGroup.links.new(crossNode2.outputs[0],normalizeNode1.inputs[0])
+		nodeGroup.links.new(mixNode.outputs["Result"],normalizeNode2.inputs[0])
+		rr = linkWithReroutes(nodeGroup,crossNode2.outputs[0],normalizeNode1.inputs[0],2)
+		rr[0].location = [0,30]
+		rr[1].location = [340,30]
 		nodeGroup.links.new(normalizeNode1.outputs[0],tbnOutput.inputs["Tangent"])
 		nodeGroup.links.new(normalizeNode2.outputs[0],tbnOutput.inputs["Bitangent"])
 		nodeGroup.links.new(normalizeNode3.outputs[0],tbnOutput.inputs["Normal"])
@@ -1190,6 +1267,20 @@ def realise_results(forgeResults, mainName, self, context):
 			meshData.normals_split_custom_set(normalsList)
 			if bpy.app.version < (4,1,0): # function removed, no longer needed
 				meshData.calc_normals_split()
+		if mesh.hasTangents():
+			# it is known that this is could be more efficient, but:
+			# 1. there's no reason to trust a colour attribute to handle non-colour data (and vector4 is not provided any other way)
+			# 2. Blender seems to greatly dislike creating an attribute if you haven't yet filled in the previous one (i.e. memory corruption)
+			# 3. the errors received while writing this range from "generally unhelpful" to "instant crash"
+			# 4. we don't really need this anyway, the TBN Matrix node seems to handle it just fine
+			tangentsList = mesh.getLoopTangentsList()
+			tangentsAttrib = meshData.attributes.new("Tangents","FLOAT_VECTOR","CORNER")
+			for loop in meshData.loops:
+				tangent = tangentsList[loop.index]
+				tangentsAttrib.data[loop.index].vector = tangent[0:3]
+			bitangentsAttrib = meshData.attributes.new("BitangentPolarity","FLOAT","CORNER")
+			bitangentsList = list([t[3] for t in tangentsList])
+			bitangentsAttrib.data.foreach_set("value",bitangentsList)
 		if mesh.hasColours():
 			meshColours = mesh.getLoopColoursList()
 			for layer,colours in meshColours.items():

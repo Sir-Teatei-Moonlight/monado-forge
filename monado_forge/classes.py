@@ -408,6 +408,7 @@ class MonadoForgeVertex:
 		self._weightSetIndex = -1 # pre-bake
 		self._weights = {} # post-bake (must also be by index rather than name since we don't necessarily know names)
 		self._normals = {}
+		self._tangents = {}
 		self._colours = {} # in 255 format
 		self._uvs = {}
 		self._outlines = {} # same as colours, but split for usefulness
@@ -467,6 +468,20 @@ class MonadoForgeVertex:
 	@property
 	def hasNormals(self):
 		return self._normals != {}
+	# no setter
+	
+	@property
+	def tangents(self):
+		return self._tangents
+	# no @setter (requires index)
+	def setTangent(self,index,tangent):
+		ensure_length(tangent,4)
+		self._tangents[index] = tangent[:]
+	def clearTangents(self):
+		self._tangents = {}
+	@property
+	def hasTangents(self):
+		return self._tangents != {}
 	# no setter
 	
 	@property
@@ -530,8 +545,14 @@ class MonadoForgeVertex:
 			return False
 		# we only compare one of the normals (the primary index's) because
 		# if a vertex has been merged previously, we already know its normals are all the same
-		if compareNormals and (self.hasNormals and other.hasNormals) and self._normals[self.index] != other._normals[other.index]:
-			return False
+		# it is no guarantee that the same normal means the same tangent, so that's its own check
+		if compareNormals:
+			if self.hasNormals != other.hasNormals or self.hasTangents != other.hasTangents:
+				return False
+			if self.hasNormals and other.hasNormals and self._normals[self.index] != other._normals[other.index]:
+				return False
+			if self.hasTangents and other.hasTangents and self._tangents[self.index] != other._tangents[other.index]:
+				return False
 		# unlike normals, there is no logical use case for "I don't want to merge vertices if their colours or UVs are different"
 		# (or at least I can't think of one)
 		# so don't offer an option, and don't compare them at all
@@ -547,6 +568,7 @@ class MonadoForgeVertex:
 			return False
 		self._indexes += other._indexes
 		self._normals |= other._normals # since indexes cannot be the same, these are "safe" (no collisions)
+		self._tangents |= other._tangents
 		self._colours |= other._colours
 		self._uvs |= other._uvs
 		self._outlines |= other._outlines
@@ -745,6 +767,10 @@ class MonadoForgeMesh:
 		for i,v in self._vertices:
 			if v.hasNormals: return True
 		return False
+	def hasTangents(self):
+		for i,v in self._vertices:
+			if v.hasTangents: return True
+		return False
 	def hasColours(self):
 		for i,v in self._vertices:
 			if v.hasColours: return True
@@ -772,6 +798,8 @@ class MonadoForgeMesh:
 		return [v for i,v in self._vertices if v.weightSetIndex == index]
 	def getVertexNormalsList(self):
 		return [v.normal for i,v in self._vertices]
+	def getVertexTangentsList(self):
+		return [v.tangent for i,v in self._vertices]
 	def getColourLayerList(self):
 		layers = []
 		for i,v in self._vertices:
@@ -797,6 +825,12 @@ class MonadoForgeMesh:
 			for i in f.vertexIndexes:
 				normalsList.append(self._vertices[i].normals[i])
 		return normalsList
+	def getLoopTangentsList(self):
+		tangentsList = []
+		for f in self._faces:
+			for i in f.vertexIndexes:
+				tangentsList.append(self._vertices[i].tangents[i])
+		return tangentsList
 	def getLoopColoursList(self):
 		coloursList = {}
 		for f in self._faces:

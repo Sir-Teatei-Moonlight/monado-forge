@@ -295,6 +295,16 @@ class MonadoForgeViewImportProperties(PropertyGroup):
 		description="Include lower-detail meshes in the import",
 		default=False,
 	)
+	importTangentData : BoolProperty(
+		name="Import Tangent Data",
+		description="Import tangent data as an extra two mesh attributes (tangent vector and bitangent polarity)",
+		default=False,
+	)
+	importOutlineData : BoolProperty(
+		name="Import Outline Data",
+		description="Import outline data and apply it as a vertex colour layer, a vertex weight group, and a solidify modifier (does not (yet) apply materials or clean up such extra models)",
+		default=True,
+	)
 	mergeSharpEdges : BoolProperty(
 		name="Merge Sharp Edges",
 		description="Merge vertices even if their normals are different, relying only on custom normals and Sharp Edges",
@@ -357,11 +367,6 @@ class MonadoForgeViewImportProperties(PropertyGroup):
 		min=0.0,
 		max=1.0,
 		subtype="COLOR",
-	)
-	importOutlineData : BoolProperty(
-		name="Import Outline Data",
-		description="Import outline data and apply it as a vertex colour layer, a vertex weight group, and a solidify modifier (does not (yet) apply materials or clean up such extra models)",
-		default=True,
 	)
 	maxOutlineThickness : FloatProperty(
 		name="Max Thickness",
@@ -524,6 +529,7 @@ class OBJECT_PT_MonadoForgeViewImportModelOptionsPanel(Panel):
 		col.prop(scn.monado_forge_import, "importToCursor")
 		if scn.monado_forge_main.game != "XC1":
 			col.prop(scn.monado_forge_import, "alsoImportLODs")
+			col.prop(scn.monado_forge_import, "importTangentData")
 		if scn.monado_forge_main.game != "XC1" and scn.monado_forge_main.game != "XCX":
 			col.prop(scn.monado_forge_import, "importOutlineData")
 		col.prop(scn.monado_forge_import, "mergeSharpEdges")
