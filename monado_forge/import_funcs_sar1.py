@@ -243,20 +243,20 @@ def import_wimdo(f, context, externalSkeleton=None):
 		
 		if bonesOffset > 0:
 			f.seek(modelsOffset+bonesOffset)
-			boneCount = readAndParseInt(f,4)
-			boneCount2 = readAndParseInt(f,4)
+			boneCount = readAndParseInt(f,4) # "render" bones?
+			boneCount2 = readAndParseInt(f,4) # "normal" bones?
 			boneHeaderOffset = readAndParseInt(f,4)
 			boneMatrixesOffset = readAndParseInt(f,4)
-			bonesUnknown1 = readAndParseInt(f,4)
-			bonesUnknown2 = readAndParseInt(f,4) # claimed by XBC2MD to be "positions offset", but that's part of the matrixes
+			bonesUnknown1 = readAndParseInt(f,4) # constraints offset?
+			bonesUnknown2 = readAndParseInt(f,4) # "bounds" offset? claimed by XBC2MD to be "positions" offset, but that's part of the matrixes
 			bonePairsOffset = readAndParseInt(f,4)
 			
 			for b in range(boneCount):
 				f.seek(modelsOffset+bonesOffset+boneHeaderOffset+b*6*4)
 				nameOffset = readAndParseInt(f,4)
 				boneUnknown1 = readAndParseInt(f,4)
-				boneType = readAndParseInt(f,4)
-				boneIndex = readAndParseInt(f,4)
+				boneType = readAndParseInt(f,4) # actually flags? 8,4,2,1 = [NoCameraOverlap,DistanceConstraint,BoundsOffset,FixedOffsetConstraint]
+				boneIndex = readAndParseInt(f,4) # actually two indexes? (constraint and parent?)
 				f.seek(modelsOffset+bonesOffset+nameOffset)
 				boneName = readStr(f)
 				f.seek(modelsOffset+bonesOffset+boneMatrixesOffset+b*16*4)

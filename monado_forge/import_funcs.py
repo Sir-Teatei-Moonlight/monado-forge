@@ -811,7 +811,6 @@ def import_library_node(nodeId, self, context):
 		# https://blender.stackexchange.com/questions/243048/fix-parallax-occlusion-mapping-from-the-side
 		nodeGroup = bpy.data.node_groups.new("TexInset","ShaderNodeTree")
 		newNodeGroupInput(nodeGroup,"NodeSocketVector","UV")
-		newNodeGroupInput(nodeGroup,"NodeSocketVector","Tangent")
 		newNodeGroupInput(nodeGroup,"NodeSocketColor","Normal Map")
 		newNodeGroupInput(nodeGroup,"NodeSocketFloat","Depth")
 		newNodeGroupOutput(nodeGroup,"NodeSocketVector","UV")
@@ -865,7 +864,6 @@ def import_library_node(nodeId, self, context):
 		nodeGroup.links.new(insetInput.outputs["Depth"],depthTripleNode.inputs[0])
 		nodeGroup.links.new(insetInput.outputs["Depth"],depthTripleNode.inputs[1])
 		nodeGroup.links.new(insetInput.outputs["Depth"],depthTripleNode.inputs[2])
-		nodeGroup.links.new(insetInput.outputs["Tangent"],tbnNode.inputs["Tangent"])
 		nodeGroup.links.new(insetInput.outputs["Normal Map"],tbnNode.inputs["Normal Map"])
 		nodeGroup.links.new(tbnNode.outputs["Tangent"],dotTangentNode.inputs[0])
 		nodeGroup.links.new(tbnNode.outputs["Bitangent"],dotBitangentNode.inputs[0])
