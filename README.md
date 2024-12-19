@@ -7,6 +7,10 @@ An addon for Blender for working with Xenoblade files. Adds a tab in the 3D view
 * **Blender 4.1.0** is the primary dev version. I do all work with this.
 * **Blender 3.3.1** is the secondary dev version. I try to ensure everything works in it, but nothing is guaranteed, and some things are unsupportable.
 
+## Installing
+
+Just grab the .zip of the source code, take the `monado_forge` folder, and put it in your Blender's `scripts\addons_contrib` folder. If there isn't `addons_contrib` in `scripts`, create it.
+
 ## Game support
 * :no_entry_sign: - Believed to be nonexistent or unnecessary.
 * :x: - Not supported, but planned (eventually).
