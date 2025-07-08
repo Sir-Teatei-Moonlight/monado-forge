@@ -34,13 +34,14 @@ def flip_selected_bones(self, context):
 
 def flip_all_r_bones_active_object(self, context):
 	nonFinalMirror = context.scene.monado_forge_modify.nonFinalMirror
+	dotMirror = context.scene.monado_forge_modify.dotMirror
 	angleEpsilon = context.scene.monado_forge_main.angleEpsilon
 	skeleton = bpy.context.view_layer.objects.active.data
 	bpy.ops.object.mode_set(mode="EDIT")
 	editBones = skeleton.edit_bones
 	flipCount = 0
 	for bone in editBones:
-		if bone.name.endswith("_R") or (nonFinalMirror and "_R_" in bone.name):
+		if bone.name.endswith("_R") or (nonFinalMirror and "_R_" in bone.name) or (dotMirror and bone.name.endswith(".R")):
 			bone.select = True
 			flipCount += 1
 		else:
@@ -55,6 +56,7 @@ def flip_all_r_bones_active_object(self, context):
 	return {"FINISHED"}
 
 def mirror_selected_bones(self, context, force=False):
+	dotMirror = context.scene.monado_forge_modify.dotMirror
 	positionEpsilon = context.scene.monado_forge_main.positionEpsilon
 	angleEpsilon = context.scene.monado_forge_main.angleEpsilon
 	skeleton = bpy.context.view_layer.objects.active.data
@@ -66,13 +68,19 @@ def mirror_selected_bones(self, context, force=False):
 		otherBone = None
 		if "_R" in bone.name: mirrorName = bone.name.replace("_R","_L")
 		if "_L" in bone.name: mirrorName = bone.name.replace("_L","_R")
+		if dotMirror:
+			if ".R" in bone.name: mirrorName = bone.name.replace(".R",".L")
+			if ".L" in bone.name: mirrorName = bone.name.replace(".L",".R")
 		try:
 			otherBone = editBones[mirrorName]
 		except KeyError:
 			if mirrorName:
 				print(bone.name+" is not mirrorable ("+mirrorName+" does not exist)")
 			else:
-				print(bone.name+" is not mirrorable (not _L or _R)")
+				if dotMirror:
+					print(bone.name+" is not mirrorable (not _L or _R or .L or .R)")
+				else:
+					print(bone.name+" is not mirrorable (not _L or _R)")
 			otherBone = None
 		if otherBone:
 			canAutoMirror,message = isBonePairIdentical(bone,otherBone,positionEpsilon,angleEpsilon,mirrorable=True)
@@ -90,6 +98,7 @@ def mirror_selected_bones(self, context, force=False):
 
 def mirror_all_r_bones_active_object(self, context):
 	nonFinalMirror = context.scene.monado_forge_modify.nonFinalMirror
+	dotMirror = context.scene.monado_forge_modify.dotMirror
 	positionEpsilon = context.scene.monado_forge_main.positionEpsilon
 	angleEpsilon = context.scene.monado_forge_main.angleEpsilon
 	skeleton = bpy.context.view_layer.objects.active.data
@@ -98,7 +107,7 @@ def mirror_all_r_bones_active_object(self, context):
 	mirroredCount = 0
 	outOfRangeCount = 0
 	for bone in editBones:
-		if bone.name.endswith("_R") or (nonFinalMirror and "_R_" in bone.name):
+		if bone.name.endswith("_R") or (nonFinalMirror and "_R_" in bone.name) or (dotMirror and bone.name.endswith(".R")):
 			bone.select = True
 		else:
 			bone.select = False
@@ -150,6 +159,7 @@ def fix_non_final_lr_selected_bones(self, context):
 	count = 0
 	for bone in bpy.context.selected_bones:
 		# assumption: no bone can have both _L_ and _R_
+		# reminder: .L and .R do not apply
 		if "_L_" in bone.name:
 			bone.name = bone.name.replace("_L_","_") + "_L"
 			count += 1
@@ -167,6 +177,67 @@ def fix_non_final_lr_bones_active_object(self, context):
 	for bone in editBones:
 		bone.select = True
 	fix_non_final_lr_selected_bones(self, context)
+	for bone in editBones:
+		bone.select = False
+	bpy.ops.object.mode_set(mode="OBJECT")
+	return {"FINISHED"}
+
+def bone_chirality_to_underscore_selected_bones(self, context):
+	skeleton = bpy.context.view_layer.objects.active.data
+	editBones = skeleton.edit_bones
+	count = 0
+	for bone in bpy.context.selected_bones:
+		if bone.name.endswith(".L"):
+			bone.name = bone.name[:-2] + "_L"
+			count += 1
+		if bone.name.endswith(".R"):
+			bone.name = bone.name[:-2] + "_R"
+			count += 1
+	self.report({"INFO"}, "Renamed "+str(count)+" bones.")
+	return {"FINISHED"}
+
+def bone_chirality_to_underscore_active_object(self, context):
+	skeleton = bpy.context.view_layer.objects.active.data
+	bpy.ops.object.mode_set(mode="EDIT")
+	editBones = skeleton.edit_bones
+	count = 0
+	for bone in editBones:
+		bone.select = True
+	bone_chirality_to_underscore_selected_bones(self, context)
+	for bone in editBones:
+		bone.select = False
+	bpy.ops.object.mode_set(mode="OBJECT")
+	return {"FINISHED"}
+
+def bone_chirality_to_dot_selected_bones(self, context):
+	nonFinalMirror = context.scene.monado_forge_modify.nonFinalMirror
+	skeleton = bpy.context.view_layer.objects.active.data
+	editBones = skeleton.edit_bones
+	count = 0
+	for bone in bpy.context.selected_bones:
+		if bone.name.endswith("_L"):
+			bone.name = bone.name[:-2] + ".L"
+			count += 1
+		if nonFinalMirror and "_L_" in bone.name:
+			bone.name = bone.name.replace("_L_","_") + ".L"
+			count += 1
+		if bone.name.endswith("_R"):
+			bone.name = bone.name[:-2] + ".R"
+			count += 1
+		if nonFinalMirror and "_R_" in bone.name:
+			bone.name = bone.name.replace("_R_","_") + ".R"
+			count += 1
+	self.report({"INFO"}, "Renamed "+str(count)+" bones.")
+	return {"FINISHED"}
+
+def bone_chirality_to_dot_active_object(self, context):
+	skeleton = bpy.context.view_layer.objects.active.data
+	bpy.ops.object.mode_set(mode="EDIT")
+	editBones = skeleton.edit_bones
+	count = 0
+	for bone in editBones:
+		bone.select = True
+	bone_chirality_to_dot_selected_bones(self, context)
 	for bone in editBones:
 		bone.select = False
 	bpy.ops.object.mode_set(mode="OBJECT")

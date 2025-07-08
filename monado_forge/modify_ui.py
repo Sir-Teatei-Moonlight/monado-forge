@@ -290,6 +290,100 @@ class MonadoForgeNonFinalLRFixSelectedOperator(Operator):
 			return {"CANCELLED"}
 		return {"FINISHED"}
 
+class MonadoForgeBoneChiralityToUnderscoreAllOperator(Operator):
+	bl_idname = "object.monado_forge_chi_to_under_all_operator"
+	bl_label = "Xenoblade Skeleton Chirality To Underscore All Operator"
+	bl_description = "Edits all bone names from .L/.R to _L/_R"
+	bl_options = {"REGISTER","UNDO"}
+	
+	@classmethod
+	def poll(cls, context):
+		activeObject = context.view_layer.objects.active
+		if not activeObject: return False
+		if activeObject.type != "ARMATURE": return False
+		if activeObject.mode == "POSE": return False
+		return True
+	
+	def execute(self, context):
+		try:
+			bone_chirality_to_underscore_active_object(self, context)
+		except Exception:
+			traceback.print_exc()
+			self.report({"ERROR"}, "Unexpected error; see console")
+			return {"CANCELLED"}
+		return {"FINISHED"}
+
+class MonadoForgeBoneChiralityToUnderscoreSelectedOperator(Operator):
+	bl_idname = "object.monado_forge_chi_to_under_selected_operator"
+	bl_label = "Xenoblade Skeleton Chirality To Underscore Selected Operator"
+	bl_description = "Edits selected bone names from .L/.R to _L/_R"
+	bl_options = {"REGISTER","UNDO"}
+	
+	@classmethod
+	def poll(cls, context):
+		activeObject = context.view_layer.objects.active
+		if not activeObject: return False
+		if activeObject.type != "ARMATURE": return False
+		if activeObject.mode != "EDIT": return False
+		return True
+	
+	def execute(self, context):
+		try:
+			# edit mode is assumed (button is edit mode limited)
+			bone_chirality_to_underscore_selected_bones(self, context)
+		except Exception:
+			traceback.print_exc()
+			self.report({"ERROR"}, "Unexpected error; see console")
+			return {"CANCELLED"}
+		return {"FINISHED"}
+
+class MonadoForgeBoneChiralityToDotAllOperator(Operator):
+	bl_idname = "object.monado_forge_chirality_to_dot_all_operator"
+	bl_label = "Xenoblade Skeleton Chirality To Dot All Operator"
+	bl_description = "Edits all bone names from _L/_R to .L/.R"
+	bl_options = {"REGISTER","UNDO"}
+	
+	@classmethod
+	def poll(cls, context):
+		activeObject = context.view_layer.objects.active
+		if not activeObject: return False
+		if activeObject.type != "ARMATURE": return False
+		if activeObject.mode == "POSE": return False
+		return True
+	
+	def execute(self, context):
+		try:
+			bone_chirality_to_dot_active_object(self, context)
+		except Exception:
+			traceback.print_exc()
+			self.report({"ERROR"}, "Unexpected error; see console")
+			return {"CANCELLED"}
+		return {"FINISHED"}
+
+class MonadoForgeBoneChiralityToDotSelectedOperator(Operator):
+	bl_idname = "object.monado_forge_chirality_to_dot_selected_operator"
+	bl_label = "Xenoblade Skeleton Chirality To Dot Selected Operator"
+	bl_description = "Edits selected bone names from _L/_R to .L/.R"
+	bl_options = {"REGISTER","UNDO"}
+	
+	@classmethod
+	def poll(cls, context):
+		activeObject = context.view_layer.objects.active
+		if not activeObject: return False
+		if activeObject.type != "ARMATURE": return False
+		if activeObject.mode != "EDIT": return False
+		return True
+	
+	def execute(self, context):
+		try:
+			# edit mode is assumed (button is edit mode limited)
+			bone_chirality_to_dot_selected_bones(self, context)
+		except Exception:
+			traceback.print_exc()
+			self.report({"ERROR"}, "Unexpected error; see console")
+			return {"CANCELLED"}
+		return {"FINISHED"}
+
 class MonadoForgeMergeSelectedToActiveOperator(Operator):
 	bl_idname = "object.monado_forge_merge_selected_to_active_operator"
 	bl_label = "Xenoblade Skeleton Merge Selected To Active Operator"
@@ -351,6 +445,11 @@ class MonadoForgeViewModifyToolsProperties(PropertyGroup):
 		name="Accept Non-Final L/R",
 		description="Treat non-final _L_ and _R_ in names as being mirrored",
 		default=True,
+	)
+	dotMirror : BoolProperty(
+		name="Also Accept .L/.R",
+		description="Treat Blender-style .L and .R as being mirrored (final only)",
+		default=False,
 	)
 	boneResizeSize : FloatProperty(
 		name="Bone Resize",
@@ -415,6 +514,7 @@ class OBJECT_PT_MonadoForgeViewModifyPanel(Panel):
 		activeObject = bpy.context.view_layer.objects.active
 		settingsPanel = col.column(align=True)
 		settingsPanel.prop(scn.monado_forge_modify, "nonFinalMirror")
+		settingsPanel.prop(scn.monado_forge_modify, "dotMirror")
 
 class OBJECT_PT_MonadoForgeViewModifySkeletonPanel(Panel):
 	bl_idname = "OBJECT_PT_MonadoForgeViewModifySkeletonPanel"
@@ -440,6 +540,9 @@ class OBJECT_PT_MonadoForgeViewModifySkeletonPanel(Panel):
 			modifyPanel.operator(MonadoForgeBoneReAxisSelectedOperator.bl_idname, text="Re-Axis Selected Bones", icon="EMPTY_ARROWS")
 			modifyPanel.separator()
 			modifyPanel.operator(MonadoForgeNonFinalLRFixSelectedOperator.bl_idname, text="Fix Non-Final L/R Names", icon="TRACKING_FORWARDS_SINGLE")
+			chiralityPanel = modifyPanel.row(align=True)
+			chiralityPanel.operator(MonadoForgeBoneChiralityToUnderscoreSelectedOperator.bl_idname, text="To _L/_R", icon="ARROW_LEFTRIGHT")
+			chiralityPanel.operator(MonadoForgeBoneChiralityToDotSelectedOperator.bl_idname, text="To .L/.R", icon="ARROW_LEFTRIGHT")
 		else:
 			modifyPanel.operator(MonadoForgeBoneResizeAllOperator.bl_idname, text="Resize Bones", icon="FIXED_SIZE")
 			modifyPanel.separator()
@@ -450,6 +553,9 @@ class OBJECT_PT_MonadoForgeViewModifySkeletonPanel(Panel):
 			modifyPanel.operator(MonadoForgeBoneReAxisAllOperator.bl_idname, text="Re-Axis Bones", icon="EMPTY_ARROWS")
 			modifyPanel.separator()
 			modifyPanel.operator(MonadoForgeNonFinalLRFixAllOperator.bl_idname, text="Fix Non-Final L/R Names", icon="TRACKING_FORWARDS_SINGLE")
+			chiralityPanel = modifyPanel.row(align=True)
+			chiralityPanel.operator(MonadoForgeBoneChiralityToUnderscoreAllOperator.bl_idname, text="To _L/_R", icon="ARROW_LEFTRIGHT")
+			chiralityPanel.operator(MonadoForgeBoneChiralityToDotAllOperator.bl_idname, text="To .L/.R", icon="ARROW_LEFTRIGHT")
 			modifyPanel.separator()
 			modifyPanel.operator(MonadoForgeMergeSelectedToActiveOperator.bl_idname, text="Merge Selected to Active", icon="AUTOMERGE_ON")
 			modifyPanel.prop(scn.monado_forge_modify, "safeMerge")
@@ -491,6 +597,10 @@ classes = (
 			MonadoForgeBoneReAxisSelectedOperator,
 			MonadoForgeNonFinalLRFixAllOperator,
 			MonadoForgeNonFinalLRFixSelectedOperator,
+			MonadoForgeBoneChiralityToUnderscoreAllOperator,
+			MonadoForgeBoneChiralityToUnderscoreSelectedOperator,
+			MonadoForgeBoneChiralityToDotAllOperator,
+			MonadoForgeBoneChiralityToDotSelectedOperator,
 			MonadoForgeMergeSelectedToActiveOperator,
 			MonadoForgeLinkShapeKeysOperator,
 			MonadoForgeViewModifyToolsProperties,
